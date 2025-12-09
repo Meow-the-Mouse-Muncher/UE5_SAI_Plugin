@@ -1,0 +1,42 @@
+Resolution: [1920, 1080]
+Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/Dataset"
+File_Name_Format: "{sequence_name}/{render_pass}/{frame_number}"
+Motion_Blur: false
+Anti_Alias:
+    enable: true
+    spatial_samples: 8
+    temporal_samples: 1
+
+Render_Passes:
+    -
+        pass_name: 'rgb'
+        enable: true
+        ext: "png"  # png, jpeg, bmp, exr
+    -
+        pass_name: 'depth'
+        enable: false
+        ext: "exr"
+    -
+        pass_name: 'diffuse'
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'normal'
+        enable: false
+        ext: "exr"
+    -
+        pass_name: 'metallic'
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'roughness'
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'specular'
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'basecolor'
+        enable: false
+        ext: "png"

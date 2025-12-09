@@ -1,0 +1,21 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug: Run Cmd Async",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/misc/run_cmd_async.py",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "python": "d:\\anaconda3\\envs\\MVSAI\\python.exe", 
+            "args": [
+                "--config_file", "misc/user.json"
+            ],
+            "justMyCode": true,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        }
+    ]
+}

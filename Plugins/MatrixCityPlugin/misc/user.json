@@ -1,0 +1,9 @@
+{
+  "ue_command": "/home/user1/Unreal_Engine_5.6/Engine/Binaries/Linux/UnrealEditor",
+  "ue_project": "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/PCGBiomeForestPoplar.uproject",
+  "ue_map": "/Game/Map/main", 
+  "camera_name": "CineCameraActor1",
+  "render_config": "misc/render_config_common.yaml",
+  "python_script": "Content/Python/pipeline.py"
+}
+

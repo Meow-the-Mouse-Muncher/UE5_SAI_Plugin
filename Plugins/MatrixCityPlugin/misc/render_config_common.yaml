@@ -1,0 +1,41 @@
+_BASE_: render_config.yaml
+Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/3dgs_data"
+
+Anti_Alias:
+    enable: true
+    spatial_samples: 8
+    temporal_samples: 1
+
+Render_Passes:
+    -
+        pass_name: 'rgb'
+        enable: true
+        ext: "png"  # png, jpeg, bmp, exr
+    -
+        pass_name: 'depth'
+        enable: true
+        ext: "exr"
+    -
+        pass_name: 'normal'  #法线
+        enable: false
+        ext: "exr"
+    -
+        pass_name: 'diffuse' #漫反射图
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'metallic' #金属度
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'roughness' #粗糙度
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'specular' #高光/镜面反射
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'basecolor' #基础色
+        enable: true
+        ext: "png"
