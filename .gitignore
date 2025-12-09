@@ -1,1 +1,8 @@
-/Saved*
+# 先忽略全部
+*
+# 但保留 .gitignore 自身（否则下一行也会被忽略）
+!.gitignore
+!/scripts/
+!/scripts/**
+!/Plugins/
+!/Plugins/**
