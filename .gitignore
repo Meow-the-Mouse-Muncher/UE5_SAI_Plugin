@@ -6,3 +6,5 @@
 !/scripts/**
 !/Plugins/
 !/Plugins/**
+!/pipeline_automation/
+!/pipeline_automation/**
