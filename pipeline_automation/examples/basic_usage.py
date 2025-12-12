@@ -8,6 +8,14 @@ and use the core components.
 from pathlib import Path
 import logging
 
+# Ensure project root is on sys.path when running this example directly.
+# Preferred usage is: `python -m pipeline_automation.examples.basic_usage`
+import sys
+from pathlib import Path as _Path
+_project_root = _Path(__file__).resolve().parents[2]
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from pipeline_automation import (
     PipelineConfig, ConfigManager, ProgressTracker, PipelineLogger,
     create_default_pipeline_config, create_sample_config
@@ -26,7 +34,7 @@ def main():
     
     # Create sample configuration files
     config_dir = example_dir / "config"
-    create_sample_config(config_dir)
+    # create_sample_config(config_dir)
     
     logging.info("Sample configuration files created")
     
@@ -87,12 +95,16 @@ def main():
                 time.sleep(0.1)  # Quick simulation
                 
                 # Create mock session result
-                from pipeline_automation.models import SamplingSession
+                from pipeline_automation.models import SamplingSession, MapInfo, TargetObject
+                
+                # Create mock objects
+                map_info = MapInfo(name=map_name, path=f"/Content/Map/{map_name}")
+                target = TargetObject(name=target_name, location=(0, 0, 100))
+                
                 session = SamplingSession(
-                    map_name=map_name,
-                    target_name=target_name,
+                    map_info=map_info,
+                    target=target,
                     height_offset=height,
-                    trajectory_name="box_trajectory",
                     session_start_time=time.time() - 0.1,
                     session_end_time=time.time()
                 )

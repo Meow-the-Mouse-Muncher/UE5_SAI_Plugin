@@ -107,6 +107,7 @@ class MapManager(BaseManager):
             
             # Find all .umap files in the directory
             map_files = list(self.maps_directory.glob("*.umap"))
+            print(f"map is found ")
             
             if not map_files:
                 self._log_warning(f"No .umap files found in {self.maps_directory}")

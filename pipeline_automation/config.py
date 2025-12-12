@@ -354,7 +354,7 @@ def create_sample_config(output_dir: Path) -> None:
     # Create sample pipeline config
     sample_config = {
         'maps_directory': './Content/Map',
-        'trajectory_file_path': './config/trajectory.json',
+        'trajectory_file_path': f'./{output_dir}/trajectory.json',
         'output_directory': './output',
         'height_variants': [0.0, 500.0, 1000.0, 2000.0],
         'max_retry_attempts': 3,

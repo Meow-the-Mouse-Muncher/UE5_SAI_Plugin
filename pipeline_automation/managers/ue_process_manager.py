@@ -38,9 +38,14 @@ class UEProcessManager(BaseManager):
     - Process lifecycle management
     """
     
-    def __init__(self, **kwargs):
+    def __init__(self, project_path: Optional[Path] = None, 
+                 ue_executable_path: Optional[Path] = None, **kwargs):
         """Initialize UE Process Manager"""
         super().__init__(**kwargs)
+        
+        # UE5 paths
+        self.project_path = Path(project_path) if project_path else None
+        self.ue_executable_path = Path(ue_executable_path) if ue_executable_path else None
         
         # Process management
         self.process: Optional[subprocess.Popen] = None
@@ -91,12 +96,12 @@ class UEProcessManager(BaseManager):
             self._log_error(f"Failed to initialize UE Process Manager: {e}")
             return False
     
-    async def start_ue_process(self, command: str, working_dir: Optional[Path] = None) -> bool:
+    async def start_ue_process(self, command: Optional[str] = None, working_dir: Optional[Path] = None) -> bool:
         """
         Start UE process with monitoring
         
         Args:
-            command: UE command to execute
+            command: UE command to execute (optional, will use configured paths)
             working_dir: Working directory for the process
             
         Returns:
@@ -107,22 +112,24 @@ class UEProcessManager(BaseManager):
             return True
         
         try:
+            # Build command from configured paths if not provided
+            if command is None:
+                if not self.ue_executable_path or not self.project_path:
+                    raise ValueError("UE executable path and project path must be configured")
+                
+                # Expand ~ in path
+                ue_path = str(Path(self.ue_executable_path).expanduser())
+                
+                # Normal UE5 startup command for VNC environment
+                command = f"{ue_path} {self.project_path}"
+            
             self.process_command = command
             self.is_ue_loaded = False
             
             self._log_info(f"Starting UE process: {command}")
             
-            # Start process
-            if working_dir:
-                self.process = subprocess.Popen(
-                    command, 
-                    shell=True, 
-                    cwd=str(working_dir),
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE
-                )
-            else:
-                self.process = subprocess.Popen(command, shell=True)
+            # Start process - simpler version without pipes to avoid blocking
+            self.process = subprocess.Popen(command, shell=True)
             
             self._log_info(f"UE process started with PID: {self.process.pid}")
             
@@ -432,20 +439,28 @@ class UEProcessManager(BaseManager):
                 try:
                     if self.process.poll() is None:
                         self.process.kill()
+                        # Wait a bit for process to terminate
+                        import time
+                        time.sleep(1)
                 except:
                     pass
+                self.process = None
             
             if self.socket_server:
                 try:
                     self.socket_server.close()
                 except:
                     pass
+                self.socket_server = None
             
             if self.client_socket:
                 try:
                     self.client_socket.close()
                 except:
                     pass
+                self.client_socket = None
+                
+            self.is_ue_loaded = False
         except:
             pass
         

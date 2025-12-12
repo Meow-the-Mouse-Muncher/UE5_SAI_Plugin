@@ -544,7 +544,7 @@ class PipelineController:
                 self.trajectory_manager.cleanup()
             
             if hasattr(self, 'ue_process_manager') and self.ue_process_manager is not None:
-                await self.ue_process_manager.cleanup()
+                self.ue_process_manager.cleanup()
             
             # Save state for potential resumption
             await self._save_pipeline_state()
