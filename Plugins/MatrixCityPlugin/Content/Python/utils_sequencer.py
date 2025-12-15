@@ -596,7 +596,7 @@ def main(target_actor=None, map_name=None):
     # 1. create a new level sequence
     # 根据地图名和目标物名生成序列名称
     if map_name and target_actor:
-        target_name = target_actor.get_name()
+        target_name = target_actor.get_actor_label()
         sequence_name = f'{map_name}_{target_name}_sequence'
     else:
         sequence_name = 'aerial_train'  # 默认名称

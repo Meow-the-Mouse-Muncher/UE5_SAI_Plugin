@@ -138,6 +138,7 @@ def main(render_config_path):
         log_msg_with_socket(PIEExecutor, f'[*] Completed processing map: {map_name}')
     
     log_msg_with_socket(PIEExecutor, '[*] All maps and targets processed successfully!')
+    # unreal.SystemLibrary.quit_editor()
 
 
 if __name__ == "__main__":
