@@ -403,46 +403,6 @@ def add_level_to_sequence(
     save_current_level()
 
 
-def add_spawnable_camera_to_sequence(
-    sequence: unreal.LevelSequence,
-    camera_trans: List[SequenceKey],
-    camera_class: Type[unreal.CameraActor]=unreal.CameraActor,
-    camera_fov: float=90.,
-    seq_length: Optional[int]=None,
-    key_type: str="CONSTANT",
-) -> None:
-
-    # get sequence settings
-    if seq_length is None:
-        seq_length = sequence.get_playback_end()
-
-    # create a camera actor & add it to the sequence
-    camera_binding = sequence.add_spawnable_from_class(camera_class)
-    camera_actor = get_spawnable_actor_from_binding(sequence, camera_binding)
-    camera_component_binding = sequence.add_possessable(camera_actor.camera_component)
-    camera_component_binding.set_parent(camera_binding)
-
-    # set the camera FOV
-    add_property_float_track_to_binding(camera_component_binding, 'FieldOfView', camera_fov)
-
-    # add camera cut track to sequence
-    camera_cut_track = sequence.add_track(unreal.MovieSceneCameraCutTrack)
-
-    # add a camera cut track for this camera, make sure the camera cut is stretched to the -1 mark
-    camera_cut_section = camera_cut_track.add_section()
-    camera_cut_section.set_start_frame(-1)
-    camera_cut_section.set_end_frame(seq_length)
-
-    # set the camera cut to use this camera
-    camera_binding_id = unreal.MovieSceneObjectBindingID()
-    camera_binding_id.set_editor_property("Guid", camera_binding.get_id())
-    camera_cut_section.set_editor_property("CameraBindingID", camera_binding_id)
-
-    # camera_binding_id = sequence.make_binding_id(camera_binding, unreal.MovieSceneObjectBindingSpace.LOCAL)
-    # camera_cut_section.set_camera_binding_id(camera_binding_id)
-
-    # set the camera location and rotation
-    add_transforms_to_binding(camera_binding, camera_trans, key_type)
 
 
 def add_possessable_camera_to_sequence(
@@ -478,48 +438,6 @@ def add_possessable_camera_to_sequence(
     # set the camera location and rotation (应用轨迹)
     add_transforms_to_binding(camera_binding, camera_trans, key_type)
 
-
-def add_spawnable_actor_to_sequence(
-    sequence: unreal.LevelSequence,
-    actor_asset: Union[unreal.SkeletalMesh, unreal.StaticMesh],
-    actor_trans: List[SequenceKey],
-    actor_id: Optional[str]=None,
-    actor_stencil_value: int=1,
-    animation_asset: Optional[unreal.AnimSequence]=None,
-    seq_fps: Optional[float]=None,
-    seq_length: Optional[int]=None,
-    key_type: str="CONSTANT",
-) -> unreal.Actor:
-
-    # get sequence settings
-    if seq_fps is None:
-        seq_fps = get_sequence_fps(sequence)
-    if seq_length is None:
-        seq_length = get_animation_length(animation_asset, seq_fps)
-
-    # add actor to sequence
-    actor_binding = sequence.add_spawnable_from_instance(actor_asset)
-    actor = get_spawnable_actor_from_binding(sequence, actor_binding)
-
-    # mesh_component = actor.skeletal_mesh_component
-    mesh_component = get_actor_mesh_component(actor)
-    mesh_component_binding = sequence.add_possessable(mesh_component)
-
-    # set stencil value
-    add_property_bool_track_to_binding(mesh_component_binding, 'bRenderCustomDepth', True)
-    add_property_int_track_to_binding(mesh_component_binding, 'CustomDepthStencilValue', actor_stencil_value)
-
-    if actor_id:
-        actor_binding.set_name(actor_id)
-
-    # add transform
-    add_transforms_to_binding(actor_binding, actor_trans, key_type)
-
-    # add animation
-    if animation_asset:
-        add_animation_to_binding(actor_binding, animation_asset, seq_length, seq_fps)
-    
-    return actor
 
 
 def generate_sequence(
@@ -645,340 +563,75 @@ def generate_train_box(line1, line2, z, current_frame):
         current_frame=current_frame+1
     return camera_trans, current_frame
 
-def generate_test_box(line1, line2, z, current_frame):
-    
-    x11, y11, x12, y12=line1
-    x21, y21, x22, y22=line2
-    assert(y11==y12)
-    assert(y21==y22)
-    assert(x11==x21)
-    assert(x12==x22)
-    w=math.dist([x11, y11], [x12, y12])
-    h=math.dist([x11, y11], [x21, y21])
-    interval=4501 # test interval
-    w_instance=int(w/interval)+2
-    h_instance=int(h/interval)+1
-    x_start=np.linspace(x11, x12, w_instance)
-    y_start=np.linspace(y11, y12, w_instance)
-    x_end=np.linspace(x21, x22, w_instance)
-    y_end=np.linspace(y21, y22, w_instance)
-    camera_trans=[]
-    
-    # test
-    for i in range(w_instance):
-        pitch=np.random.randint(-60,-44,size=1)
-        yaw=np.random.randint(0,361,size=1)
-        camera_trans.append( 
-            SequenceKey(
-            frame=current_frame, 
-            location=(x_start[i], y_start[i], z),
-            rotation=(0, pitch, yaw)
-            )
-        )
-        current_frame=current_frame+h_instance
-        camera_trans.append( 
-            SequenceKey(
-            frame=current_frame, 
-            location=(x_end[i], y_end[i], z),
-            rotation=(0, pitch, yaw)
-            )
-        )
-        current_frame=current_frame+1
-    return camera_trans, current_frame
-    
 
-def generate_train_line(point1, point2, z, yaw, current_frame, dense=False):
-
-    distance=math.dist(point1, point2)
-    if dense==True:
-        instance=int(distance/100)+1 # dense
-    else:
-        instance=int(distance/500)+1 # sparse
-
-    camera_trans=[]
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 0, yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 0, yaw)
-        )
-    )
-    current_frame=current_frame+1
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 0, 90+yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 0, 90+yaw)
-        )
-    )
-    current_frame=current_frame+1
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 0, 180+yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 0, 180+yaw)
-        )
-    )
-    current_frame=current_frame+1
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 0, 270+yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 0, 270+yaw)
-        )
-    )
-    current_frame=current_frame+1
-    # camera_trans.append(
-    #     SequenceKey(
-    #         frame=current_frame, 
-    #         location=(point1[0], point1[1], z),
-    #         rotation=(0, -90, yaw)
-    #     )
-    # )
-    # current_frame=current_frame+instance
-    # camera_trans.append(
-    #     SequenceKey(
-    #         frame=current_frame, 
-    #         location=(point2[0], point2[1], z),
-    #         rotation=(0, -90, yaw)
-    #     )
-    # )
-    # current_frame=current_frame+1
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 90, yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 90, yaw)
-        )
-    )
-    current_frame=current_frame+1
-    return camera_trans, current_frame
-
-def generate_test_line(point1, point2, z, yaw, current_frame):
-    # for test
-    point1[0]=point1[0]+math.cos(math.radians(yaw))*570
-    point1[1]=point1[1]+math.sin(math.radians(yaw))*570
-    point2[0]=point2[0]-math.cos(math.radians(yaw))*570
-    point2[1]=point2[1]-math.sin(math.radians(yaw))*570
-    yaw=np.random.randint(0,90,size=1)
-
-    distance=math.dist(point1, point2)
-    instance = int(distance/4830)+1 # test
-
-    camera_trans=[]
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 0, yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 0, yaw)
-        )
-    )
-    current_frame=current_frame+1
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 0, 90+yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 0, 90+yaw)
-        )
-    )
-    current_frame=current_frame+1
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 0, 180+yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 0, 180+yaw)
-        )
-    )
-    current_frame=current_frame+1
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 0, 270+yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 0, 270+yaw)
-        )
-    )
-    current_frame=current_frame+1
-    # camera_trans.append(
-    #     SequenceKey(
-    #         frame=current_frame, 
-    #         location=(point1[0], point1[1], z),
-    #         rotation=(0, -90, yaw)
-    #     )
-    # )
-    # current_frame=current_frame+instance
-    # camera_trans.append(
-    #     SequenceKey(
-    #         frame=current_frame, 
-    #         location=(point2[0], point2[1], z),
-    #         rotation=(0, -90, yaw)
-    #     )
-    # )
-    # current_frame=current_frame+1
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point1[0], point1[1], z),
-            rotation=(0, 90, yaw)
-        )
-    )
-    current_frame=current_frame+instance
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame, 
-            location=(point2[0], point2[1], z),
-            rotation=(0, 90, yaw)
-        )
-    )
-    current_frame=current_frame+1
-    return camera_trans, current_frame
-
-
-def main():
+def main(target_actor=None, map_name=None):
     config_file = PLUGIN_ROOT / 'misc/user.json'
     with open(config_file, 'r') as f:
         config = json.load(f)
         
-    level = config.get('ue_map', '/Game/Map/main') # 从配置中获取 map，如果不存在则使用默认值
-    # [新增] 从配置中获取相机名称，默认为 'CineCameraActor1'
+    # 如果没有传入地图名，从配置中获取
+    if map_name is None:
+        level = config.get('ue_map', '/Game/Map/main')
+    else:
+        level = f'/Game/Map/{map_name}'
+        
+    # 从配置中获取相机名称，默认为 'CineCameraActor1'
     target_camera_name = config.get('camera_name', 'CineCameraActor1') 
     sequence_dir = '/Game/Sequences'
     seq_fps = 24
     current_frame=0
     
-    unreal.log(f"正在加载地图: {level} ...")
-    # 使用 EditorLoadingAndSavingUtils 加载地图
-    # 注意：这会关闭当前未保存的关卡，但在自动化流程中通常是可以接受的
-    if not unreal.EditorLoadingAndSavingUtils.load_map(level):
-        error_msg = f"CRITICAL ERROR: 无法加载地图: {level}。请检查路径是否正确。"
-        unreal.log_error(error_msg)
-        raise RuntimeError(error_msg)
+    # 如果已经在正确的地图中，就不需要重新加载
+    current_world = unreal.EditorLevelLibrary.get_editor_world()
+    current_level_name = current_world.get_name()
     
-    # 确保地图加载后，世界上下文已更新
-    unreal.log(f"地图 {level} 加载成功。")
-
+    if map_name and current_level_name != map_name:
+        unreal.log(f"正在加载地图: {level} ...")
+        if not unreal.EditorLoadingAndSavingUtils.load_map(level):
+            error_msg = f"CRITICAL ERROR: 无法加载地图: {level}。请检查路径是否正确。"
+            unreal.log_error(error_msg)
+            raise RuntimeError(error_msg)
+        unreal.log(f"地图 {level} 加载成功。")
     
     # 1. create a new level sequence
-    sequence_name='aerial_train'  # 定义生成的序列轨迹的名称
-    fov=40
-    camera_trans, current_frame=generate_train_box([33900, 38500, 40000, 38500], [33900, 46500, 40000, 46500], 6500, current_frame) 
-    # 37260.0 cm 43080.0 cm  800
-    # exmaples for generating testing set for aerial data
-    # sequence_name='aerial_test'
-    # fov=45
-    # camera_trans, current_frame=generate_test_box([-95000, 5000,-17000, 5000], [-95000, 33000, -17000, 33000], 15000, current_frame) # block 1 test
-
-    # exmaples for generating training(sparse) set for street data
-    # sequence_name='street_train'
-    # fov=90
-    # camera_trans=[]
-    # tmp_camera_trans, current_frame=generate_train_line([-85151.664062, 7755.524902], [-18491.283203, 46241.914062], 300, 30, current_frame)
-    # camera_trans.extend(tmp_camera_trans)
-    # tmp_camera_trans, current_frame=generate_train_line([-19102.925781, 46310.578125], [-10849.427734, 49813.980469], 300, 23, current_frame)
-    # camera_trans.extend(tmp_camera_trans)
-
-    # exmaples for generating training(dense) set for street data
-    # sequence_name='street_train_dense'
-    # fov=90
-    # camera_trans=[]
-    # tmp_camera_trans, current_frame=generate_train_line([-85151.664062, 7755.524902], [-18491.283203, 46241.914062], 300, 30, current_frame, dense=True)
-    # camera_trans.extend(tmp_camera_trans)
-    # tmp_camera_trans, current_frame=generate_train_line([-19102.925781, 46310.578125], [-10849.427734, 49813.980469], 300, 23, current_frame, dense=True)
-    # camera_trans.extend(tmp_camera_trans)
+    # 根据地图名和目标物名生成序列名称
+    if map_name and target_actor:
+        target_name = target_actor.get_name()
+        sequence_name = f'{map_name}_{target_name}_sequence'
+    else:
+        sequence_name = 'aerial_train'  # 默认名称
+        
+    fov = 40
     
-    # exmaples for generating testing set for street data
-    # sequence_name='street_test'
-    # fov=90
-    # camera_trans=[]
-    # tmp_camera_trans, current_frame=generate_test_line([-85151.664062, 7755.524902], [-18491.283203, 46241.914062], 300, 30, current_frame)
-    # camera_trans.extend(tmp_camera_trans)
-    # tmp_camera_trans, current_frame=generate_test_line([-19102.925781, 46310.578125], [-10849.427734, 49813.980469], 300, 23, current_frame)
-    # camera_trans.extend(tmp_camera_trans)
+    # 如果有目标物，围绕目标物生成轨迹
+    if target_actor:
+        target_location = target_actor.get_actor_location()
+        target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
+        
+        # 围绕目标物生成一个盒子轨迹，可以根据需要调整参数
+        box_size = 2000  # 盒子大小
+        height = target_z + 1000  # 相机高度
+        
+        camera_trans, current_frame = generate_train_box(
+            [target_x - box_size, target_y - box_size, target_x + box_size, target_y - box_size], 
+            [target_x - box_size, target_y + box_size, target_x + box_size, target_y + box_size], 
+            height, 
+            current_frame
+        )
+    else:
+        # 使用默认轨迹
+        camera_trans, current_frame = generate_train_box(
+            [33900, 38500, 40000, 38500], 
+            [33900, 46500, 40000, 46500], 
+            6500, 
+            current_frame
+        )
+ 
 
     seq_length=current_frame  #使用计算出的序列长度
     # 生成新的序列资产，保证长度fps等设置
     new_sequence = generate_sequence(sequence_dir, sequence_name, seq_fps, seq_length) 
 
-    # # 将预先设置好的相机设置和相机轨迹添加到新创建的序列中
-    # add_spawnable_camera_to_sequence(
-    #     new_sequence, 
-    #     camera_trans=camera_trans,
-    #     camera_class=unreal.CineCameraActor,
-    #     camera_fov=fov,
-    #     seq_length=seq_length,
-    #     key_type="LINEAR"
-    # )
     # 查找并使用场景中的 CineCameraActor
     found_camera = None
     actor_system = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)

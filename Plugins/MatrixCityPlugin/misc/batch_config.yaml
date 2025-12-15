@@ -1,0 +1,50 @@
+# 批量渲染配置文件
+_BASE_: render_config.yaml
+
+# 基础渲染设置
+Resolution: [1920, 1080]
+Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/batch_render_data"
+File_Name_Format: "{sequence_name}/{render_pass}/{frame_number}"
+Motion_Blur: false
+
+Anti_Alias:
+    enable: true
+    spatial_samples: 8
+    temporal_samples: 1
+
+# 批量处理设置
+Batch_Settings:
+  # 地图文件夹路径
+  maps_folder: "/Game/Map"
+  
+  # 目标物前缀
+  target_prefix: "Target_"
+  
+  # 遮挡物前缀
+  occlusion_prefix: "SM_"
+  
+  # 相机名称
+  camera_name: "CineCameraActor1"
+  
+  # 序列设置
+  sequence_fps: 24
+  sequence_folder: "/Game/Sequences"
+  
+  # 轨迹生成参数
+  trajectory_settings:
+    box_size: 20000  # 围绕目标物的盒子大小
+    camera_height_offset: 10000  # 相机高度偏移
+    
+# 输出设置
+Output_Settings:
+  # 基础输出路径
+  base_output_path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/batch_render_data"
+  
+  # 文件命名格式
+  # 支持的变量: {map_name}, {target_name}, {suffix}, {render_pass}, {frame_number}
+  file_name_format: "{map_name}_{target_name}_{suffix}/{render_pass}/{frame_number}"
+  
+  # 后缀设置
+  occlusion_suffix: "occ"    # 有遮挡物的后缀
+  ground_truth_suffix: "GT"  # 无遮挡物的后缀
+

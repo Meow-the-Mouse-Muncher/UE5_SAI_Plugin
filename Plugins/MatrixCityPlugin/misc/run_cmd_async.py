@@ -208,7 +208,6 @@ def main(config_file: str='misc/user.json'):
         f'LOG=Pipeline.log',
         f'-LOCALLOGTIMES',
     ]
-    
     command = ' '.join(map(str, command))
     logging.info(colorama.Fore.BLUE + command)
 
