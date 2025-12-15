@@ -1,9 +1,9 @@
-_BASE_: render_config.yaml
 Resolution: [1920, 1080]
-Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/3dgs_data"
-File_Name_Format: "{sequence_name}/{render_pass}/{frame_number}"
-Motion_Blur: false
+Output_Path: "D:/Dataset"
 
+File_Name_Format: "{sequence_name}/{render_pass}/{frame_number}"
+
+Motion_Blur: false
 Anti_Alias:
     enable: true
     spatial_samples: 8
@@ -16,29 +16,29 @@ Render_Passes:
         ext: "png"  # png, jpeg, bmp, exr
     -
         pass_name: 'depth'
-        enable: true
-        ext: "exr"
-    -
-        pass_name: 'normal'  # 法线
         enable: false
         ext: "exr"
     -
-        pass_name: 'diffuse' # 漫反射图
+        pass_name: 'diffuse'
         enable: false
         ext: "png"
     -
-        pass_name: 'metallic' # 金属度
+        pass_name: 'normal'
+        enable: false
+        ext: "exr"
+    -
+        pass_name: 'metallic'
         enable: false
         ext: "png"
     -
-        pass_name: 'roughness' # 粗糙度
+        pass_name: 'roughness'
         enable: false
         ext: "png"
     -
-        pass_name: 'specular' # 高光/镜面反射
+        pass_name: 'specular'
         enable: false
         ext: "png"
     -
-        pass_name: 'basecolor' # 基础色
+        pass_name: 'basecolor'
         enable: false
         ext: "png"
