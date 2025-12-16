@@ -20,25 +20,9 @@ output_path = None
 unreal_loaded = False
 
 
-def setup_logging(log_path: Path):
-    logging.basicConfig(
-        level=logging.INFO, 
-        format='[%(asctime)s] - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(str(log_path)),
-            logging.StreamHandler()
-        ]
-    )
 
-    formatter = logging.Formatter('[%(asctime)s] - %(levelname)s - %(message)s')
-    ch = logging.StreamHandler()
-    ch.setLevel(level=logging.DEBUG)
-    ch.setFormatter(formatter)
 
-    logging.getLogger("asyncio").setLevel(logging.INFO)
-    logging.getLogger("asyncio").addHandler(ch)
 
-    logging.info(f'Python Logging to {log_path.as_uri()}')
 
 
 def format_time(seconds: float) -> str:
@@ -75,7 +59,7 @@ async def handle_client(client, host='127.0.0.1', port=9999, parent_loop=None):
                 server.listen(8)
                 server.setblocking(False)
                 client, _ = await parent_loop.sock_accept(server)
-                logging.info(f'Socket Connection from {client.getpeername()}')
+
 
         if not data:
             break
@@ -179,9 +163,6 @@ def main(config_file: str='misc/user.json'):
     render_config_path = Path(config['render_config']).resolve()
     render_config = CfgNode.load_yaml_with_base(str(render_config_path))
     output_path = Path(render_config['Output_Path']).resolve()
-    python_log_file = output_path / f'_config/log_{datetime.datetime.now().strftime("%m-%d_%H-%M-%S")}.log'
-    python_log_file.parent.mkdir(parents=True, exist_ok=True)
-    setup_logging(python_log_file)
 
     # if ' ' in ue_project:
     #     raise ValueError(f"Found blanks in `ue_project` path. UE can't handle that. `ue_project`: {ue_project}")
