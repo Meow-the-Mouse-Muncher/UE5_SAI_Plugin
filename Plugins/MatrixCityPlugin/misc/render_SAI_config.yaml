@@ -12,6 +12,41 @@ Anti_Alias:
     spatial_samples: 8
     temporal_samples: 1
 
+# 渲染通道设置
+Render_Passes:
+    -
+        pass_name: 'rgb'
+        enable: true
+        ext: "png"
+    -
+        pass_name: 'depth'
+        enable: true
+        ext: "exr"
+    -
+        pass_name: 'normal'
+        enable: false
+        ext: "exr"
+    -
+        pass_name: 'diffuse'
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'metallic'
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'roughness'
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'specular'
+        enable: false
+        ext: "png"
+    -
+        pass_name: 'basecolor'
+        enable: false
+        ext: "png"
+
 # 批量处理设置
 Batch_Settings:
   # 地图文件夹路径

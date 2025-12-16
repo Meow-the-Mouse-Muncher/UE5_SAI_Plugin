@@ -25,7 +25,7 @@ def main(render_config_path):
     # 2. 读取渲染配置
     # if render_config_path is None:
     unreal.log_warning(f"Render Config Path: {render_config_path}")
-    render_config_path = str(PLUGIN_ROOT / 'misc/batch_config.yaml')
+    render_config_path = str(PLUGIN_ROOT / 'misc/render_SAI_config.yaml')
     
 
     unreal.log_warning(f"PLUGIN_ROOT: {PLUGIN_ROOT}")

@@ -3,7 +3,7 @@
   "ue_project": "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/PCGBiomeForestPoplar.uproject",
   "ue_map": "/Game/Map/scene_001", 
   "camera_name": "CineCameraActor1",
-  "render_config": "misc/batch_config.yaml",
+  "render_config": "misc/render_SAI_config.yaml",
   "python_script": "Content/Python/pipeline.py",
   "batch_mode": true,
   "target_prefix": "Target_",
