@@ -65,57 +65,23 @@ def main(render_config_path):
         occlusion_actors = batch_utils.get_occlusion_actors_by_prefix("SM_")
         log_msg_with_socket(PIEExecutor, f'[*] Found {len(occlusion_actors)} occlusion objects in {map_name}')
         
-        # 5. 遍历每个目标物
-        for target_idx, target_actor in enumerate(target_actors, 1):
-            target_name = target_actor.get_actor_label()  # 使用标签名称而不是内部名称
-            
-            # 记录进度
-            progress_msg = batch_utils.log_batch_progress(
-                map_idx, len(map_list), target_idx, len(target_actors), 
-                map_name, target_name, "Starting"
-            )
-            log_msg_with_socket(PIEExecutor, progress_msg)
-            
-            # 6. 生成相机轨迹（针对当前目标物）
-            level, sequence_name = utils_sequencer.main(target_actor=target_actor, map_name=map_name)
-            log_msg_with_socket(PIEExecutor, f'[*] Created Sequence: {sequence_name}')
-            
-            # 7. 串行渲染：先OCC后GT
-            progress_msg = batch_utils.log_batch_progress(
-                map_idx, len(map_list), target_idx, len(target_actors), 
-                map_name, target_name, "Starting serial rendering (OCC -> GT)"
-            )
-            log_msg_with_socket(PIEExecutor, progress_msg)
-            
-            # 准备OCC渲染配置
-            render_config_occ = render_config.copy()
-            output_suffix = batch_utils.create_output_folder_name(map_name, target_name, "occ")
-            render_config_occ['File_Name_Format'] = f"{output_suffix}/{{render_pass}}/{{frame_number}}"
-            
-            # 准备GT渲染配置
-            render_config_gt = render_config.copy()
-            output_suffix = batch_utils.create_output_folder_name(map_name, target_name, "GT")
-            render_config_gt['File_Name_Format'] = f"{output_suffix}/{{render_pass}}/{{frame_number}}"
-            
-            # 启动串行渲染（OCC -> GT）
-            CustomMoviePipeline.render_serial_occ_gt(
-                level=level,
-                level_sequence=sequence_name,
-                render_config_occ=render_config_occ,
-                render_config_gt=render_config_gt,
-                occlusion_actors=occlusion_actors,
-                executor=PIEExecutor
-            )
-            
-            # 恢复遮挡物可见性
-            batch_utils.set_actors_visibility(occlusion_actors, visible=True)
-            
-            progress_msg = batch_utils.log_batch_progress(
-                map_idx, len(map_list), target_idx, len(target_actors), 
-                map_name, target_name, "Completed"
-            )
-            log_msg_with_socket(PIEExecutor, progress_msg)
+        # 5. 启动批量目标物串行渲染
+        CustomMoviePipeline.start_batch_target_rendering(
+            map_name=map_name,
+            map_package_path=map_package_path,
+            target_actors=target_actors,
+            occlusion_actors=occlusion_actors,
+            render_config=render_config,
+            executor=PIEExecutor,
+            map_idx=map_idx,
+            total_maps=len(map_list)
+        )
         
+        # 等待当前地图的所有目标物渲染完成
+        import time
+        while CustomMoviePipeline._is_batch_target_rendering:
+            time.sleep(1)  # 每秒检查一次状态
+            
         log_msg_with_socket(PIEExecutor, f'[*] Completed processing map: {map_name}')
     
     log_msg_with_socket(PIEExecutor, '[*] All maps and targets processed successfully!')

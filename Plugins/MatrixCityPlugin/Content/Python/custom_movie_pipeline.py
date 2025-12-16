@@ -34,6 +34,12 @@ class CustomMoviePipeline():
     # 串行渲染控制变量
     _pending_render_task = None  # 待执行的第二次渲染任务
     _is_serial_rendering = False  # 是否在串行渲染模式
+    
+    # 批量目标物渲染控制变量
+    _target_render_queue = []  # 目标物渲染队列
+    _current_target_index = 0  # 当前目标物索引
+    _is_batch_target_rendering = False  # 是否在批量目标物渲染模式
+    _current_map_context = None  # 当前地图上下文
 
     @classmethod
     def clear_queue(cls):
@@ -364,6 +370,8 @@ class CustomMoviePipeline():
         render_config_occ: dict,
         render_config_gt: dict,
         occlusion_actors: list,
+        target_actors: list,
+        current_target_actor,
         executor: Optional[unreal.MoviePipelineLinearExecutorBase] = None,
     ) -> None:
         """串行渲染OCC和GT两个任务
@@ -374,6 +382,8 @@ class CustomMoviePipeline():
             render_config_occ: OCC渲染配置
             render_config_gt: GT渲染配置
             occlusion_actors: 遮挡物列表
+            target_actors: 所有目标物列表
+            current_target_actor: 当前目标物
             executor: 执行器
         """
         # 设置串行渲染状态
@@ -385,14 +395,20 @@ class CustomMoviePipeline():
             'level_sequence': level_sequence,
             'render_config': render_config_gt,
             'occlusion_actors': occlusion_actors,
+            'target_actors': target_actors,
+            'current_target_actor': current_target_actor,
             'visibility': False  # GT渲染时遮挡物不可见
         }
         
         # 开始第一个任务（OCC渲染）
         unreal.log("Starting serial rendering: OCC first, then GT")
         
-        # 设置遮挡物可见（OCC渲染）
+        # 设置目标物可见性：只有当前目标物可见
         import batch_utils
+        batch_utils.set_actors_visibility(target_actors, visible=False)  # 隐藏所有目标物
+        batch_utils.set_actors_visibility([current_target_actor], visible=True)  # 显示当前目标物
+        
+        # 设置遮挡物可见（OCC渲染）
         batch_utils.set_actors_visibility(occlusion_actors, visible=True)
         
         # 清空队列并添加第一个任务
@@ -405,6 +421,145 @@ class CustomMoviePipeline():
         
         # 启动第一次渲染（完成后会自动触发第二次渲染）
         cls.render_queue(executor=executor)
+
+    @classmethod
+    def start_batch_target_rendering(
+        cls,
+        map_name: str,
+        map_package_path: str,
+        target_actors: list,
+        occlusion_actors: list,
+        render_config: dict,
+        executor,
+        map_idx: int = 1,
+        total_maps: int = 1
+    ) -> None:
+        """启动批量目标物串行渲染
+        
+        Args:
+            map_name: 地图名称
+            map_package_path: 地图包路径
+            target_actors: 目标物列表
+            occlusion_actors: 遮挡物列表
+            render_config: 渲染配置
+            executor: 执行器
+            map_idx: 地图索引（默认1）
+            total_maps: 总地图数（默认1）
+        """
+        # 设置批量目标物渲染状态
+        cls._is_batch_target_rendering = True
+        cls._current_target_index = 0
+        
+        # 保存地图上下文
+        cls._current_map_context = {
+            'map_name': map_name,
+            'map_package_path': map_package_path,
+            'map_idx': map_idx,
+            'total_maps': total_maps,
+            'executor': executor
+        }
+        
+        # 准备目标物渲染队列
+        cls._target_render_queue = []
+        for target_idx, target_actor in enumerate(target_actors, 1):
+            target_task = {
+                'target_actor': target_actor,
+                'target_name': target_actor.get_actor_label(),
+                'target_idx': target_idx,
+                'total_targets': len(target_actors),
+                'target_actors': target_actors,
+                'occlusion_actors': occlusion_actors,
+                'render_config': render_config,
+                'map_name': map_name,
+                'map_idx': map_idx,
+                'total_maps': total_maps
+            }
+            cls._target_render_queue.append(target_task)
+        
+        unreal.log(f"Starting batch target rendering for {len(target_actors)} targets in {map_name}")
+        
+        # 开始处理第一个目标物
+        cls._process_next_target()
+
+    @classmethod
+    def _process_next_target(cls):
+        """处理下一个目标物"""
+        if cls._current_target_index >= len(cls._target_render_queue):
+            # 当前地图的所有目标物处理完成
+            cls._on_map_targets_completed()
+            return
+        
+        # 获取当前目标物任务
+        current_task = cls._target_render_queue[cls._current_target_index]
+        executor = cls._current_map_context['executor']
+        
+        unreal.log(f"Processing target {cls._current_target_index + 1}/{len(cls._target_render_queue)}: {current_task['target_name']}")
+        
+        # 记录进度
+        from utils import log_msg_with_socket
+        import batch_utils
+        progress_msg = batch_utils.log_batch_progress(
+            current_task['map_idx'], current_task['total_maps'],
+            current_task['target_idx'], current_task['total_targets'],
+            current_task['map_name'], current_task['target_name'], "Starting"
+        )
+        log_msg_with_socket(executor, progress_msg)
+        
+        # 生成相机轨迹
+        import utils_sequencer
+        level, sequence_name = utils_sequencer.main(
+            target_actor=current_task['target_actor'], 
+            map_name=current_task['map_name']
+        )
+        log_msg_with_socket(executor, f'[*] Created Sequence: {sequence_name}')
+        
+        # 准备渲染配置
+        import batch_utils
+        render_config_occ = current_task['render_config'].copy()
+        output_suffix = batch_utils.create_output_folder_name(
+            current_task['map_name'], current_task['target_name'], "occ"
+        )
+        render_config_occ['File_Name_Format'] = f"{output_suffix}/{{render_pass}}/{{frame_number}}"
+        
+        render_config_gt = current_task['render_config'].copy()
+        output_suffix = batch_utils.create_output_folder_name(
+            current_task['map_name'], current_task['target_name'], "GT"
+        )
+        render_config_gt['File_Name_Format'] = f"{output_suffix}/{{render_pass}}/{{frame_number}}"
+        
+        # 启动当前目标物的串行渲染
+        progress_msg = batch_utils.log_batch_progress(
+            current_task['map_idx'], current_task['total_maps'],
+            current_task['target_idx'], current_task['total_targets'],
+            current_task['map_name'], current_task['target_name'], "Starting serial rendering (OCC -> GT)"
+        )
+        log_msg_with_socket(executor, progress_msg)
+        
+        cls.render_serial_occ_gt(
+            level=level,
+            level_sequence=sequence_name,
+            render_config_occ=render_config_occ,
+            render_config_gt=render_config_gt,
+            occlusion_actors=current_task['occlusion_actors'],
+            target_actors=current_task['target_actors'],
+            current_target_actor=current_task['target_actor'],
+            executor=executor
+        )
+
+    @classmethod
+    def _on_map_targets_completed(cls):
+        """当前地图的所有目标物处理完成"""
+        map_context = cls._current_map_context
+        unreal.log(f"All targets completed for map: {map_context['map_name']}")
+        
+        # 重置批量目标物渲染状态
+        cls._is_batch_target_rendering = False
+        cls._target_render_queue = []
+        cls._current_target_index = 0
+        cls._current_map_context = None
+        
+        # 这里可以添加地图完成后的回调
+        # 如果有多个地图，可以在这里触发下一个地图的处理
 
     def onQueueFinishedCallback(executor: unreal.MoviePipelineLinearExecutorBase, success: bool):
         """On queue finished callback.
@@ -425,8 +580,13 @@ class CustomMoviePipeline():
             # 获取待执行任务
             task = CustomMoviePipeline._pending_render_task
             
-            # 设置遮挡物可见性
+            # 设置目标物可见性：保持当前目标物可见，其他隐藏
             import batch_utils
+            if 'target_actors' in task and 'current_target_actor' in task:
+                batch_utils.set_actors_visibility(task['target_actors'], visible=False)  # 隐藏所有目标物
+                batch_utils.set_actors_visibility([task['current_target_actor']], visible=True)  # 显示当前目标物
+            
+            # 设置遮挡物可见性
             batch_utils.set_actors_visibility(task['occlusion_actors'], visible=task['visibility'])
             
             # 清空队列并添加第二个任务
@@ -450,6 +610,26 @@ class CustomMoviePipeline():
             # 串行渲染完成，重置状态
             CustomMoviePipeline._is_serial_rendering = False
             unreal.log("Serial rendering completed!")
+            
+            # 检查是否在批量目标物渲染模式
+            if CustomMoviePipeline._is_batch_target_rendering:
+                # 当前目标物完成，移动到下一个目标物
+                CustomMoviePipeline._current_target_index += 1
+                
+                # 记录当前目标物完成
+                if CustomMoviePipeline._current_target_index <= len(CustomMoviePipeline._target_render_queue):
+                    current_task = CustomMoviePipeline._target_render_queue[CustomMoviePipeline._current_target_index - 1]
+                    from utils import log_msg_with_socket
+                    import batch_utils
+                    progress_msg = batch_utils.log_batch_progress(
+                        current_task['map_idx'], current_task['total_maps'],
+                        current_task['target_idx'], current_task['total_targets'],
+                        current_task['map_name'], current_task['target_name'], "Completed"
+                    )
+                    log_msg_with_socket(executor, progress_msg)
+                
+                # 处理下一个目标物
+                CustomMoviePipeline._process_next_target()
 
     def onIndividualJobFinishedCallback(inJob: unreal.MoviePipelineExecutorJob, success: bool):
         """On individual job finished callback.
