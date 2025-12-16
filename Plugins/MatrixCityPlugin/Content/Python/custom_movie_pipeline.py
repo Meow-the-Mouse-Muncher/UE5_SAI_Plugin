@@ -426,36 +426,27 @@ class CustomMoviePipeline():
     def start_batch_target_rendering(
         cls,
         map_name: str,
-        map_package_path: str,
         target_actors: list,
         occlusion_actors: list,
         render_config: dict,
-        executor,
-        map_idx: int = 1,
-        total_maps: int = 1
+        executor
     ) -> None:
         """启动批量目标物串行渲染
         
         Args:
             map_name: 地图名称
-            map_package_path: 地图包路径
             target_actors: 目标物列表
             occlusion_actors: 遮挡物列表
             render_config: 渲染配置
             executor: 执行器
-            map_idx: 地图索引（默认1）
-            total_maps: 总地图数（默认1）
         """
         # 设置批量目标物渲染状态
         cls._is_batch_target_rendering = True
         cls._current_target_index = 0
         
-        # 保存地图上下文
+        # 保存上下文
         cls._current_map_context = {
             'map_name': map_name,
-            'map_package_path': map_package_path,
-            'map_idx': map_idx,
-            'total_maps': total_maps,
             'executor': executor
         }
         
@@ -470,9 +461,7 @@ class CustomMoviePipeline():
                 'target_actors': target_actors,
                 'occlusion_actors': occlusion_actors,
                 'render_config': render_config,
-                'map_name': map_name,
-                'map_idx': map_idx,
-                'total_maps': total_maps
+                'map_name': map_name
             }
             cls._target_render_queue.append(target_task)
         
@@ -497,13 +486,7 @@ class CustomMoviePipeline():
         
         # 记录进度
         from utils import log_msg_with_socket
-        import batch_utils
-        progress_msg = batch_utils.log_batch_progress(
-            current_task['map_idx'], current_task['total_maps'],
-            current_task['target_idx'], current_task['total_targets'],
-            current_task['map_name'], current_task['target_name'], "Starting"
-        )
-        log_msg_with_socket(executor, progress_msg)
+        log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Starting')
         
         # 生成相机轨迹
         import utils_sequencer
@@ -528,12 +511,7 @@ class CustomMoviePipeline():
         render_config_gt['File_Name_Format'] = f"{output_suffix}/{{render_pass}}/{{frame_number}}"
         
         # 启动当前目标物的串行渲染
-        progress_msg = batch_utils.log_batch_progress(
-            current_task['map_idx'], current_task['total_maps'],
-            current_task['target_idx'], current_task['total_targets'],
-            current_task['map_name'], current_task['target_name'], "Starting serial rendering (OCC -> GT)"
-        )
-        log_msg_with_socket(executor, progress_msg)
+        log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Starting serial rendering (OCC -> GT)')
         
         cls.render_serial_occ_gt(
             level=level,
@@ -548,7 +526,7 @@ class CustomMoviePipeline():
 
     @classmethod
     def _on_map_targets_completed(cls):
-        """当前地图的所有目标物处理完成"""
+        """所有目标物处理完成"""
         map_context = cls._current_map_context
         unreal.log(f"All targets completed for map: {map_context['map_name']}")
         
@@ -557,9 +535,6 @@ class CustomMoviePipeline():
         cls._target_render_queue = []
         cls._current_target_index = 0
         cls._current_map_context = None
-        
-        # 这里可以添加地图完成后的回调
-        # 如果有多个地图，可以在这里触发下一个地图的处理
 
     def onQueueFinishedCallback(executor: unreal.MoviePipelineLinearExecutorBase, success: bool):
         """On queue finished callback.
@@ -620,13 +595,7 @@ class CustomMoviePipeline():
                 if CustomMoviePipeline._current_target_index <= len(CustomMoviePipeline._target_render_queue):
                     current_task = CustomMoviePipeline._target_render_queue[CustomMoviePipeline._current_target_index - 1]
                     from utils import log_msg_with_socket
-                    import batch_utils
-                    progress_msg = batch_utils.log_batch_progress(
-                        current_task['map_idx'], current_task['total_maps'],
-                        current_task['target_idx'], current_task['total_targets'],
-                        current_task['map_name'], current_task['target_name'], "Completed"
-                    )
-                    log_msg_with_socket(executor, progress_msg)
+                    log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Completed')
                 
                 # 处理下一个目标物
                 CustomMoviePipeline._process_next_target()

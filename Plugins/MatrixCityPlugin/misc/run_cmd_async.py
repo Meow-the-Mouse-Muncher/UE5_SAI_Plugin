@@ -197,11 +197,10 @@ def main(config_file: str='misc/user.json'):
     command=[
         f'"{ue_command}"',
         f'"{ue_project}"',
-        # f'"{ue_map}"' if ue_map else '',
-        # f'-run=pythonscript -script="{python_script}"',
-        # f'-ExecutePythonScript="{python_script}"',
+        f'"{ue_map}"' if ue_map else '',  # 加载指定地图
         f'-ExecCmds="py {script_path_str}"',
         f'-render_config_path="{render_config_path}"',
+        f'-target_map="{ue_map}"' if ue_map else '',  # 传递地图路径参数
         
         f'-notexturestreaming',
         # f'-silent',
