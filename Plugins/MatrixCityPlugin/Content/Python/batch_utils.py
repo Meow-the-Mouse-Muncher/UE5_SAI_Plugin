@@ -90,11 +90,13 @@ def set_actors_visibility(actors: List[unreal.Actor], visible: bool = True):
     for actor in actors:
         # 设置游戏中的可见性
         actor.set_actor_hidden_in_game(not visible)
-        # # 对于StaticMeshActor，还需要设置组件的可见性
-        # if isinstance(actor, unreal.StaticMeshActor):
-        #     mesh_component = actor.get_static_mesh_component()
-        #     if mesh_component:
-        #         mesh_component.set_visibility(visible)
+        
+        # 报告每个StaticMeshActor的可见性状态
+        if isinstance(actor, unreal.StaticMeshActor):
+            actor_name = actor.get_actor_label()
+            is_hidden = actor.get_editor_property("hidden")
+            unreal.log(f"StaticMeshActor '{actor_name}': Hidden 属性的值为: {is_hidden}")
+
 
 
 def load_map_if_different(map_package_path: str, current_map_name: str = None):

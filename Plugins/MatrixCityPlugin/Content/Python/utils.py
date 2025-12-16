@@ -10,21 +10,40 @@ from GLOBAL_VARS import LEVEL_INFO_JSON, EditorLevelSub, EditorSub
 
 
 def loader_func(func):
+    # 添加执行标志，防止重复执行
+    executed = False
+    tickhandle = None
 
     def wrap_func(*args, **kwargs):
+        nonlocal executed, tickhandle
+        
         unreal.log_warning("ticking.")
         asset_registry = unreal.AssetRegistryHelpers.get_asset_registry()
+        
         if asset_registry.is_loading_assets():
             unreal.log_warning("still loading...")
+            return None  # 资产还在加载，不执行函数
         else:
             unreal.log_warning("ready!")
-            unreal.unregister_slate_pre_tick_callback(tickhandle)
+            
+            # 注销tick回调
+            if tickhandle is not None:
+                unreal.unregister_slate_pre_tick_callback(tickhandle)
+                tickhandle = None
+            
+            # 检查是否已经执行过
+            if executed:
+                unreal.log_warning("Function already executed, skipping...")
+                return None
+            
+            # 标记为已执行
+            executed = True
+            
+            # 执行实际函数
+            result = func(*args, **kwargs)
+            return result
 
-        result = func(*args, **kwargs)
-        return result
-
-    # This function shows the execution time of
-    # the function object passed
+    # 注册tick回调
     tickhandle = unreal.register_slate_pre_tick_callback(wrap_func)
 
     return wrap_func
