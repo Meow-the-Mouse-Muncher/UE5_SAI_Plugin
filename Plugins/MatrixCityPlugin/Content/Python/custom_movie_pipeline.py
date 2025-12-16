@@ -30,6 +30,10 @@ class CustomMoviePipeline():
     port = 9999
     jobs = []
     new_executor = None
+    
+    # 串行渲染控制变量
+    _pending_render_task = None  # 待执行的第二次渲染任务
+    _is_serial_rendering = False  # 是否在串行渲染模式
 
     @classmethod
     def clear_queue(cls):
@@ -352,6 +356,56 @@ class CustomMoviePipeline():
         unreal.log(f"Added new job ({newJob.job_name}) to queue.")
         return True
 
+    @classmethod
+    def render_serial_occ_gt(
+        cls,
+        level: str,
+        level_sequence: str,
+        render_config_occ: dict,
+        render_config_gt: dict,
+        occlusion_actors: list,
+        executor: Optional[unreal.MoviePipelineLinearExecutorBase] = None,
+    ) -> None:
+        """串行渲染OCC和GT两个任务
+        
+        Args:
+            level: 关卡路径
+            level_sequence: 序列路径
+            render_config_occ: OCC渲染配置
+            render_config_gt: GT渲染配置
+            occlusion_actors: 遮挡物列表
+            executor: 执行器
+        """
+        # 设置串行渲染状态
+        cls._is_serial_rendering = True
+        
+        # 准备第二个任务（GT渲染）
+        cls._pending_render_task = {
+            'level': level,
+            'level_sequence': level_sequence,
+            'render_config': render_config_gt,
+            'occlusion_actors': occlusion_actors,
+            'visibility': False  # GT渲染时遮挡物不可见
+        }
+        
+        # 开始第一个任务（OCC渲染）
+        unreal.log("Starting serial rendering: OCC first, then GT")
+        
+        # 设置遮挡物可见（OCC渲染）
+        import batch_utils
+        batch_utils.set_actors_visibility(occlusion_actors, visible=True)
+        
+        # 清空队列并添加第一个任务
+        cls.clear_queue()
+        cls.add_job_to_queue_with_render_config(
+            level=level,
+            level_sequence=level_sequence,
+            render_config=render_config_occ
+        )
+        
+        # 启动第一次渲染（完成后会自动触发第二次渲染）
+        cls.render_queue(executor=executor)
+
     def onQueueFinishedCallback(executor: unreal.MoviePipelineLinearExecutorBase, success: bool):
         """On queue finished callback.
         This is called when the queue finishes.
@@ -362,7 +416,40 @@ class CustomMoviePipeline():
             success (bool): Whether the queue finished successfully.
         """
         mss = f"Render completed. Success: {success}"
-        utils.log_msg_with_socket(executor, mss)
+        unreal.log(mss)  # 使用普通日志，避免Socket问题
+        
+        # 检查是否有待执行的串行渲染任务
+        if CustomMoviePipeline._is_serial_rendering and CustomMoviePipeline._pending_render_task:
+            unreal.log("First render completed, starting second render...")
+            
+            # 获取待执行任务
+            task = CustomMoviePipeline._pending_render_task
+            
+            # 设置遮挡物可见性
+            import batch_utils
+            batch_utils.set_actors_visibility(task['occlusion_actors'], visible=task['visibility'])
+            
+            # 清空队列并添加第二个任务
+            CustomMoviePipeline.clear_queue()
+            CustomMoviePipeline.add_job_to_queue_with_render_config(
+                level=task['level'],
+                level_sequence=task['level_sequence'],
+                render_config=task['render_config']
+            )
+            
+            # 清空待执行任务，避免无限循环
+            CustomMoviePipeline._pending_render_task = None
+            
+            # 创建新的执行器，避免Socket连接冲突
+            new_executor = unreal.MoviePipelinePIEExecutor()
+            new_executor.connect_socket(CustomMoviePipeline.host, CustomMoviePipeline.port)
+            
+            # 启动第二次渲染
+            CustomMoviePipeline.render_queue(executor=new_executor)
+        else:
+            # 串行渲染完成，重置状态
+            CustomMoviePipeline._is_serial_rendering = False
+            unreal.log("Serial rendering completed!")
 
     def onIndividualJobFinishedCallback(inJob: unreal.MoviePipelineExecutorJob, success: bool):
         """On individual job finished callback.
@@ -415,8 +502,13 @@ class CustomMoviePipeline():
         else:
             cls.new_executor = unreal.MoviePipelinePIEExecutor()
 
-        # connect socket
-        cls.new_executor.connect_socket(cls.host, cls.port)
+        # connect socket (只在需要时连接)
+        try:
+            if not hasattr(cls.new_executor, '_socket_connected') or not cls.new_executor._socket_connected:
+                cls.new_executor.connect_socket(cls.host, cls.port)
+                cls.new_executor._socket_connected = True
+        except Exception as e:
+            unreal.log_warning(f"Socket connection failed: {e}, continuing without socket")
 
         # set callbacks
         cls.new_executor.on_executor_finished_delegate.add_callable_unique(
@@ -426,7 +518,12 @@ class CustomMoviePipeline():
 
         # render the queue
         cls.new_executor.execute(cls.pipeline_queue)
-        cls.new_executor.send_socket_message("Start Render:")
+        
+        # 安全发送Socket消息
+        try:
+            cls.new_executor.send_socket_message("Start Render:")
+        except Exception as e:
+            unreal.log_warning(f"Failed to send socket message: {e}")
 
 
 def main():

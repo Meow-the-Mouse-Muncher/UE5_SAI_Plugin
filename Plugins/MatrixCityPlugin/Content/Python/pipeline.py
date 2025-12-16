@@ -80,51 +80,32 @@ def main(render_config_path):
             level, sequence_name = utils_sequencer.main(target_actor=target_actor, map_name=map_name)
             log_msg_with_socket(PIEExecutor, f'[*] Created Sequence: {sequence_name}')
             
-            # 7. 第一次渲染：有遮挡物 (occ)
-            unreal.log(f"first time render")
+            # 7. 串行渲染：先OCC后GT
             progress_msg = batch_utils.log_batch_progress(
                 map_idx, len(map_list), target_idx, len(target_actors), 
-                map_name, target_name, "Rendering with occlusion (occ)"
+                map_name, target_name, "Starting serial rendering (OCC -> GT)"
             )
             log_msg_with_socket(PIEExecutor, progress_msg)
             
-            batch_utils.set_actors_visibility(occlusion_actors, visible=True)
-            
-            # 修改输出路径为 map_target_occ
+            # 准备OCC渲染配置
             render_config_occ = render_config.copy()
             output_suffix = batch_utils.create_output_folder_name(map_name, target_name, "occ")
             render_config_occ['File_Name_Format'] = f"{output_suffix}/{{render_pass}}/{{frame_number}}"
             
-            # CustomMoviePipeline.clear_queue()  不要清除队列，等待上一个队列完成
-            CustomMoviePipeline.add_job_to_queue_with_render_config(
-                level=level,
-                level_sequence=sequence_name,
-                render_config=render_config_occ
-            )
-            CustomMoviePipeline.render_queue(executor=PIEExecutor)
-            
-            # 8. 第二次渲染：无遮挡物 (GT)
-            unreal.log(f"second time render")
-            progress_msg = batch_utils.log_batch_progress(
-                map_idx, len(map_list), target_idx, len(target_actors), 
-                map_name, target_name, "Rendering without occlusion (GT)"
-            )
-            log_msg_with_socket(PIEExecutor, progress_msg)
-            
-            batch_utils.set_actors_visibility(occlusion_actors, visible=False)
-            
-            # 修改输出路径为 map_target_GT
+            # 准备GT渲染配置
             render_config_gt = render_config.copy()
             output_suffix = batch_utils.create_output_folder_name(map_name, target_name, "GT")
             render_config_gt['File_Name_Format'] = f"{output_suffix}/{{render_pass}}/{{frame_number}}"
             
-            # CustomMoviePipeline.clear_queue()  不要清除队列，等待上一个队列完成
-            CustomMoviePipeline.add_job_to_queue_with_render_config(
+            # 启动串行渲染（OCC -> GT）
+            CustomMoviePipeline.render_serial_occ_gt(
                 level=level,
                 level_sequence=sequence_name,
-                render_config=render_config_gt
+                render_config_occ=render_config_occ,
+                render_config_gt=render_config_gt,
+                occlusion_actors=occlusion_actors,
+                executor=PIEExecutor
             )
-            CustomMoviePipeline.render_queue(executor=PIEExecutor)
             
             # 恢复遮挡物可见性
             batch_utils.set_actors_visibility(occlusion_actors, visible=True)

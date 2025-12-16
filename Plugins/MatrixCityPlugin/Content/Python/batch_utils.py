@@ -86,16 +86,23 @@ def get_occlusion_actors_by_prefix(prefix="SM_"):
 
 
 def set_actors_visibility(actors: List[unreal.Actor], visible: bool = True):
-    """设置actors的可见性"""
+    """设置actors的可见性
+    
+    Args:
+        actors: 要设置可见性的Actor列表
+        visible: True表示可见，False表示隐藏
+    """
+    unreal.log(f"Setting visibility for {len(actors)} actors to {'VISIBLE' if visible else 'HIDDEN'}")
+    
     for actor in actors:
-        # 设置游戏中的可见性
-        actor.set_actor_hidden_in_game(not visible)
+        actor_name = actor.get_actor_label()
         
-        # 报告每个StaticMeshActor的可见性状态
+        # 设置游戏中的可见性（这是渲染时使用的）
+        actor.set_actor_hidden_in_game(not visible)
         if isinstance(actor, unreal.StaticMeshActor):
-            actor_name = actor.get_actor_label()
-            is_hidden = actor.get_editor_property("hidden")
-            unreal.log(f"StaticMeshActor '{actor_name}': Hidden 属性的值为: {is_hidden}")
+                actor_name = actor.get_actor_label()
+                is_hidden = actor.get_editor_property("hidden")
+                unreal.log(f"StaticMeshActor '{actor_name}': Hidden 属性的值为: {is_hidden}")
 
 
 
