@@ -11,6 +11,7 @@ from utils_actor import *
 import math
 import numpy as np
 import random
+import yaml
 
 ################################################################################
 # misc
@@ -34,6 +35,25 @@ def get_animation_length(animation_asset: unreal.AnimSequence, seq_fps: Optional
             anim_len = round(animation_asset.get_editor_property("sequence_length") * seq_fps)
 
     return anim_len
+
+
+def load_trajectory_config() -> Dict[str, Any]:
+    """Load trajectory config YAML from plugin misc folder.
+
+    Returns an empty dict on failure or if file not present.
+    """
+    yaml_file = PLUGIN_ROOT / 'misc' / 'trajectory_config.yaml'
+    try:
+        if not yaml_file.exists():
+            unreal.log_warning(f"trajectory config not found: {yaml_file}")
+            return {}
+        with open(yaml_file, 'r') as f:
+            data = yaml.safe_load(f) or {}
+        unreal.log(f"Loaded trajectory config: {yaml_file}")
+        return data
+    except Exception as e:
+        unreal.log_error(f"Failed to load trajectory config: {e}")
+        return {}
 
 
 ################################################################################
@@ -468,106 +488,186 @@ def generate_sequence(
 
     return new_sequence
 
-def generate_train_box(line1, line2, z, current_frame):
-    # [0, 0, -80000.0, 0], 
-    # [0, 38000, -80000.0, 38000]
-    x11, y11, x12, y12=line1
-    x21, y21, x22, y22=line2
-    assert(y11==y12)
-    assert(y21==y22)
-    assert(x11==x21)
-    assert(x12==x22)
-    w=math.dist([x11, y11], [x12, y12])
-    h=math.dist([x11, y11], [x21, y21])
-    interval=800 # train interval 采样间隔
-    w_instance=int(w/interval)+2
-    h_instance=int(h/interval)+1
-    x_start=np.linspace(x11, x12, w_instance)
-    y_start=np.linspace(y11, y12, w_instance)
-    x_end=np.linspace(x21, x22, w_instance)
-    y_end=np.linspace(y21, y22, w_instance)
-    camera_trans=[]
+def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_length, current_frame=0):
+    """
+    在目标物正上方生成直线轨迹
     
-    # train
-    if z>25000:
-        pitch=-60
-    else:
-        pitch=-45
-    for i in range(w_instance):
-        camera_trans.append( 
+    Args:
+        target_actor: 目标物Actor
+        num_frames (int): 图像张数（帧数）
+        angle_degrees (float): 与x轴的夹角（度）
+        height_offset (float): 相对于目标物的高度偏移（UE单位：cm）
+        trajectory_length (float): 运动轨迹的长度（UE单位：cm）
+        current_frame (int): 起始帧数，默认为0
+    
+    Returns:
+        tuple: (camera_trans, end_frame) - 相机轨迹列表和结束帧数
+    """
+    # 获取目标物位置
+    target_location = target_actor.get_actor_location()
+    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
+    
+    # 计算相机高度
+    camera_z = target_z + height_offset
+    
+    # 将角度转换为弧度
+    angle_radians = math.radians(angle_degrees)
+    
+    # 计算直线的方向向量
+    dx = math.cos(angle_radians)
+    dy = math.sin(angle_radians)
+    
+    # 计算起点和终点（以目标物为中心，轨迹长度的一半为半径）
+    half_length = trajectory_length / 2.0
+    
+    start_x = target_x - half_length * dx
+    start_y = target_y - half_length * dy
+    
+    end_x = target_x + half_length * dx
+    end_y = target_y + half_length * dy
+    
+    # 生成轨迹点
+    camera_trans = []
+    
+    for i in range(num_frames):
+        # 计算当前帧的插值比例 (0.0 到 1.0)
+        t = i / (num_frames - 1) if num_frames > 1 else 0.0
+        
+        # 线性插值计算当前位置
+        current_x = start_x + t * (end_x - start_x)
+        current_y = start_y + t * (end_y - start_y)
+        
+        # 设置相机垂直向下看的旋转角度
+        roll = 0.0   # 不翻滚
+        pitch = -90.0  # 垂直向下
+        yaw = 0.0    # 朝向正X轴方向
+        
+        # 添加轨迹点
+        camera_trans.append(
             SequenceKey(
-            frame=current_frame, 
-            location=(x_start[i], y_start[i], z),
-            rotation=(0, pitch, 0)
+                frame=current_frame + i,
+                location=(current_x, current_y, camera_z),
+                rotation=(roll, pitch, yaw)
             )
         )
-        current_frame=current_frame+h_instance
-        camera_trans.append( 
-            SequenceKey(
-            frame=current_frame, 
-            location=(x_end[i], y_end[i], z),
-            rotation=(0, pitch, 0)
-            )
-        )
-        current_frame=current_frame+1
-    for i in range(w_instance):
-        camera_trans.append( 
-            SequenceKey(
-            frame=current_frame, 
-            location=(x_start[i], y_start[i], z),
-            rotation=(0, pitch, 90)
-            )
-        )
-        current_frame=current_frame+h_instance
-        camera_trans.append( 
-            SequenceKey(
-            frame=current_frame, 
-            location=(x_end[i], y_end[i], z),
-            rotation=(0, pitch, 90)
-            )
-        )
-        current_frame=current_frame+1
-    for i in range(w_instance):
-        camera_trans.append( 
-            SequenceKey(
-            frame=current_frame, 
-            location=(x_start[i], y_start[i], z),
-            rotation=(0, pitch, 180)
-            )
-        )
-        current_frame=current_frame+h_instance
-        camera_trans.append( 
-            SequenceKey(
-            frame=current_frame, 
-            location=(x_end[i], y_end[i], z),
-            rotation=(0, pitch, 180)
-            )
-        )
-        current_frame=current_frame+1
-    for i in range(w_instance):
-        camera_trans.append( 
-            SequenceKey(
-            frame=current_frame, 
-            location=(x_start[i], y_start[i], z),
-            rotation=(0, pitch, 270)
-            )
-        )
-        current_frame=current_frame+h_instance
-        camera_trans.append( 
-            SequenceKey(
-            frame=current_frame, 
-            location=(x_end[i], y_end[i], z),
-            rotation=(0, pitch, 270)
-            )
-        )
-        current_frame=current_frame+1
-    return camera_trans, current_frame
+    
+    end_frame = current_frame + num_frames
+    return camera_trans, end_frame
 
 
-def main(target_actor=None, map_name=None):
+def rot_line(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_degrees, current_frame=0):
+    """
+    以目标物为中心生成圆弧轨迹，相机始终对准目标物
+    
+    Args:
+        target_actor: 目标物Actor
+        num_frames (int): 图像张数（帧数）
+        arc_angle_degrees (float): 圆弧的角度范围（度）
+        radius (float): 圆弧半径（UE单位：cm）
+        plane_angle_degrees (float): 圆弧平面与x轴的夹角（度）
+        current_frame (int): 起始帧数，默认为0
+    
+    Returns:
+        tuple: (camera_trans, end_frame) - 相机轨迹列表和结束帧数
+    """
+    # 获取目标物位置
+    target_location = target_actor.get_actor_location()
+    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
+    
+    # 将角度转换为弧度
+    arc_angle_radians = math.radians(arc_angle_degrees)
+    plane_angle_radians = math.radians(plane_angle_degrees)
+    
+    # 计算圆弧的起始角度（以圆弧中心为0度）
+    start_angle = -arc_angle_radians / 2.0
+    end_angle = arc_angle_radians / 2.0
+    
+    # 生成轨迹点
+    camera_trans = []
+    
+    for i in range(num_frames):
+        # 计算当前帧在圆弧上的角度
+        if num_frames > 1:
+            t = i / (num_frames - 1)  # 0.0 到 1.0
+        else:
+            t = 0.0
+        
+        current_angle = start_angle + t * (end_angle - start_angle)
+        
+        # 在局部坐标系中计算圆弧上的点（z轴为圆弧轴）
+        local_x = radius * math.cos(current_angle)
+        local_y = radius * math.sin(current_angle)
+        local_z = 0.0
+        
+        # 将局部坐标旋转到指定平面（绕z轴旋转plane_angle_degrees）
+        rotated_x = local_x * math.cos(plane_angle_radians) - local_y * math.sin(plane_angle_radians)
+        rotated_y = local_x * math.sin(plane_angle_radians) + local_y * math.cos(plane_angle_radians)
+        rotated_z = local_z
+        
+        # 转换到世界坐标系（以目标物为中心）
+        camera_x = target_x + rotated_x
+        camera_y = target_y + rotated_y
+        camera_z = target_z + rotated_z
+        
+        # 计算相机朝向目标物的旋转角度
+        # 计算从相机到目标物的向量
+        look_vector_x = target_x - camera_x
+        look_vector_y = target_y - camera_y
+        look_vector_z = target_z - camera_z
+        
+        # 计算俯仰角（pitch）- 朝向目标物（UE5左手坐标系）
+        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
+        if horizontal_distance > 0:
+            # 在UE5中，向下看是负pitch
+            pitch = -math.degrees(math.atan2(look_vector_z, horizontal_distance))
+        else:
+            pitch = -90.0 if look_vector_z > 0 else 90.0
+        
+        # 计算偏航角（yaw）- 朝向目标物（UE5左手坐标系）
+        if horizontal_distance > 0:
+            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
+        else:
+            yaw = 0.0
+        
+        # 翻滚角保持为0
+        roll = 0.0
+        
+        # 添加轨迹点
+        camera_trans.append(
+            SequenceKey(
+                frame=current_frame + i,
+                location=(camera_x, camera_y, camera_z),
+                rotation=(roll, pitch, yaw)
+            )
+        )
+    
+    end_frame = current_frame + num_frames
+    return camera_trans, end_frame
+
+
+
+
+
+def main(target_actor=None, map_name=None, trajectory_type='rot_line', trajectory_params=None):
     config_file = PLUGIN_ROOT / 'misc/user.json'
     with open(config_file, 'r') as f:
         config = json.load(f)
+
+    # 尝试加载轨迹配置（YAML），若存在则在 trajectory_params 缺省时使用
+    trajectory_cfg = load_trajectory_config()
+    if trajectory_params is None:
+        if isinstance(trajectory_cfg, dict):
+            if trajectory_type in trajectory_cfg and isinstance(trajectory_cfg[trajectory_type], dict):
+                trajectory_params = dict(trajectory_cfg[trajectory_type])
+                unreal.log(f"Using trajectory params from YAML for type '{trajectory_type}'")
+            elif 'default' in trajectory_cfg and isinstance(trajectory_cfg['default'], dict):
+                trajectory_params = dict(trajectory_cfg['default'])
+                unreal.log("Using default trajectory params from YAML")
+            else:
+                # Fallback: use whole YAML as params if it's a flat dict
+                trajectory_params = dict(trajectory_cfg)
+        else:
+            trajectory_params = {}
         
     # 如果没有传入地图名，从配置中获取
     if map_name is None:
@@ -600,33 +700,39 @@ def main(target_actor=None, map_name=None):
         sequence_name = f'{map_name}_{target_name}_sequence'
     else:
         sequence_name = 'aerial_train'  # 默认名称
-        
-    fov = 40
     
-    # 如果有目标物，围绕目标物生成轨迹
+    # 根据轨迹类型生成相机轨迹
     if target_actor:
-        target_location = target_actor.get_actor_location()
-        target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
-        
-        # 围绕目标物生成一个盒子轨迹，可以根据需要调整参数
-        box_size = 2000  # 盒子大小
-        height = target_z + 1000  # 相机高度
-        
-        camera_trans, current_frame = generate_train_box(
-            [target_x - box_size, target_y - box_size, target_x + box_size, target_y - box_size], 
-            [target_x - box_size, target_y + box_size, target_x + box_size, target_y + box_size], 
-            height, 
-            current_frame
-        )
-    else:
-        # 使用默认轨迹
-        camera_trans, current_frame = generate_train_box(
-            [33900, 38500, 40000, 38500], 
-            [33900, 46500, 40000, 46500], 
-            6500, 
-            current_frame
-        )
- 
+        if trajectory_type == 'fix_line' :
+            # 使用fix_line轨迹
+            num_frames = trajectory_params.get('num_frames', 32)
+            angle_degrees = trajectory_params.get('angle_degrees', 0.0)
+            height_offset = trajectory_params.get('height_offset', 1000.0)
+            trajectory_length = trajectory_params.get('trajectory_length', 4000.0)
+            
+            camera_trans, current_frame = fix_line(
+                target_actor=target_actor,
+                num_frames=num_frames,
+                angle_degrees=angle_degrees,
+                height_offset=height_offset,
+                trajectory_length=trajectory_length,
+                current_frame=current_frame
+            )
+        elif trajectory_type == 'rot_line':
+            # 使用rot_line轨迹
+            num_frames = trajectory_params.get('num_frames', 32)
+            arc_angle_degrees = trajectory_params.get('arc_angle_degrees', 90.0)
+            radius = trajectory_params.get('radius', 2000.0)
+            plane_angle_degrees = trajectory_params.get('plane_angle_degrees', 0.0)
+            
+            camera_trans, current_frame = rot_line(
+                target_actor=target_actor,
+                num_frames=num_frames,
+                arc_angle_degrees=arc_angle_degrees,
+                radius=radius,
+                plane_angle_degrees=plane_angle_degrees,
+                current_frame=current_frame
+            )
 
     seq_length=current_frame  #使用计算出的序列长度
     # 生成新的序列资产，保证长度fps等设置
@@ -685,6 +791,3 @@ def main(target_actor=None, map_name=None):
 
     return level, f'{sequence_dir}/{sequence_name}'
 
-
-if __name__ == "__main__":
-    main()
