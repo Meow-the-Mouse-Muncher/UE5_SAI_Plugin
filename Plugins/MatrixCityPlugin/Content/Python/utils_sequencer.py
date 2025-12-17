@@ -558,13 +558,16 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
 def rot_line(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_degrees, current_frame=0):
     """
     以目标物为中心生成圆弧轨迹，相机始终对准目标物
+    圆弧轨迹在包含目标物Z轴的垂直平面内
     
     Args:
         target_actor: 目标物Actor
         num_frames (int): 图像张数（帧数）
         arc_angle_degrees (float): 圆弧的角度范围（度）
         radius (float): 圆弧半径（UE单位：cm）
-        plane_angle_degrees (float): 圆弧平面与x轴的夹角（度）
+        plane_angle_degrees (float): 垂直平面与X轴的夹角（度）
+            - 0度: 圆弧在XZ平面内
+            - 90度: 圆弧在YZ平面内
         current_frame (int): 起始帧数，默认为0
     
     Returns:
@@ -578,12 +581,14 @@ def rot_line(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_de
     arc_angle_radians = math.radians(arc_angle_degrees)
     plane_angle_radians = math.radians(plane_angle_degrees)
     
-    # 计算圆弧的起始角度（以圆弧中心为0度）
-    start_angle = -arc_angle_radians / 2.0
-    end_angle = arc_angle_radians / 2.0
+    # 计算圆弧的起始角度（以垂直向上90度为中心）
+    center_angle = math.pi / 2.0  # 90度，垂直向上
+    start_angle = center_angle - arc_angle_radians / 2.0
+    end_angle = center_angle + arc_angle_radians / 2.0
     
     # 生成轨迹点
     camera_trans = []
+    previous_yaw = None  # 用于角度展开
     
     for i in range(num_frames):
         # 计算当前帧在圆弧上的角度
@@ -594,20 +599,16 @@ def rot_line(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_de
         
         current_angle = start_angle + t * (end_angle - start_angle)
         
-        # 在局部坐标系中计算圆弧上的点（z轴为圆弧轴）
-        local_x = radius * math.cos(current_angle)
-        local_y = radius * math.sin(current_angle)
-        local_z = 0.0
+        # 在垂直平面的局部坐标系中计算圆弧上的点
+        # 局部坐标系：水平方向为local_r，垂直方向为local_z
+        local_r = radius * math.cos(current_angle)  # 水平距离（从目标物向外的距离）
+        local_z = radius * math.sin(current_angle)  # 垂直距离（相对于目标物的高度）
         
-        # 将局部坐标旋转到指定平面（绕z轴旋转plane_angle_degrees）
-        rotated_x = local_x * math.cos(plane_angle_radians) - local_y * math.sin(plane_angle_radians)
-        rotated_y = local_x * math.sin(plane_angle_radians) + local_y * math.cos(plane_angle_radians)
-        rotated_z = local_z
-        
-        # 转换到世界坐标系（以目标物为中心）
-        camera_x = target_x + rotated_x
-        camera_y = target_y + rotated_y
-        camera_z = target_z + rotated_z
+        # 将局部坐标转换到世界坐标系
+        # 根据plane_angle_degrees确定水平方向在XY平面的投影
+        camera_x = target_x + local_r * math.cos(plane_angle_radians)
+        camera_y = target_y + local_r * math.sin(plane_angle_radians)
+        camera_z = target_z + local_z
         
         # 计算相机朝向目标物的旋转角度
         # 计算从相机到目标物的向量
@@ -615,19 +616,18 @@ def rot_line(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_de
         look_vector_y = target_y - camera_y
         look_vector_z = target_z - camera_z
         
-        # 计算俯仰角（pitch）- 朝向目标物（UE5左手坐标系）
+        # 计算俯仰角（pitch）
         horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
-        if horizontal_distance > 0:
-            # 在UE5中，向下看是负pitch
-            pitch = -math.degrees(math.atan2(look_vector_z, horizontal_distance))
-        else:
-            pitch = -90.0 if look_vector_z > 0 else 90.0
+        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
         
-        # 计算偏航角（yaw）- 朝向目标物（UE5左手坐标系）
-        if horizontal_distance > 0:
+        # 计算偏航角（yaw）
+        if horizontal_distance > 0.001:  # 避免在正上方时的不稳定计算
             yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
         else:
-            yaw = 0.0
+            # 当相机在目标物正上方时，保持前一帧的yaw值
+            yaw = previous_yaw if previous_yaw is not None else 0.0
+        
+        previous_yaw = yaw
         
         # 翻滚角保持为0
         roll = 0.0
