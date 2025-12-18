@@ -443,6 +443,104 @@ class CustomMoviePipeline():
         cls._render_controller.start_rendering()
 
     @classmethod
+    def render_multi_trajectory_serial(
+        cls,
+        trajectory_results: dict,
+        render_config: dict,
+        map_name: str,
+        target_name: str,
+        occlusion_actors: list,
+        target_actors: list,
+        current_target_actor,
+        executor
+    ) -> None:
+        """串行渲染多种轨迹类型 - 使用新的渲染控制器
+        
+        Args:
+            trajectory_results: 轨迹结果字典 {trajectory_type: (level, sequence_name)}
+            render_config: 基础渲染配置
+            map_name: 地图名称
+            target_name: 目标物名称
+            occlusion_actors: 遮挡物列表
+            target_actors: 所有目标物列表
+            current_target_actor: 当前目标物
+            executor: 执行器
+        """
+        from render_controller import RenderController, RenderSequenceBuilder, SceneConfig
+        
+        # 创建渲染控制器
+        cls._render_controller = RenderController(executor)
+        
+        # 准备场景配置
+        # OCC渲染场景配置：当前目标物可见，遮挡物可见，其他目标物隐藏
+        occ_scene_config = SceneConfig(
+            target_actors_visibility={actor.get_actor_label(): False for actor in target_actors},
+            occlusion_actors_visibility={actor.get_actor_label(): True for actor in occlusion_actors}
+        )
+        occ_scene_config.target_actors_visibility[current_target_actor.get_actor_label()] = True
+        
+        # GT渲染场景配置：当前目标物可见，遮挡物隐藏，其他目标物隐藏
+        gt_scene_config = SceneConfig(
+            target_actors_visibility={actor.get_actor_label(): False for actor in target_actors},
+            occlusion_actors_visibility={actor.get_actor_label(): False for actor in occlusion_actors}
+        )
+        gt_scene_config.target_actors_visibility[current_target_actor.get_actor_label()] = True
+        
+        # 构建多轨迹渲染序列
+        builder = RenderSequenceBuilder()
+        
+        import batch_utils
+        for trajectory_type, (level, sequence_name) in trajectory_results.items():
+            # 准备OCC渲染配置
+            render_config_occ = render_config.copy()
+            output_suffix = batch_utils.create_output_folder_name(map_name, target_name, "occ")
+            render_config_occ['File_Name_Format'] = f"render_data/{trajectory_type}/{output_suffix}/{{render_pass}}/{{frame_number}}"
+            
+            # 准备GT渲染配置
+            render_config_gt = render_config.copy()
+            output_suffix = batch_utils.create_output_folder_name(map_name, target_name, "GT")
+            render_config_gt['File_Name_Format'] = f"render_data/{trajectory_type}/{output_suffix}/{{render_pass}}/{{frame_number}}"
+            
+            # 添加OCC渲染步骤
+            builder.add_occ_render(
+                step_id=f"{trajectory_type}_occ_render",
+                scene_config=occ_scene_config,
+                render_config=render_config_occ,
+                level_path=level,
+                sequence_path=sequence_name
+            )
+            
+            # 添加GT渲染步骤
+            builder.add_gt_render(
+                step_id=f"{trajectory_type}_gt_render",
+                scene_config=gt_scene_config,
+                render_config=render_config_gt,
+                level_path=level,
+                sequence_path=sequence_name
+            )
+        
+        # 设置完成回调
+        def on_sequence_complete(context):
+            unreal.log("Multi-trajectory rendering completed successfully!")
+            # 触发批量目标物渲染的下一个目标物
+            if cls._is_batch_target_rendering:
+                cls._current_target_index += 1
+                cls._process_next_target()
+        
+        def on_sequence_failed(error):
+            unreal.log_error(f"Multi-trajectory rendering failed: {error}")
+            if cls._is_batch_target_rendering:
+                cls._current_target_index += 1
+                cls._process_next_target()
+        
+        cls._render_controller.on_sequence_complete = on_sequence_complete
+        cls._render_controller.on_sequence_failed = on_sequence_failed
+        
+        # 添加渲染序列并开始执行
+        cls._render_controller.add_render_sequence(builder.build())
+        cls._render_controller.start_rendering()
+
+    @classmethod
     def start_batch_target_rendering(
         cls,
         map_name: str,
@@ -508,36 +606,27 @@ class CustomMoviePipeline():
         from utils import log_msg_with_socket
         log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Starting')
         
-        # 生成相机轨迹
+        # 生成所有轨迹类型的相机序列
         import utils_sequencer
-        level, sequence_name = utils_sequencer.main(
+        trajectory_results = utils_sequencer.main(
             target_actor=current_task['target_actor'], 
             map_name=current_task['map_name']
         )
-        log_msg_with_socket(executor, f'[*] Created Sequence: {sequence_name}')
         
-        # 准备渲染配置
-        import batch_utils
-        render_config_occ = current_task['render_config'].copy()
-        output_suffix = batch_utils.create_output_folder_name(
-            current_task['map_name'], current_task['target_name'], "occ"
-        )
-        render_config_occ['File_Name_Format'] = f"{output_suffix}/{{render_pass}}/{{frame_number}}"
+        if not trajectory_results:
+            unreal.log_error("Failed to generate any trajectories")
+            return
         
-        render_config_gt = current_task['render_config'].copy()
-        output_suffix = batch_utils.create_output_folder_name(
-            current_task['map_name'], current_task['target_name'], "GT"
-        )
-        render_config_gt['File_Name_Format'] = f"{output_suffix}/{{render_pass}}/{{frame_number}}"
+        log_msg_with_socket(executor, f'[*] Created {len(trajectory_results)} trajectory sequences')
         
-        # 启动当前目标物的串行渲染
-        log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Starting serial rendering (OCC -> GT)')
+        # 启动多轨迹串行渲染
+        log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Starting multi-trajectory rendering')
         
-        cls.render_serial_occ_gt(
-            level=level,
-            level_sequence=sequence_name,
-            render_config_occ=render_config_occ,
-            render_config_gt=render_config_gt,
+        cls.render_multi_trajectory_serial(
+            trajectory_results=trajectory_results,
+            render_config=current_task['render_config'],
+            map_name=current_task['map_name'],
+            target_name=current_task['target_name'],
             occlusion_actors=current_task['occlusion_actors'],
             target_actors=current_task['target_actors'],
             current_target_actor=current_task['target_actor'],

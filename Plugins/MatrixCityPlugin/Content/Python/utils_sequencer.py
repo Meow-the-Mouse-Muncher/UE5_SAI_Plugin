@@ -742,27 +742,24 @@ def rot_arc(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_deg
 
 
 
-def main(target_actor=None, map_name=None, trajectory_type='rot_line', trajectory_params=None):
+def generate_single_trajectory(target_actor, map_name, trajectory_type, trajectory_params, camera_height, num_frames):
+    """生成单个轨迹类型的序列
+    
+    Args:
+        target_actor: 目标物Actor
+        map_name: 地图名称
+        trajectory_type: 轨迹类型 ('fix_line', 'rot_arc', 'rot_line')
+        trajectory_params: 轨迹参数
+        camera_height: 相机高度（共用参数）
+        num_frames: 帧数（共用参数）
+    
+    Returns:
+        tuple: (level, sequence_name) - 关卡路径和序列名称
+    """
     config_file = PLUGIN_ROOT / 'misc/user.json'
     with open(config_file, 'r') as f:
         config = json.load(f)
 
-    # 尝试加载轨迹配置（YAML），若存在则在 trajectory_params 缺省时使用
-    trajectory_cfg = load_trajectory_config()
-    if trajectory_params is None:
-        if isinstance(trajectory_cfg, dict):
-            if trajectory_type in trajectory_cfg and isinstance(trajectory_cfg[trajectory_type], dict):
-                trajectory_params = dict(trajectory_cfg[trajectory_type])
-                unreal.log(f"Using trajectory params from YAML for type '{trajectory_type}'")
-            elif 'default' in trajectory_cfg and isinstance(trajectory_cfg['default'], dict):
-                trajectory_params = dict(trajectory_cfg['default'])
-                unreal.log("Using default trajectory params from YAML")
-            else:
-                # Fallback: use whole YAML as params if it's a flat dict
-                trajectory_params = dict(trajectory_cfg)
-        else:
-            trajectory_params = {}
-        
     # 如果没有传入地图名，从配置中获取
     if map_name is None:
         level = config.get('ue_map', '/Game/Map/main')
@@ -770,10 +767,14 @@ def main(target_actor=None, map_name=None, trajectory_type='rot_line', trajector
         level = f'/Game/Map/{map_name}'
         
     # 从配置中获取相机名称，默认为 'CineCameraActor1'
-    target_camera_name = config.get('camera_name', 'CineCameraActor1') 
-    sequence_dir = '/Game/Sequences'
+    target_camera_name = config.get('camera_name', 'CineCameraActor1')
+    
+    # 根据轨迹类型设置序列保存目录
+    sequence_base_dir = '/Game/Sequences'
+    sequence_dir = f'{sequence_base_dir}/{trajectory_type}'  # 按轨迹类型分文件夹
+    
     seq_fps = 24
-    current_frame=0
+    current_frame = 0
     
     # 如果已经在正确的地图中，就不需要重新加载
     current_world = unreal.EditorLevelLibrary.get_editor_world()
@@ -787,63 +788,70 @@ def main(target_actor=None, map_name=None, trajectory_type='rot_line', trajector
             raise RuntimeError(error_msg)
         unreal.log(f"地图 {level} 加载成功。")
     
-    # 1. create a new level sequence
-    # 根据地图名和目标物名生成序列名称
+    # 根据地图名和目标物名生成序列名称，格式：scene_001_Target_002_50
     if map_name and target_actor:
         target_name = target_actor.get_actor_label()
-        sequence_name = f'{map_name}_{target_name}_sequence'
+        # 将相机高度从cm转换为米
+        height_in_meters = int(camera_height / 100.0)
+        sequence_name = f'{map_name}_{target_name}_{height_in_meters}'
     else:
-        sequence_name = 'aerial_train'  # 默认名称
+        height_in_meters = int(camera_height / 100.0)
+        sequence_name = f'aerial_train_{height_in_meters}'  # 默认名称
     
     # 根据轨迹类型生成相机轨迹
+    camera_trans = None
     if target_actor:
-        if trajectory_type == 'fix_line' :
+        if trajectory_type == 'fix_line':
             # 使用fix_line轨迹
-            num_frames = trajectory_params.get('num_frames', 32)
             angle_degrees = trajectory_params.get('angle_degrees', 0.0)
-            height_offset = trajectory_params.get('height_offset', 1000.0)
             trajectory_length = trajectory_params.get('trajectory_length', 4000.0)
             
             camera_trans, current_frame = fix_line(
                 target_actor=target_actor,
                 num_frames=num_frames,
                 angle_degrees=angle_degrees,
-                height_offset=height_offset,
+                height_offset=camera_height,  # 使用共用的camera_height
                 trajectory_length=trajectory_length,
                 current_frame=current_frame
             )
         elif trajectory_type == 'rot_arc':
             # 使用rot_arc轨迹
-            num_frames = trajectory_params.get('num_frames', 32)
             arc_angle_degrees = trajectory_params.get('arc_angle_degrees', 90.0)
-            radius = trajectory_params.get('radius', 2000.0)
             plane_angle_degrees = trajectory_params.get('plane_angle_degrees', 0.0)
             
             camera_trans, current_frame = rot_arc(
                 target_actor=target_actor,
                 num_frames=num_frames,
                 arc_angle_degrees=arc_angle_degrees,
-                radius=radius,
+                radius=camera_height,  # 使用共用的camera_height
                 plane_angle_degrees=plane_angle_degrees,
                 current_frame=current_frame
             )
         elif trajectory_type == 'rot_line':
             # 使用rot_line轨迹
-            num_frames = trajectory_params.get('num_frames', 32)
             arc_angle_degrees = trajectory_params.get('arc_angle_degrees', 90.0)
-            height = trajectory_params.get('height', 2000.0)  # 使用height而不是radius
             plane_angle_degrees = trajectory_params.get('plane_angle_degrees', 0.0)
             
             camera_trans, current_frame = rot_line(
                 target_actor=target_actor,
                 num_frames=num_frames,
                 arc_angle_degrees=arc_angle_degrees,
-                height=height,
+                height=camera_height,  # 使用共用的camera_height
                 plane_angle_degrees=plane_angle_degrees,
                 current_frame=current_frame
             )
 
-    seq_length=current_frame  #使用计算出的序列长度
+    seq_length = current_frame  # 使用计算出的序列长度
+    
+    # 确保序列目录存在
+    try:
+        # 检查目录是否存在，如果不存在则创建
+        if not unreal.EditorAssetLibrary.does_directory_exist(sequence_dir):
+            unreal.EditorAssetLibrary.make_directory(sequence_dir)
+            unreal.log(f"Created sequence directory: {sequence_dir}")
+    except Exception as e:
+        unreal.log_warning(f"Failed to create sequence directory {sequence_dir}: {e}")
+    
     # 生成新的序列资产，保证长度fps等设置
     new_sequence = generate_sequence(sequence_dir, sequence_name, seq_fps, seq_length) 
 
@@ -899,4 +907,63 @@ def main(target_actor=None, map_name=None, trajectory_type='rot_line', trajector
     unreal.EditorAssetLibrary.save_loaded_asset(new_sequence, False)
 
     return level, f'{sequence_dir}/{sequence_name}'
+
+
+def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_params=None):
+    """生成所有三种轨迹的序列
+    
+    Args:
+        target_actor: 目标物Actor
+        map_name: 地图名称
+        trajectory_type: 轨迹类型（已废弃，现在生成所有三种）
+        trajectory_params: 轨迹参数（已废弃，从YAML读取）
+    
+    Returns:
+        dict: 包含所有轨迹类型的序列信息 {trajectory_type: (level, sequence_name)}
+    """
+    # 加载轨迹配置
+    trajectory_cfg = load_trajectory_config()
+    if not isinstance(trajectory_cfg, dict):
+        unreal.log_error("Failed to load trajectory config")
+        return {}
+    
+    # 获取全局参数
+    global_params = trajectory_cfg.get('global', {})
+    camera_height = global_params.get('camera_height', 5000.0)
+    num_frames = global_params.get('num_frames', 32)
+    
+    unreal.log(f"Using global params: camera_height={camera_height}, num_frames={num_frames}")
+    
+    # 定义要生成的轨迹类型
+    trajectory_types = ['fix_line', 'rot_arc', 'rot_line']
+    results = {}
+    
+    # 为每种轨迹类型生成序列
+    for traj_type in trajectory_types:
+        unreal.log(f"Generating trajectory: {traj_type}")
+        
+        # 获取该轨迹类型的参数
+        traj_params = trajectory_cfg.get(traj_type, {})
+        
+        try:
+            # 生成单个轨迹序列
+            level, sequence_name = generate_single_trajectory(
+                target_actor=target_actor,
+                map_name=map_name,
+                trajectory_type=traj_type,
+                trajectory_params=traj_params,
+                camera_height=camera_height,
+                num_frames=num_frames
+            )
+            
+            results[traj_type] = (level, sequence_name)
+            unreal.log(f"Successfully generated {traj_type} trajectory: {sequence_name}")
+            
+        except Exception as e:
+            unreal.log_error(f"Failed to generate {traj_type} trajectory: {e}")
+            # 继续生成其他轨迹类型
+            continue
+    
+    unreal.log(f"Generated {len(results)} trajectory sequences")
+    return results
 
