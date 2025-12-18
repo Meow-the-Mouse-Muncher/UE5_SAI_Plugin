@@ -31,9 +31,8 @@ class CustomMoviePipeline():
     jobs = []
     new_executor = None
     
-    # 串行渲染控制变量
-    _pending_render_task = None  # 待执行的第二次渲染任务
-    _is_serial_rendering = False  # 是否在串行渲染模式
+    # 渲染控制器 - 新的方案3架构
+    _render_controller = None
     
     # 批量目标物渲染控制变量
     _target_render_queue = []  # 目标物渲染队列
@@ -374,7 +373,7 @@ class CustomMoviePipeline():
         current_target_actor,
         executor: Optional[unreal.MoviePipelineLinearExecutorBase] = None,
     ) -> None:
-        """串行渲染OCC和GT两个任务
+        """串行渲染OCC和GT两个任务 - 使用新的渲染控制器
         
         Args:
             level: 关卡路径
@@ -386,41 +385,62 @@ class CustomMoviePipeline():
             current_target_actor: 当前目标物
             executor: 执行器
         """
-        # 设置串行渲染状态
-        cls._is_serial_rendering = True
+        from render_controller import RenderController, RenderSequenceBuilder, SceneConfig
         
-        # 准备第二个任务（GT渲染）
-        cls._pending_render_task = {
-            'level': level,
-            'level_sequence': level_sequence,
-            'render_config': render_config_gt,
-            'occlusion_actors': occlusion_actors,
-            'target_actors': target_actors,
-            'current_target_actor': current_target_actor,
-            'visibility': False  # GT渲染时遮挡物不可见
-        }
+        # 创建渲染控制器
+        cls._render_controller = RenderController(executor)
         
-        # 开始第一个任务（OCC渲染）
-        unreal.log("Starting serial rendering: OCC first, then GT")
+        # 准备场景配置
+        # 1. OCC渲染场景配置：当前目标物可见，遮挡物可见，其他目标物隐藏
+        occ_scene_config = SceneConfig(
+            target_actors_visibility={actor.get_actor_label(): False for actor in target_actors},
+            occlusion_actors_visibility={actor.get_actor_label(): True for actor in occlusion_actors}
+        )
+        occ_scene_config.target_actors_visibility[current_target_actor.get_actor_label()] = True
         
-        # 设置目标物可见性：只有当前目标物可见
-        import batch_utils
-        batch_utils.set_actors_visibility(target_actors, visible=False)  # 隐藏所有目标物
-        batch_utils.set_actors_visibility([current_target_actor], visible=True)  # 显示当前目标物
+        # 2. GT渲染场景配置：当前目标物可见，遮挡物隐藏，其他目标物隐藏
+        gt_scene_config = SceneConfig(
+            target_actors_visibility={actor.get_actor_label(): False for actor in target_actors},
+            occlusion_actors_visibility={actor.get_actor_label(): False for actor in occlusion_actors}
+        )
+        gt_scene_config.target_actors_visibility[current_target_actor.get_actor_label()] = True
         
-        # 设置遮挡物可见（OCC渲染）
-        batch_utils.set_actors_visibility(occlusion_actors, visible=True)
-        
-        # 清空队列并添加第一个任务
-        cls.clear_queue()
-        cls.add_job_to_queue_with_render_config(
-            level=level,
-            level_sequence=level_sequence,
-            render_config=render_config_occ
+        # 构建渲染序列
+        builder = RenderSequenceBuilder()
+        builder.add_occ_render(
+            step_id="occ_render",
+            scene_config=occ_scene_config,
+            render_config=render_config_occ,
+            level_path=level,
+            sequence_path=level_sequence
+        ).add_gt_render(
+            step_id="gt_render", 
+            scene_config=gt_scene_config,
+            render_config=render_config_gt,
+            level_path=level,
+            sequence_path=level_sequence
         )
         
-        # 启动第一次渲染（完成后会自动触发第二次渲染）
-        cls.render_queue(executor=executor)
+        # 设置完成回调
+        def on_sequence_complete(context):
+            unreal.log("Serial rendering (OCC -> GT) completed successfully!")
+            # 触发批量目标物渲染的下一个目标物
+            if cls._is_batch_target_rendering:
+                cls._current_target_index += 1
+                cls._process_next_target()
+        
+        def on_sequence_failed(error):
+            unreal.log_error(f"Serial rendering failed: {error}")
+            if cls._is_batch_target_rendering:
+                cls._current_target_index += 1
+                cls._process_next_target()
+        
+        cls._render_controller.on_sequence_complete = on_sequence_complete
+        cls._render_controller.on_sequence_failed = on_sequence_failed
+        
+        # 添加渲染序列并开始执行
+        cls._render_controller.add_render_sequence(builder.build())
+        cls._render_controller.start_rendering()
 
     @classmethod
     def start_batch_target_rendering(
@@ -431,7 +451,7 @@ class CustomMoviePipeline():
         render_config: dict,
         executor
     ) -> None:
-        """启动批量目标物串行渲染
+        """启动批量目标物串行渲染 
         
         Args:
             map_name: 地图名称
@@ -472,7 +492,7 @@ class CustomMoviePipeline():
 
     @classmethod
     def _process_next_target(cls):
-        """处理下一个目标物"""
+        """处理下一个目标物 - 使用新的渲染控制器"""
         if cls._current_target_index >= len(cls._target_render_queue):
             # 当前地图的所有目标物处理完成
             cls._on_map_targets_completed()
@@ -546,59 +566,14 @@ class CustomMoviePipeline():
             success (bool): Whether the queue finished successfully.
         """
         mss = f"Render completed. Success: {success}"
-        unreal.log(mss)  # 使用普通日志，避免Socket问题
+        unreal.log(mss)
         
-        # 检查是否有待执行的串行渲染任务
-        if CustomMoviePipeline._is_serial_rendering and CustomMoviePipeline._pending_render_task:
-            unreal.log("First render completed, starting second render...")
-            
-            # 获取待执行任务
-            task = CustomMoviePipeline._pending_render_task
-            
-            # 设置目标物可见性：保持当前目标物可见，其他隐藏
-            import batch_utils
-            if 'target_actors' in task and 'current_target_actor' in task:
-                batch_utils.set_actors_visibility(task['target_actors'], visible=False)  # 隐藏所有目标物
-                batch_utils.set_actors_visibility([task['current_target_actor']], visible=True)  # 显示当前目标物
-            
-            # 设置遮挡物可见性
-            batch_utils.set_actors_visibility(task['occlusion_actors'], visible=task['visibility'])
-            
-            # 清空队列并添加第二个任务
-            CustomMoviePipeline.clear_queue()
-            CustomMoviePipeline.add_job_to_queue_with_render_config(
-                level=task['level'],
-                level_sequence=task['level_sequence'],
-                render_config=task['render_config']
+        # 如果有渲染控制器，通知它渲染完成
+        if CustomMoviePipeline._render_controller:
+            CustomMoviePipeline._render_controller._on_render_complete(
+                CustomMoviePipeline._render_controller.get_current_step(), 
+                success
             )
-            
-            # 清空待执行任务，避免无限循环
-            CustomMoviePipeline._pending_render_task = None
-            
-            # 创建新的执行器，避免Socket连接冲突
-            new_executor = unreal.MoviePipelinePIEExecutor()
-            new_executor.connect_socket(CustomMoviePipeline.host, CustomMoviePipeline.port)
-            
-            # 启动第二次渲染
-            CustomMoviePipeline.render_queue(executor=new_executor)
-        else:
-            # 串行渲染完成，重置状态
-            CustomMoviePipeline._is_serial_rendering = False
-            unreal.log("Serial rendering completed!")
-            
-            # 检查是否在批量目标物渲染模式
-            if CustomMoviePipeline._is_batch_target_rendering:
-                # 当前目标物完成，移动到下一个目标物
-                CustomMoviePipeline._current_target_index += 1
-                
-                # 记录当前目标物完成
-                if CustomMoviePipeline._current_target_index <= len(CustomMoviePipeline._target_render_queue):
-                    current_task = CustomMoviePipeline._target_render_queue[CustomMoviePipeline._current_target_index - 1]
-                    from utils import log_msg_with_socket
-                    log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Completed')
-                
-                # 处理下一个目标物
-                CustomMoviePipeline._process_next_target()
 
     def onIndividualJobFinishedCallback(inJob: unreal.MoviePipelineExecutorJob, success: bool):
         """On individual job finished callback.

@@ -64,11 +64,7 @@ Batch_Settings:
   # 序列设置
   sequence_fps: 24
   sequence_folder: "/Game/Sequences"
-  
-  # 轨迹生成参数
-  trajectory_settings:
-    box_size: 20000  # 围绕目标物的盒子大小
-    camera_height_offset: 10000  # 相机高度偏移
+
     
 # 输出设置
 Output_Settings:
