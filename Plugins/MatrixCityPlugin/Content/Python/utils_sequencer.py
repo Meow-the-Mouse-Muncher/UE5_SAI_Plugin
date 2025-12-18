@@ -555,7 +555,101 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
     return camera_trans, end_frame
 
 
-def rot_line(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_degrees, current_frame=0):
+def rot_line(target_actor, num_frames, arc_angle_degrees, height, plane_angle_degrees, current_frame=0):
+    """
+    以目标物为中心生成直线轨迹，相机始终对准目标物
+    按角度均匀采样，而不是按距离均匀采样（类似rot_arc的角度采样方式）
+    
+    Args:
+        target_actor: 目标物Actor
+        num_frames (int): 图像张数（帧数）
+        arc_angle_degrees (float): 角度范围（度），用于角度均匀采样
+        height (float): 相机相对于目标物的高度（UE单位：cm）
+        plane_angle_degrees (float): 直线与X轴的夹角（度）
+            - 0度: 直线沿X轴方向
+            - 90度: 直线沿Y轴方向
+        current_frame (int): 起始帧数，默认为0
+    
+    Returns:
+        tuple: (camera_trans, end_frame) - 相机轨迹列表和结束帧数
+    """
+    # 获取目标物位置
+    target_location = target_actor.get_actor_location()
+    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
+    
+    # 计算相机高度
+    camera_z = target_z + height
+    
+    # 将角度转换为弧度
+    arc_angle_radians = math.radians(arc_angle_degrees)
+    plane_angle_radians = math.radians(plane_angle_degrees)
+
+    # 计算圆弧的起始角度（以垂直向上90度为中心）
+    center_angle = math.pi / 2.0  # 90度，垂直向上
+    start_angle = center_angle - arc_angle_radians / 2.0
+    end_angle = center_angle + arc_angle_radians / 2.0
+
+    
+    # 生成轨迹点
+    camera_trans = []
+    
+    for i in range(num_frames):
+        # 按角度均匀采样（类似rot_arc）
+        if num_frames > 1:
+            t = i / (num_frames - 1)  # 0.0 到 1.0
+        else:
+            t = 0.0
+        
+        # 当前视角角度（从目标物看向相机的角度）
+        current_angle = start_angle + t * (end_angle - start_angle)
+
+        # 在垂直平面的局部坐标系中计算圆弧上的点
+        # 局部坐标系：水平方向为local_r，垂直方向为local_z
+        local_r = height / math.tan(current_angle)  # 水平距离（从目标物向外的距离）
+        local_z = height  # 垂直距离（相对于目标物的高度）
+        
+        # 将局部坐标转换到世界坐标系
+        # 根据plane_angle_degrees确定水平方向在XY平面的投影
+        camera_x = target_x + local_r * math.cos(plane_angle_radians)
+        camera_y = target_y + local_r * math.sin(plane_angle_radians)
+        camera_z = target_z + local_z
+
+                
+        # 计算相机朝向目标物的旋转角度
+        # 计算从相机到目标物的向量
+        look_vector_x = target_x - camera_x
+        look_vector_y = target_y - camera_y
+        look_vector_z = target_z - camera_z
+        
+        # 计算俯仰角（pitch）
+        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
+        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
+        
+        # 计算偏航角（yaw）
+        if horizontal_distance > 0.001:  # 避免在正上方时的不稳定计算
+            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
+        else:
+            yaw = previous_yaw if previous_yaw is not None else 0.0
+
+        previous_yaw = yaw
+
+        # 翻滚角保持为0
+        roll = 0.0
+        
+        # 添加轨迹点
+        camera_trans.append(
+            SequenceKey(
+                frame=current_frame + i,
+                location=(camera_x, camera_y, camera_z),
+                rotation=(roll, pitch, yaw)
+            )
+        )
+    
+    end_frame = current_frame + num_frames
+    return camera_trans, end_frame
+
+
+def rot_arc(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_degrees, current_frame=0):
     """
     以目标物为中心生成圆弧轨迹，相机始终对准目标物
     圆弧轨迹在包含目标物Z轴的垂直平面内
@@ -718,18 +812,33 @@ def main(target_actor=None, map_name=None, trajectory_type='rot_line', trajector
                 trajectory_length=trajectory_length,
                 current_frame=current_frame
             )
+        elif trajectory_type == 'rot_arc':
+            # 使用rot_arc轨迹
+            num_frames = trajectory_params.get('num_frames', 32)
+            arc_angle_degrees = trajectory_params.get('arc_angle_degrees', 90.0)
+            radius = trajectory_params.get('radius', 2000.0)
+            plane_angle_degrees = trajectory_params.get('plane_angle_degrees', 0.0)
+            
+            camera_trans, current_frame = rot_arc(
+                target_actor=target_actor,
+                num_frames=num_frames,
+                arc_angle_degrees=arc_angle_degrees,
+                radius=radius,
+                plane_angle_degrees=plane_angle_degrees,
+                current_frame=current_frame
+            )
         elif trajectory_type == 'rot_line':
             # 使用rot_line轨迹
             num_frames = trajectory_params.get('num_frames', 32)
             arc_angle_degrees = trajectory_params.get('arc_angle_degrees', 90.0)
-            radius = trajectory_params.get('radius', 2000.0)
+            height = trajectory_params.get('height', 2000.0)  # 使用height而不是radius
             plane_angle_degrees = trajectory_params.get('plane_angle_degrees', 0.0)
             
             camera_trans, current_frame = rot_line(
                 target_actor=target_actor,
                 num_frames=num_frames,
                 arc_angle_degrees=arc_angle_degrees,
-                radius=radius,
+                height=height,
                 plane_angle_degrees=plane_angle_degrees,
                 current_frame=current_frame
             )
