@@ -537,19 +537,19 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
         t = i / (num_frames - 1) if num_frames > 1 else 0.0
         
         # 线性插值计算当前位置
-        current_x = start_x + t * (end_x - start_x)
-        current_y = start_y + t * (end_y - start_y)
+        camera_x = start_x + t * (end_x - start_x)
+        camera_y = start_y + t * (end_y - start_y)
         
         # 设置相机垂直向下看的旋转角度
-        roll = 0.0   # 不翻滚
-        pitch = -90.0  # 垂直向下
-        yaw = 0.0    # 朝向正X轴方向
+        roll = 0
+        pitch = -90
+        yaw = 0
         
         # 添加轨迹点
         camera_trans.append(
             SequenceKey(
                 frame=current_frame + i,
-                location=(current_x, current_y, camera_z),
+                location=(camera_x, camera_y, camera_z),
                 rotation=(roll, pitch, yaw)
             )
         )
@@ -647,13 +647,9 @@ def rot_line(target_actor, num_frames, arc_angle_degrees, height, plane_angle_de
         
         # 计算俯仰角（pitch）
         horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
-        if horizontal_distance > 0.001:
-            pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
-            # 计算偏航角（yaw）
-            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
-        else:
-            # 当相机在目标物正上方时，保持前一帧的yaw值
-            yaw = previous_yaw if previous_yaw is not None else 0.0
+        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
+        # 计算偏航角（yaw）
+        yaw = 0
         
         # 翻滚角保持为0
         roll = 0.0
@@ -737,12 +733,7 @@ def rot_arc(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_deg
         horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
         pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
         
-        # 计算偏航角（yaw）
-        if horizontal_distance > 0.001:  # 避免在正上方时的不稳定计算
-            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
-        else:
-            # 当相机在目标物正上方时，保持前一帧的yaw值
-            yaw = previous_yaw if previous_yaw is not None else 0.0
+        yaw = 0
         
         previous_yaw = yaw
         
