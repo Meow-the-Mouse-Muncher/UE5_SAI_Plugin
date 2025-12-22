@@ -443,7 +443,7 @@ class CustomMoviePipeline():
         cls._render_controller.start_rendering()
 
     @classmethod
-    def render_multi_trajectory_serial(
+    def render_multi_trajectory_multi_height_serial(
         cls,
         trajectory_results: dict,
         render_config: dict,
@@ -454,10 +454,10 @@ class CustomMoviePipeline():
         current_target_actor,
         executor
     ) -> None:
-        """串行渲染多种轨迹类型 - 使用新的渲染控制器
+        """串行渲染多种轨迹类型和多种高度 - 使用新的渲染控制器
         
         Args:
-            trajectory_results: 轨迹结果字典 {trajectory_type: (level, sequence_name)}
+            trajectory_results: 轨迹结果字典 {(trajectory_type, height): (level, sequence_name)}
             render_config: 基础渲染配置
             map_name: 地图名称
             target_name: 目标物名称
@@ -486,24 +486,29 @@ class CustomMoviePipeline():
         )
         gt_scene_config.target_actors_visibility[current_target_actor.get_actor_label()] = True
         
-        # 构建多轨迹渲染序列
+        # 构建多轨迹多高度渲染序列
         builder = RenderSequenceBuilder()
         
         import batch_utils
-        for trajectory_type, (level, sequence_name) in trajectory_results.items():
+        for (trajectory_type, camera_height), (level, sequence_name) in trajectory_results.items():
+            # 将高度转换为米，格式化为3位数字
+            height_in_meters = int(camera_height / 100.0)
+            height_str = f"height_{height_in_meters:03d}"  # 格式化为 height_050
+            
             # 准备OCC渲染配置
             render_config_occ = render_config.copy()
-            output_suffix = batch_utils.create_output_folder_name(map_name, target_name, "occ")
-            render_config_occ['File_Name_Format'] = f"render_data/{trajectory_type}/{output_suffix}/{{render_pass}}/{{frame_number}}"
+            # 文件名格式: scene_001_Target_002_height_050_occ
+            output_name = f"{map_name}_{target_name}_{height_str}_occ"
+            render_config_occ['File_Name_Format'] = f"render_data/{trajectory_type}/{output_name}/{{render_pass}}/{{frame_number}}"
             
             # 准备GT渲染配置
             render_config_gt = render_config.copy()
-            output_suffix = batch_utils.create_output_folder_name(map_name, target_name, "GT")
-            render_config_gt['File_Name_Format'] = f"render_data/{trajectory_type}/{output_suffix}/{{render_pass}}/{{frame_number}}"
+            output_name = f"{map_name}_{target_name}_{height_str}_GT"
+            render_config_gt['File_Name_Format'] = f"render_data/{trajectory_type}/{output_name}/{{render_pass}}/{{frame_number}}"
             
             # 添加OCC渲染步骤
             builder.add_occ_render(
-                step_id=f"{trajectory_type}_occ_render",
+                step_id=f"{trajectory_type}_{height_str}_occ_render",
                 scene_config=occ_scene_config,
                 render_config=render_config_occ,
                 level_path=level,
@@ -512,7 +517,7 @@ class CustomMoviePipeline():
             
             # 添加GT渲染步骤
             builder.add_gt_render(
-                step_id=f"{trajectory_type}_gt_render",
+                step_id=f"{trajectory_type}_{height_str}_gt_render",
                 scene_config=gt_scene_config,
                 render_config=render_config_gt,
                 level_path=level,
@@ -521,14 +526,14 @@ class CustomMoviePipeline():
         
         # 设置完成回调
         def on_sequence_complete(context):
-            unreal.log("Multi-trajectory rendering completed successfully!")
+            unreal.log("Multi-trajectory multi-height rendering completed successfully!")
             # 触发批量目标物渲染的下一个目标物
             if cls._is_batch_target_rendering:
                 cls._current_target_index += 1
                 cls._process_next_target()
         
         def on_sequence_failed(error):
-            unreal.log_error(f"Multi-trajectory rendering failed: {error}")
+            unreal.log_error(f"Multi-trajectory multi-height rendering failed: {error}")
             if cls._is_batch_target_rendering:
                 cls._current_target_index += 1
                 cls._process_next_target()
@@ -606,7 +611,7 @@ class CustomMoviePipeline():
         from utils import log_msg_with_socket
         log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Starting')
         
-        # 生成所有轨迹类型的相机序列
+        # 生成所有轨迹类型和高度的相机序列
         import utils_sequencer
         trajectory_results = utils_sequencer.main(
             target_actor=current_task['target_actor'], 
@@ -619,10 +624,10 @@ class CustomMoviePipeline():
         
         log_msg_with_socket(executor, f'[*] Created {len(trajectory_results)} trajectory sequences')
         
-        # 启动多轨迹串行渲染
-        log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Starting multi-trajectory rendering')
+        # 启动多轨迹多高度串行渲染
+        log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Starting multi-trajectory multi-height rendering')
         
-        cls.render_multi_trajectory_serial(
+        cls.render_multi_trajectory_multi_height_serial(
             trajectory_results=trajectory_results,
             render_config=current_task['render_config'],
             map_name=current_task['map_name'],
