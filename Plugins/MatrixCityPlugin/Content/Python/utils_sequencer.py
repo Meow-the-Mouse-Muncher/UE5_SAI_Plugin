@@ -495,7 +495,7 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
     Args:
         target_actor: 目标物Actor
         num_frames (int): 图像张数（帧数）
-        angle_degrees (float): 与x轴的夹角（度）
+        angle_degrees (float): 与x轴的夹角（度）- 直线的方向角度
         height_offset (float): 相对于目标物的高度偏移（UE单位：cm）
         trajectory_length (float): 运动轨迹的长度（UE单位：cm）
         current_frame (int): 起始帧数，默认为0
@@ -517,12 +517,15 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
     dx = math.cos(angle_radians)
     dy = math.sin(angle_radians)
     
-    # 计算起点和终点（以目标物为中心，轨迹长度的一半为半径）
+    # 修正：计算起点和终点，确保起点在angle_degrees的反方向
+    # 这样轨迹从angle_degrees的反方向开始，向angle_degrees方向移动
     half_length = trajectory_length / 2.0
     
+    # 起点：从目标物沿angle_degrees反方向偏移half_length
     start_x = target_x - half_length * dx
     start_y = target_y - half_length * dy
     
+    # 终点：从目标物沿angle_degrees正方向偏移half_length  
     end_x = target_x + half_length * dx
     end_y = target_y + half_length * dy
     
@@ -558,13 +561,13 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
 def rot_line(target_actor, num_frames, arc_angle_degrees, height, plane_angle_degrees, current_frame=0):
     """
     以目标物为中心生成直线轨迹，相机始终对准目标物
-    按角度均匀采样，而不是按距离均匀采样（类似rot_arc的角度采样方式）
+    按角度均匀采样生成直线上的点，相机在固定高度的水平面上移动
     
     Args:
         target_actor: 目标物Actor
         num_frames (int): 图像张数（帧数）
         arc_angle_degrees (float): 角度范围（度），用于角度均匀采样
-        height (float): 相机相对于目标物的高度（UE单位：cm）
+        height (float): 相机相对于目标物的垂直高度偏移（UE单位：cm）
         plane_angle_degrees (float): 直线与X轴的夹角（度）
             - 0度: 直线沿X轴方向
             - 90度: 直线沿Y轴方向
@@ -577,44 +580,65 @@ def rot_line(target_actor, num_frames, arc_angle_degrees, height, plane_angle_de
     target_location = target_actor.get_actor_location()
     target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
     
-    # 计算相机高度
+    # 计算相机高度（固定高度偏移）
     camera_z = target_z + height
     
     # 将角度转换为弧度
     arc_angle_radians = math.radians(arc_angle_degrees)
     plane_angle_radians = math.radians(plane_angle_degrees)
-
-    # 计算圆弧的起始角度（以垂直向上90度为中心）
-    center_angle = math.pi / 2.0  # 90度，垂直向上
-    start_angle = center_angle - arc_angle_radians / 2.0
-    end_angle = center_angle + arc_angle_radians / 2.0
-
+    
+    # 计算直线的长度（基于高度和角度范围）
+    # 使用高度作为参考距离，根据角度范围计算直线长度
+    reference_distance = height  # 使用高度作为参考距离
+    line_length = 2.0 * reference_distance * math.tan(arc_angle_radians / 2.0)
+    
+    # 计算直线的起点和终点（在水平面上）
+    # 直线方向向量
+    line_direction_x = math.cos(plane_angle_radians)
+    line_direction_y = math.sin(plane_angle_radians)
+    
+    # 直线中心点（目标物在水平面上的投影）
+    line_center_x = target_x
+    line_center_y = target_y
+    
+    # 计算起点和终点
+    half_length = line_length / 2.0
+    start_x = line_center_x - half_length * line_direction_x
+    start_y = line_center_y - half_length * line_direction_y
+    end_x = line_center_x + half_length * line_direction_x
+    end_y = line_center_y + half_length * line_direction_y
     
     # 生成轨迹点
     camera_trans = []
     
     for i in range(num_frames):
-        # 按角度均匀采样（类似rot_arc）
+        # 按角度均匀采样的思路：
+        # 1. 先计算角度采样点
+        # 2. 将角度采样点映射到直线上的位置
         if num_frames > 1:
-            t = i / (num_frames - 1)  # 0.0 到 1.0
+            angle_t = i / (num_frames - 1)  # 0.0 到 1.0
         else:
-            t = 0.0
+            angle_t = 0.0
         
-        # 当前视角角度（从目标物看向相机的角度）
-        current_angle = start_angle + t * (end_angle - start_angle)
-
-        # 在垂直平面的局部坐标系中计算圆弧上的点
-        # 局部坐标系：水平方向为local_r，垂直方向为local_z
-        local_r = height / math.tan(current_angle)  # 水平距离（从目标物向外的距离）
-        local_z = height  # 垂直距离（相对于目标物的高度）
+        # 将角度采样转换为直线上的位置参数
+        # 使用正弦函数映射，使得角度均匀采样对应直线上的非均匀采样
+        # 这样可以保持与rot_arc相似的角度采样特性
+        current_angle = -arc_angle_radians / 2.0 + angle_t * arc_angle_radians
         
-        # 将局部坐标转换到世界坐标系
-        # 根据plane_angle_degrees确定水平方向在XY平面的投影
-        camera_x = target_x + local_r * math.cos(plane_angle_radians)
-        camera_y = target_y + local_r * math.sin(plane_angle_radians)
-        camera_z = target_z + local_z
-
-                
+        # 将角度映射到直线位置参数 t (0.0 到 1.0)
+        # 使用正弦函数的反函数来实现角度到位置的映射
+        if arc_angle_radians > 0:
+            position_t = (math.sin(current_angle) + math.sin(arc_angle_radians / 2.0)) / (2.0 * math.sin(arc_angle_radians / 2.0))
+        else:
+            position_t = angle_t
+        
+        # 确保position_t在[0,1]范围内
+        position_t = max(0.0, min(1.0, position_t))
+        
+        # 根据位置参数计算相机在直线上的位置
+        camera_x = start_x + position_t * (end_x - start_x)
+        camera_y = start_y + position_t * (end_y - start_y)
+        
         # 计算相机朝向目标物的旋转角度
         # 计算从相机到目标物的向量
         look_vector_x = target_x - camera_x
@@ -623,16 +647,14 @@ def rot_line(target_actor, num_frames, arc_angle_degrees, height, plane_angle_de
         
         # 计算俯仰角（pitch）
         horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
-        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
-        
-        # 计算偏航角（yaw）
-        if horizontal_distance > 0.001:  # 避免在正上方时的不稳定计算
+        if horizontal_distance > 0.001:
+            pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
+            # 计算偏航角（yaw）
             yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
         else:
+            # 当相机在目标物正上方时，保持前一帧的yaw值
             yaw = previous_yaw if previous_yaw is not None else 0.0
-
-        previous_yaw = yaw
-
+        
         # 翻滚角保持为0
         roll = 0.0
         
@@ -660,8 +682,8 @@ def rot_arc(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_deg
         arc_angle_degrees (float): 圆弧的角度范围（度）
         radius (float): 圆弧半径（UE单位：cm）
         plane_angle_degrees (float): 垂直平面与X轴的夹角（度）
-            - 0度: 圆弧在XZ平面内
-            - 90度: 圆弧在YZ平面内
+            - 0度: 圆弧在XZ平面内，起点朝向X轴正方向
+            - 90度: 圆弧在YZ平面内，起点朝向Y轴正方向
         current_frame (int): 起始帧数，默认为0
     
     Returns:
@@ -676,6 +698,7 @@ def rot_arc(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_deg
     plane_angle_radians = math.radians(plane_angle_degrees)
     
     # 计算圆弧的起始角度（以垂直向上90度为中心）
+    # 这样圆弧的中心点在目标物正上方，相机在圆弧上看向地面目标物
     center_angle = math.pi / 2.0  # 90度，垂直向上
     start_angle = center_angle - arc_angle_radians / 2.0
     end_angle = center_angle + arc_angle_radians / 2.0

@@ -10,7 +10,7 @@ global:
 
 # fix_line 轨迹参数
 fix_line:
-  angle_degrees: 0.0           # 与x轴的夹角（度）, 0度表示沿x轴正方向
+  angle_degrees: 45           # 与x轴的夹角（度）, 0度表示沿x轴正方向
   trajectory_length: 5000.0    # 运动轨迹的长度（UE单位：cm，5000cm = 50米）
 
 # rot_arc 轨迹参数（圆弧轨迹）
@@ -21,7 +21,7 @@ rot_arc:
 # rot_line 轨迹参数（直线轨迹，相机始终看向目标物）
 rot_line:
   arc_angle_degrees: 90.0     # 弧度角度范围（度）
-  plane_angle_degrees: 0.0    # 直线与X轴的夹角（度）
+  plane_angle_degrees: 45    # 直线与X轴的夹角（度）
 
 
 # 序列设置
