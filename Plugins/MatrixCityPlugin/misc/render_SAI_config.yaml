@@ -65,12 +65,8 @@ Batch_Settings:
   sequence_fps: 24
   sequence_folder: "/Game/Sequences"
 
-    
 # 输出设置
 Output_Settings:
-  # 基础输出路径
-  base_output_path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/batch_render_data"
-  
   # 文件命名格式
   # 支持的变量: {map_name}, {target_name}, {suffix}, {render_pass}, {frame_number}
   file_name_format: "{map_name}_{target_name}_{suffix}/{render_pass}/{frame_number}"
@@ -78,4 +74,3 @@ Output_Settings:
   # 后缀设置
   occlusion_suffix: "occ"    # 有遮挡物的后缀
   ground_truth_suffix: "GT"  # 无遮挡物的后缀
-

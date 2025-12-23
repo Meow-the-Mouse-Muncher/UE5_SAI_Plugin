@@ -802,12 +802,12 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
             raise RuntimeError(error_msg)
         unreal.log(f"地图 {level} 加载成功。")
     
-    # 根据地图名和目标物名生成序列名称，格式：scene_001_Target_002_50
+    # 根据地图名和目标物名生成序列名称，格式：scene_001_Target_002_height_50
     if map_name and target_actor:
         target_name = target_actor.get_actor_label()
         # 将相机高度从cm转换为米
         height_in_meters = int(camera_height / 100.0)
-        sequence_name = f'{map_name}_{target_name}_{height_in_meters}'
+        sequence_name = f'{map_name}_{target_name}_height_{height_in_meters}'
     else:
         height_in_meters = int(camera_height / 100.0)
         sequence_name = f'aerial_train_{height_in_meters}'  # 默认名称

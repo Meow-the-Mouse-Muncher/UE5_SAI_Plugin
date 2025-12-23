@@ -499,12 +499,12 @@ class CustomMoviePipeline():
             render_config_occ = render_config.copy()
             # 文件名格式: scene_001_Target_002_height_050_occ
             output_name = f"{map_name}_{target_name}_{height_str}_occ"
-            render_config_occ['File_Name_Format'] = f"render_data/{trajectory_type}/{output_name}/{{render_pass}}/{{frame_number}}"
+            render_config_occ['File_Name_Format'] = f"{trajectory_type}/{output_name}/{{render_pass}}/{{frame_number}}"
             
             # 准备GT渲染配置
             render_config_gt = render_config.copy()
             output_name = f"{map_name}_{target_name}_{height_str}_GT"
-            render_config_gt['File_Name_Format'] = f"render_data/{trajectory_type}/{output_name}/{{render_pass}}/{{frame_number}}"
+            render_config_gt['File_Name_Format'] = f"{trajectory_type}/{output_name}/{{render_pass}}/{{frame_number}}"
             
             # 添加OCC渲染步骤
             builder.add_occ_render(
