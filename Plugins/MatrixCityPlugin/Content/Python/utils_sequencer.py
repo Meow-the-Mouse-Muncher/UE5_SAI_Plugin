@@ -532,6 +532,9 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
     # 生成轨迹点
     camera_trans = []
     
+    # 用于存储前一帧的 yaw 角度，处理奇点情况
+    previous_yaw = 0.0
+    
     for i in range(num_frames):
         # 计算当前帧的插值比例 (0.0 到 1.0)
         t = i / (num_frames - 1) if num_frames > 1 else 0.0
@@ -540,10 +543,25 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
         camera_x = start_x + t * (end_x - start_x)
         camera_y = start_y + t * (end_y - start_y)
         
-        # 设置相机垂直向下看的旋转角度
+        # 计算相机朝向目标物的旋转角度
+        # 计算从相机到目标物的向量
+        look_vector_x = target_x - camera_x
+        look_vector_y = target_y - camera_y
+        look_vector_z = target_z - camera_z
+        
+        # 计算俯仰角（pitch）
+        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
+        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
+        
+        # 计算偏航角（yaw）- 处理奇点情况
+        if horizontal_distance < 1e-6:  # 相机在目标物正上方（奇点）
+            yaw = previous_yaw  # 使用前一帧的 yaw 角度
+        else:
+            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
+            previous_yaw = yaw  # 更新前一帧的 yaw 角度
+        
+        # 翻滚角保持为0
         roll = 0
-        pitch = -90
-        yaw = 0
         
         # 添加轨迹点
         camera_trans.append(
@@ -611,6 +629,9 @@ def rot_line(target_actor, num_frames, arc_angle_degrees, height, plane_angle_de
     # 生成轨迹点
     camera_trans = []
     
+    # 用于存储前一帧的 yaw 角度，处理奇点情况
+    previous_yaw = 0.0
+    
     for i in range(num_frames):
         # 按角度均匀采样的思路：
         # 1. 先计算角度采样点
@@ -648,8 +669,13 @@ def rot_line(target_actor, num_frames, arc_angle_degrees, height, plane_angle_de
         # 计算俯仰角（pitch）
         horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
         pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
-        # 计算偏航角（yaw）
-        yaw = 0
+        
+        # 计算偏航角（yaw）- 处理奇点情况
+        if horizontal_distance < 1e-6:  # 相机在目标物正上方（奇点）
+            yaw = previous_yaw  # 使用前一帧的 yaw 角度
+        else:
+            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
+            previous_yaw = yaw  # 更新前一帧的 yaw 角度
         
         # 翻滚角保持为0
         roll = 0.0
@@ -701,7 +727,9 @@ def rot_arc(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_deg
     
     # 生成轨迹点
     camera_trans = []
-    previous_yaw = None  # 用于角度展开
+    
+    # 用于存储前一帧的 yaw 角度，处理奇点情况
+    previous_yaw = 0.0
     
     for i in range(num_frames):
         # 计算当前帧在圆弧上的角度
@@ -733,9 +761,12 @@ def rot_arc(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_deg
         horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
         pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
         
-        yaw = 0
-        
-        previous_yaw = yaw
+        # 计算偏航角（yaw）- 处理奇点情况
+        if horizontal_distance < 1e-6:  # 相机在目标物正上方（奇点）
+            yaw = previous_yaw  # 使用前一帧的 yaw 角度
+        else:
+            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
+            previous_yaw = yaw  # 更新前一帧的 yaw 角度
         
         # 翻滚角保持为0
         roll = 0.0
@@ -805,11 +836,11 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
     # 根据地图名和目标物名生成序列名称，格式：scene_001_Target_002_height_50
     if map_name and target_actor:
         target_name = target_actor.get_actor_label()
-        # 将相机高度从cm转换为米
-        height_in_meters = int(camera_height / 100.0)
+        # 将相机高度从cm转换为米，并格式化为3位数
+        height_in_meters = str(int(camera_height / 100.0)).zfill(3)
         sequence_name = f'{map_name}_{target_name}_height_{height_in_meters}'
     else:
-        height_in_meters = int(camera_height / 100.0)
+        height_in_meters = str(int(camera_height / 100.0)).zfill(3)
         sequence_name = f'aerial_train_{height_in_meters}'  # 默认名称
     
     # 根据轨迹类型生成相机轨迹
@@ -955,7 +986,7 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
     # 为每种轨迹类型和每种高度生成序列
     for traj_type in trajectory_types:
         for camera_height in camera_heights:
-            height_in_meters = int(camera_height / 100.0)
+            height_in_meters = str(int(camera_height / 100.0)).zfill(3)
             unreal.log(f"Generating trajectory: {traj_type} at height {height_in_meters}m")
             
             # 获取该轨迹类型的参数

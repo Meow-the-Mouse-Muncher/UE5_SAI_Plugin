@@ -112,55 +112,40 @@ def generate_3dgs_transforms_direct(out_data, output_dir, config, scale=100):
         "frames": all_frames
     }
     
-    # 从输出目录名称中提取信息，判断是否需要生成 GT 和 occ 版本
     fbx_name = os.path.basename(output_dir)
+    # 获取父目录（轨迹类型目录）
+    parent_dir = os.path.dirname(output_dir)
+    output_files = []
     
-    # 检查是否包含高度信息（如 scene_001_Target_001_30）
-    if '_' in fbx_name and fbx_name.split('_')[-1].isdigit():
-        # 提取基础名称和高度
-        parts = fbx_name.split('_')
-        height = parts[-1]
-        base_name = '_'.join(parts[:-1])
+    # 为 GT 和 occ 都创建目录和 JSON 文件
+    for suffix in ["_GT", "_occ"]:
+        target_name = fbx_name + suffix
+        target_dir = os.path.join(parent_dir, target_name)
+        pose_dir = os.path.join(target_dir, "pose")
         
-        # 生成 GT 和 occ 版本的目录名
-        gt_name = f"{base_name}_{height.zfill(3)}_GT"
-        occ_name = f"{base_name}_{height.zfill(3)}_occ"
-        
-        # 获取父目录（轨迹类型目录）
-        parent_dir = os.path.dirname(output_dir)
-        
-        # 创建 GT 和 occ 目录
-        gt_dir = os.path.join(parent_dir, gt_name)
-        occ_dir = os.path.join(parent_dir, occ_name)
-        
-        output_files = []
-        
-        # 为 GT 和 occ 都创建 pose 目录和 JSON 文件
-        for target_dir, suffix in [(gt_dir, "GT"), (occ_dir, "occ")]:
-            pose_dir = os.path.join(target_dir, "pose")
-            if not os.path.exists(pose_dir):
-                os.makedirs(pose_dir)
-            
-            output_file = os.path.join(pose_dir, "transforms.json")
-            with open(output_file, "w") as outfile:
-                json.dump(pose, outfile, indent=2)
-            
-            output_files.append(output_file)
-            print(f"Generated 3DGS transforms ({suffix}): {output_file} with {len(all_frames)} frames")
-        
-        return output_files
-    else:
-        # 原有逻辑：只生成一个 JSON 文件
-        pose_dir = os.path.join(output_dir, "pose")
         if not os.path.exists(pose_dir):
             os.makedirs(pose_dir)
         
         output_file = os.path.join(pose_dir, "transforms.json")
         with open(output_file, "w") as outfile:
             json.dump(pose, outfile, indent=2)
-            
-        print(f"Generated 3DGS transforms: {output_file} with {len(all_frames)} frames")
-        return output_file
+        
+        output_files.append(output_file)
+        print(f"Generated 3DGS transforms ({suffix[1:]}): {output_file} with {len(all_frames)} frames")
+    
+    return output_files
+    
+    # 原有逻辑：只生成一个 JSON 文件
+    pose_dir = os.path.join(output_dir, "pose")
+    if not os.path.exists(pose_dir):
+        os.makedirs(pose_dir)
+    
+    output_file = os.path.join(pose_dir, "transforms.json")
+    with open(output_file, "w") as outfile:
+        json.dump(pose, outfile, indent=2)
+        
+    print(f"Generated 3DGS transforms: {output_file} with {len(all_frames)} frames")
+    return output_file
 
 def generate_3dgs_transforms(raw_transforms_path, output_dir, config, scale=100):
     """
@@ -280,10 +265,7 @@ def process_single_fbx(fbx_path, output_base_dir, config, scale=100):
     
     # Create output directory based on FBX filename
     fbx_name = os.path.splitext(os.path.basename(fbx_path))[0]
-    output_dir = os.path.join(output_base_dir, fbx_name)
-    
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    output_dir = os.path.join(output_base_dir, fbx_name)  
     
     # Extract transforms for each frame (following your code exactly)
     for i, frame in enumerate(range(scene.frame_start, scene.frame_end + 1)):
