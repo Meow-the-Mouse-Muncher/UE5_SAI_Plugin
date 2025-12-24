@@ -551,7 +551,7 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
         
         # 计算俯仰角（pitch）
         horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
-        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
+        pitch = -90
         
         # 计算偏航角（yaw）- 处理奇点情况
         if horizontal_distance < 1e-6:  # 相机在目标物正上方（奇点）

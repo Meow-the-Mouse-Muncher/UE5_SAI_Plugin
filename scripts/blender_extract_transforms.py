@@ -128,7 +128,7 @@ def generate_3dgs_transforms_direct(out_data, output_dir, config, scale=100):
         
         # Transformation logic from generate_transforms_3dgs.py
         c2w[:3, :3] *= 100
-        c2w[:3, 3] /= scale
+        # c2w[:3, 3] /= scale
         
         all_frames.append({
             'file_path': file_path,

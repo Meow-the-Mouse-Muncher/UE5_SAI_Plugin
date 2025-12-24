@@ -20,48 +20,55 @@ def extract_depth_from_folder_name(folder_name):
     """
     match = re.search(r'height_(\d+)', folder_name)
     if match:
-        return int(match.group(1))
+        # Convert from centimeters to meters 
+        return int(match.group(1)) 
     return None
 
 def refocus_image(src_img, src_pose, center_pose, K, depth):
     """
     Refocus source image to specified depth plane using proper geometric transformation
+    Based on the correct refocus algorithm from your PyTorch reference
     """
     h, w = src_img.shape[:2]
     
     # Camera intrinsics
     K_inv = np.linalg.inv(K)
     
-    # Rotation and translation from center to source
+    # Extract rotation and translation matrices
     R_center = center_pose[:3, :3]
     T_center = center_pose[:3, 3:4]
     R_src = src_pose[:3, :3]
     T_src = src_pose[:3, 3:4]
     
-    # Transform from center to source camera
-    R_c2s = R_src @ R_center.T
+    # Transform from center to source (following PyTorch reference logic)
+    R_center_inv = R_center.T  # Inverse of rotation matrix
+    R_c2s = R_src @ R_center_inv
     T_c2s = T_src - R_c2s @ T_center
     
     # Create pixel coordinates for center camera
     u, v = np.meshgrid(np.arange(w), np.arange(h))
     ones = np.ones_like(u)
+    
+    # Stack to homogeneous coordinates [3, H*W]
     pixels = np.stack([u.flatten(), v.flatten(), ones.flatten()], axis=0)
     
-    # Convert to rays in center camera coordinate
-    rays = K_inv @ pixels
+    # Convert to rays in center camera coordinate system
+    rays = K_inv @ pixels  # [3, H*W]
     
-    # Transform rays to source camera and project to depth plane
+    # Apply depth and transform to source camera
+    # This follows the logic: x_ray = R_C2x @ c_ray + T_c2x / depth
     transformed_rays = R_c2s @ rays + T_c2s / depth
     
     # Project back to source image coordinates
     projected = K @ transformed_rays
     
-    # Extract x, y coordinates
-    x_coords = projected[0, :].reshape(h, w)
-    y_coords = projected[1, :].reshape(h, w)
+    # Normalize by Z coordinate and reshape
+    x_coords = (projected[0, :] / projected[2, :]).reshape(h, w)
+    y_coords = (projected[1, :] / projected[2, :]).reshape(h, w)
     
-    # Apply remap
-    refocused_img = cv2.remap(src_img, x_coords.astype(np.float32), y_coords.astype(np.float32), cv2.INTER_LINEAR)
+    # Apply remap with boundary handling
+    refocused_img = cv2.remap(src_img, x_coords.astype(np.float32), y_coords.astype(np.float32), 
+                             cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
     
     return refocused_img
 def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name):
