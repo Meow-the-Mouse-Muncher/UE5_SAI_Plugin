@@ -20,8 +20,7 @@ def extract_depth_from_folder_name(folder_name):
     """
     match = re.search(r'height_(\d+)', folder_name)
     if match:
-        # Convert from centimeters to meters (030 -> 0.30m)
-        return int(match.group(1)) / 100.0
+        return int(match.group(1))
     return None
 
 def refocus_image(src_img, src_pose, center_pose, K, depth):
