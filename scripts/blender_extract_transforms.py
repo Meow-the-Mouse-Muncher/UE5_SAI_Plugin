@@ -55,6 +55,50 @@ def listify_matrix(matrix):
         matrix_list.append(list(row))
     return matrix_list
 
+def get_camera_keyframes(camera_obj):
+    """
+    Detect frames where camera transform actually changes
+    """
+    scene = bpy.context.scene
+    keyframes = []
+    
+    # Store original frame
+    original_frame = scene.frame_current
+    
+    # Sample every frame and detect changes
+    previous_matrix = None
+    tolerance = 1e-6
+    
+    for frame in range(scene.frame_start, scene.frame_end + 1):
+        scene.frame_set(frame)
+        bpy.context.view_layer.update()
+        
+        current_matrix = camera_obj.matrix_world.copy()
+        
+        # Check if transform changed from previous frame
+        if previous_matrix is not None:
+            diff_found = False
+            for i in range(4):
+                for j in range(4):
+                    if abs(current_matrix[i][j] - previous_matrix[i][j]) > tolerance:
+                        diff_found = True
+                        break
+                if diff_found:
+                    break
+            
+            if diff_found:
+                keyframes.append(frame)
+        else:
+            # Always include first frame
+            keyframes.append(frame)
+        
+        previous_matrix = current_matrix
+    
+    # Restore original frame
+    scene.frame_set(original_frame)
+    
+    return keyframes
+
 def clear_scene():
     """Clear all objects from the scene"""
     bpy.ops.object.select_all(action='SELECT')
@@ -267,11 +311,18 @@ def process_single_fbx(fbx_path, output_base_dir, config, scale=100):
     fbx_name = os.path.splitext(os.path.basename(fbx_path))[0]
     output_dir = os.path.join(output_base_dir, fbx_name)  
     
-    # Extract transforms for each frame (following your code exactly)
-    for i, frame in enumerate(range(scene.frame_start, scene.frame_end + 1)):
+    # Get keyframes by detecting camera pose changes
+    keyframes = get_camera_keyframes(cam)
+    
+    if not keyframes:
+        print(f"No pose changes detected, using single frame")
+        keyframes = [scene.frame_start]
+    
+    print(f"Processing {len(keyframes)} frames with pose changes")
+    
+    # Extract transforms for each keyframe
+    for i, frame in enumerate(keyframes):
         scene.frame_set(frame)
-        
-        # Update scene to get current frame transforms
         bpy.context.view_layer.update()
         
         frame_data = {
@@ -377,6 +428,8 @@ def main():
     # You can modify the scale factor here if needed
     scale_factor = 100
     batch_process_by_category(scale_factor)
+
+
 
 if __name__ == "__main__":
     main()
