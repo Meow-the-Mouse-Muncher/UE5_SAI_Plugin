@@ -182,6 +182,11 @@ def batch_process_render_data():
             # Create output directory
             output_dir = os.path.join(output_base, trajectory_type, sequence_name)
             
+            # Skip if output directory already exists
+            if os.path.exists(output_dir):
+                print(f"Skipping {trajectory_type}/{sequence_name}: output already exists")
+                continue
+            
             print(f"Processing {trajectory_type}/{sequence_name}")
             process_dataset(transforms_file, rgb_dir, output_dir, sequence_name)
 
