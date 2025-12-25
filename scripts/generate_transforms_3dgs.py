@@ -66,7 +66,7 @@ def main():
         
         # Transformation logic strictly from reference (load_aerial.py / load_street.py)
         c2w[:3, :3] *= 100
-        c2w[:3, 3] /= args.scale
+        # c2w[:3, 3] /= args.scale
         
         all_frames.append({
             'file_path': file_path,
