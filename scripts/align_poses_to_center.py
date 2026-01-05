@@ -12,6 +12,7 @@ import re
 from pathlib import Path
 import OpenEXR
 import Imath
+from tqdm import tqdm
 
 def extract_depth_from_folder_name(folder_name):
     """
@@ -47,7 +48,7 @@ def refocus_image(src_img, src_pose, center_pose, K, depth):
     T_center = center_pose[:3, 3:4]
     
     R_src = src_pose[:3, :3]
-    T_src = src_pose[:3, 3:4]  # 【修正1】原代码这里把 R_src 覆盖了，必须修正！
+    T_src = src_pose[:3, 3:4]  
     
     # 2. Calculate Relative Transform: Center -> Source
     # 因为输入是 C2W，我们需要计算 M_src^-1 * M_center
@@ -111,8 +112,6 @@ def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name):
         print(f"Could not extract depth from folder name: {sequence_name}")
         return
     
-    print(f"Refocusing to depth plane: {depth:.2f}m")
-    
     # Load transforms
     with open(transforms_file, 'r') as f:
         pose_data = json.load(f)
@@ -133,6 +132,7 @@ def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name):
     os.makedirs(os.path.join(output_dir, 'rgb'), exist_ok=True)
     
     # Process each frame
+    processed_count = 0
     for i, frame in enumerate(frames):
         # Load RGB image
         rgb_path = os.path.join(rgb_dir, f"{i:04d}.png")
@@ -150,8 +150,9 @@ def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name):
         
         # Save refocused image
         cv2.imwrite(os.path.join(output_dir, 'rgb', f"{i:04d}.png"), refocused_rgb)
+        processed_count += 1
     
-    print(f"Processed {len(frames)} frames to {output_dir}")
+    return processed_count, len(frames), depth
 
 def batch_process_render_data():
     """
@@ -160,7 +161,9 @@ def batch_process_render_data():
     base_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/render_data"
     output_base = "./refocus_data"
     
-    # Find all sequence directories
+    # First, count total sequences for overall progress
+    sequence_list = []
+    
     for trajectory_type in os.listdir(base_dir):
         trajectory_dir = os.path.join(base_dir, trajectory_type)
         if not os.path.isdir(trajectory_dir):
@@ -176,19 +179,30 @@ def batch_process_render_data():
             rgb_dir = os.path.join(sequence_dir, "rgb")
             
             if not all(os.path.exists(p) for p in [transforms_file, rgb_dir]):
-                print(f"Skipping {sequence_name}: missing required files")
                 continue
             
-            # Create output directory
+            # Create output directory path
             output_dir = os.path.join(output_base, trajectory_type, sequence_name)
             
             # Skip if output directory already exists
             if os.path.exists(output_dir):
-                print(f"Skipping {trajectory_type}/{sequence_name}: output already exists")
                 continue
             
-            print(f"Processing {trajectory_type}/{sequence_name}")
-            process_dataset(transforms_file, rgb_dir, output_dir, sequence_name)
+            sequence_list.append((trajectory_type, sequence_name, transforms_file, rgb_dir, output_dir))
+    
+    if len(sequence_list) == 0:
+        print("No sequences to process (all already exist or missing required files)")
+        return
+    
+    print(f"Found {len(sequence_list)} sequences to process")
+    
+    # Process sequences with overall progress
+    with tqdm(sequence_list, desc="Processing sequences", unit="seq") as pbar:
+        for trajectory_type, sequence_name, transforms_file, rgb_dir, output_dir in pbar:
+            pbar.set_postfix_str(f"{trajectory_type}/{sequence_name}")
+            processed_count, total_frames, depth = process_dataset(transforms_file, rgb_dir, output_dir, sequence_name)
+    
+    print(f"✓ Batch processing completed! Processed {len(sequence_list)} sequences.")
 
 def main():
     if len(sys.argv) == 1:

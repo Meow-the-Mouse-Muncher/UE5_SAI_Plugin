@@ -166,9 +166,7 @@ def generate_3dgs_transforms_direct(out_data, output_dir, config, scale=100):
         target_name = fbx_name + suffix
         target_dir = os.path.join(parent_dir, target_name)
         pose_dir = os.path.join(target_dir, "pose")
-        
-        if not os.path.exists(pose_dir):
-            os.makedirs(pose_dir)
+        os.makedirs(pose_dir,exist_ok=True)
         
         output_file = os.path.join(pose_dir, "transforms.json")
         with open(output_file, "w") as outfile:

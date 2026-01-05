@@ -34,7 +34,7 @@ MAP_NAME = "scene_001"  # 改为你的目标地图名称
 
 2. **执行脚本**：
    ```python
-   exec(open(r'/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/scripts/ue5_export_sequences_to_fbx.py').read())
+   '/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/scripts/ue5_export_sequences_to_fbx.py'
    ```
 
 #### 输出结果
@@ -64,15 +64,10 @@ Exported_FBX/
 - 已完成步骤 1 的 FBX 导出
 - 系统已安装 Python 包：`numpy`, `pyyaml`
 
-#### 安装依赖
-```bash
-# 如果 Blender 的 Python 缺少依赖包
-pip install numpy pyyaml
-```
-
 #### 运行方法
 ```bash
 cd /home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar
+
 blender --background --python scripts/blender_extract_transforms.py
 ```
 
@@ -82,11 +77,9 @@ blender --background --python scripts/blender_extract_transforms.py
 3dgs_data/
 ├── fix_line/
 │   ├── scene_001_Target_001_30/
-│   │   ├── transforms_raw.json      # 原始轨迹数据
 │   │   └── pose/
 │   │       └── transforms.json     # 3DGS 格式数据
 │   └── scene_001_Target_001_50/
-│       ├── transforms_raw.json
 │       └── pose/
 │           └── transforms.json
 ├── rot_arc/
@@ -123,23 +116,6 @@ Batch_Settings:
 
 ## 生成的 JSON 格式
 
-### `transforms_raw.json`（原始格式）
-```json
-{
-    "camera_angle_x": 0.8575560450553894,
-    "frames": [
-        {
-            "frame_index": 0,
-            "rot_mat": [
-                [1.0, 0.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0],
-                [0.0, 0.0, 0.0, 1.0]
-            ]
-        }
-    ]
-}
-```
 
 ### `pose/transforms.json`（3DGS 格式）
 ```json
@@ -185,32 +161,6 @@ scale_factor = 100  # 修改缩放因子
 Resolution: [1920, 1080]  # 修改为目标分辨率
 ```
 
-## 故障排除
-
-### UE5 相关问题
-1. **"No Level Sequences found"**
-   - 检查序列文件是否在 `/Game/Sequences` 路径下
-   - 确认地图名称过滤是否正确
-
-2. **导出失败**
-   - 确保 UE5 Python 插件已启用
-   - 检查磁盘空间是否充足
-
-### Blender 相关问题
-1. **"FBX directory not found"**
-   - 确保先运行了 UE5 导出脚本
-   - 检查 `Exported_FBX` 目录是否存在
-
-2. **"No camera found"**
-   - 检查 FBX 文件是否包含相机对象
-   - 确认相机名称配置是否正确
-
-3. **依赖包错误**
-   ```bash
-   # 安装缺失的包
-   pip install numpy pyyaml
-   ```
-
 ## 完整工作流程示例
 
 ```bash
@@ -225,12 +175,3 @@ blender --background --python scripts/blender_extract_transforms.py
 # 3. 检查输出结果
 ls -la 3dgs_data/
 ```
-
-## 输出文件用途
-
-生成的 `pose/transforms.json` 文件可以直接用于：
-- 3D Gaussian Splatting 训练
-- NeRF 训练
-- 其他基于相机轨迹的 3D 重建任务
-
-文件格式完全兼容主流的 3D 重建框架。
