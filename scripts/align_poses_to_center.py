@@ -13,6 +13,8 @@ from pathlib import Path
 import OpenEXR
 import Imath
 from tqdm import tqdm
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
+import multiprocessing as mp
 
 def extract_depth_from_folder_name(folder_name):
     """
@@ -25,8 +27,81 @@ def extract_depth_from_folder_name(folder_name):
         return -int(match.group(1)) 
     return None
 
-import numpy as np
-import cv2
+def precompute_transforms(poses, center_pose, K, depth):
+    """
+    预计算所有帧的变换矩阵，避免重复计算
+    """
+    K_inv = np.linalg.inv(K)
+    R_center = center_pose[:3, :3]
+    T_center = center_pose[:3, 3:4]
+    
+    # 分离共享数据和每帧独有数据
+    shared_data = (K, K_inv, depth)
+    frame_transforms = []
+    
+    for pose in poses:
+        R_src = pose[:3, :3]
+        T_src = pose[:3, 3:4]
+        
+        # Calculate relative transform
+        R_c2s = R_src.T @ R_center
+        T_c2s = R_src.T @ (T_center - T_src)
+        
+        frame_transforms.append((R_c2s, T_c2s))
+    
+    return shared_data, frame_transforms
+
+def refocus_image_fast(src_img, frame_transform, shared_data):
+    """
+    使用预计算的变换数据快速重聚焦图像
+    """
+    R_c2s, T_c2s = frame_transform
+    K, K_inv, depth = shared_data
+    h, w = src_img.shape[:2]
+    
+    # Create pixel coordinates
+    u, v = np.meshgrid(np.arange(w), np.arange(h))
+    ones = np.ones_like(u)
+    pixels = np.stack([u.flatten(), v.flatten(), ones.flatten()], axis=0)
+    
+    # Unproject and transform
+    rays_center = K_inv @ pixels
+    transformed_points = R_c2s @ rays_center + T_c2s / depth
+    projected = K @ transformed_points
+    
+    # Perspective division
+    z = projected[2, :] + 1e-6
+    x_coords = (projected[0, :] / z).reshape(h, w).astype(np.float32)
+    y_coords = (projected[1, :] / z).reshape(h, w).astype(np.float32)
+    
+    # Remap
+    return cv2.remap(src_img, x_coords, y_coords, 
+                     interpolation=cv2.INTER_LINEAR, 
+                     borderMode=cv2.BORDER_CONSTANT, 
+                     borderValue=0)
+
+def process_single_frame(args):
+    """
+    处理单帧的工作函数，用于多进程
+    """
+    frame_idx, rgb_path, output_path, frame_transform, shared_data = args
+    
+    if not os.path.exists(rgb_path):
+        return False
+    
+    # Load image
+    rgb_img = cv2.imread(rgb_path)
+    if rgb_img is None:
+        return False
+    
+    # Refocus
+    refocused_rgb = refocus_image_fast(rgb_img, frame_transform, shared_data)
+    
+    # Save
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    cv2.imwrite(output_path, refocused_rgb)
+    
+    return True
 
 def refocus_image(src_img, src_pose, center_pose, K, depth):
     """
@@ -102,15 +177,19 @@ def refocus_image(src_img, src_pose, center_pose, K, depth):
                               borderValue=0)
     
     return refocused_img
-def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name):
+def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name, num_workers=None):
     """
     Process dataset: refocus images to the depth plane specified in folder name
+    使用多进程加速处理
     """
+    if num_workers is None:
+        num_workers = min(mp.cpu_count(), 16)  # 限制最大进程数
+    
     # Extract depth from sequence name
     depth = extract_depth_from_folder_name(sequence_name)
     if depth is None:
         print(f"Could not extract depth from folder name: {sequence_name}")
-        return
+        return 0, 0, None
     
     # Load transforms
     with open(transforms_file, 'r') as f:
@@ -123,41 +202,40 @@ def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name):
         [0, 0, 1]
     ])
     
-    # Find center frame
+    # Find center frame and precompute transforms
     frames = pose_data['frames']
     center_idx = len(frames) // 2
     center_pose = np.array(frames[center_idx]['transform_matrix'])
     
+    poses = [np.array(frame['transform_matrix']) for frame in frames]
+    shared_data, frame_transforms = precompute_transforms(poses, center_pose, K, depth)
+    
     # Create output directory
     os.makedirs(os.path.join(output_dir, 'rgb'), exist_ok=True)
     
-    # Process each frame
-    processed_count = 0
-    for i, frame in enumerate(frames):
-        # Load RGB image
+    # Prepare arguments for multiprocessing
+    args_list = []
+    for i, frame_transform in enumerate(frame_transforms):
         rgb_path = os.path.join(rgb_dir, f"{i:04d}.png")
-        
-        if not os.path.exists(rgb_path):
-            continue
-            
-        rgb_img = cv2.imread(rgb_path)
-        
-        # Get pose
-        src_pose = np.array(frame['transform_matrix'])   
-        
-        # Refocus to specified depth plane
-        refocused_rgb = refocus_image(rgb_img, src_pose, center_pose, K, depth)
-        
-        # Save refocused image
-        cv2.imwrite(os.path.join(output_dir, 'rgb', f"{i:04d}.png"), refocused_rgb)
-        processed_count += 1
+        output_path = os.path.join(output_dir, 'rgb', f"{i:04d}.png")
+        args_list.append((i, rgb_path, output_path, frame_transform, shared_data))
+    
+    # Process with multiprocessing
+    processed_count = 0
+    with ProcessPoolExecutor(max_workers=num_workers) as executor:
+        results = list(executor.map(process_single_frame, args_list))
+        processed_count = sum(results)
     
     return processed_count, len(frames), depth
 
-def batch_process_render_data():
+def batch_process_render_data(num_workers=None):
     """
     Batch process all render data with refocusing
+    使用多进程加速处理
     """
+    if num_workers is None:
+        num_workers = min(mp.cpu_count(), 16)
+    
     base_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/render_data"
     output_base = "./refocus_data"
     
@@ -195,19 +273,34 @@ def batch_process_render_data():
         return
     
     print(f"Found {len(sequence_list)} sequences to process")
+    print(f"Using {num_workers} worker processes")
     
     # Process sequences with overall progress
+    total_processed = 0
+    total_frames = 0
+    
     with tqdm(sequence_list, desc="Processing sequences", unit="seq") as pbar:
         for trajectory_type, sequence_name, transforms_file, rgb_dir, output_dir in pbar:
             pbar.set_postfix_str(f"{trajectory_type}/{sequence_name}")
-            processed_count, total_frames, depth = process_dataset(transforms_file, rgb_dir, output_dir, sequence_name)
+            processed_count, frame_count, depth = process_dataset(
+                transforms_file, rgb_dir, output_dir, sequence_name, num_workers
+            )
+            total_processed += processed_count
+            total_frames += frame_count
     
-    print(f"✓ Batch processing completed! Processed {len(sequence_list)} sequences.")
+    print(f"✓ Batch processing completed!")
+    print(f"  Processed {len(sequence_list)} sequences")
+    print(f"  Total frames: {total_processed}/{total_frames}")
+    print(f"  Success rate: {total_processed/total_frames*100:.1f}%")
 
 def main():
     if len(sys.argv) == 1:
         # Batch mode
         batch_process_render_data()
+    elif len(sys.argv) == 2:
+        # Batch mode with custom worker count
+        num_workers = int(sys.argv[1])
+        batch_process_render_data(num_workers)
     elif len(sys.argv) == 4:
         # Manual mode
         transforms_file = sys.argv[1]
@@ -217,9 +310,12 @@ def main():
         process_dataset(transforms_file, rgb_dir, output_dir, sequence_name)
     else:
         print("Usage:")
-        print("  Batch mode: python align_poses_to_center.py")
+        print("  Batch mode: python align_poses_to_center.py [num_workers]")
         print("  Manual mode: python align_poses_to_center.py <transforms.json> <rgb_dir> <output_dir>")
+        print(f"  Default workers: {min(mp.cpu_count(), 16)}")
         sys.exit(1)
 
 if __name__ == "__main__":
+    # 多进程安全保护
+    mp.set_start_method('spawn', force=True)
     main()
