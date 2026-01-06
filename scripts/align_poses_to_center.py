@@ -7,14 +7,35 @@ import json
 import numpy as np
 import sys
 import os
+os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 import cv2
 import re
 from pathlib import Path
-import OpenEXR
 import Imath
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import multiprocessing as mp
+
+def load_depth(depth_path):
+    """
+    读取深度图文件
+    Args:
+        depth_path: 深度图文件路径
+    Returns:
+        image: 深度图数组
+    """
+    if not os.path.exists(depth_path):
+        return None, None
+    
+    try:
+        # 使用cv2读取深度图
+        image = cv2.imread(depth_path, cv2.IMREAD_ANYCOLOR | cv2.IMREAD_ANYDEPTH)[..., 0]  # (H, W)
+        
+        return image
+        
+    except Exception as e:
+        print(f"Error reading depth file {depth_path}: {e}")
+        return None
 
 def extract_depth_from_folder_name(folder_name):
     """
@@ -51,51 +72,73 @@ def precompute_transforms(poses, center_pose, K, depth):
     
     return shared_data, frame_transforms
 
-def refocus_image_fast(src_img, frame_transform, shared_data):
+def refocus_image_with_depth_remap(src_img, center_depth, frame_transform, shared_data):
     """
-    使用预计算的变换数据快速重聚焦图像
+    使用中心相机深度图和cv2.remap进行重聚焦
     """
     R_c2s, T_c2s = frame_transform
-    K, K_inv, depth = shared_data
+    K, K_inv, _ = shared_data
     h, w = src_img.shape[:2]
     
-    # Create pixel coordinates
+    # 转换深度单位：厘米 -> 米，并考虑相机朝向(-Z)
+    depths_m = -center_depth / 100.0  # 负号因为相机朝向-Z轴
+    
+    # 创建中心相机的像素坐标网格
     u, v = np.meshgrid(np.arange(w), np.arange(h))
     ones = np.ones_like(u)
+    
+    # 构建齐次坐标 [3, H*W]
     pixels = np.stack([u.flatten(), v.flatten(), ones.flatten()], axis=0)
     
-    # Unproject and transform
-    rays_center = K_inv @ pixels
-    transformed_points = R_c2s @ rays_center + T_c2s / depth
-    projected = K @ transformed_points
+    # 反投影到中心相机坐标系的射线
+    rays_center = K_inv @ pixels  # [3, H*W]
     
-    # Perspective division
-    z = projected[2, :] + 1e-6
+    # 使用中心相机深度进行3D重建
+    depths_flat = depths_m.flatten()  # [H*W]
+    points_3d_center = rays_center * depths_flat[np.newaxis, :]  # [3, H*W] 中心相机坐标系下的3D点
+    
+    # 变换到源相机坐标系
+    transformed_points = R_c2s @ points_3d_center + T_c2s  # [3, H*W]
+    
+    # 投影到源图像坐标
+    projected = K @ transformed_points  # [3, H*W]
+    
+    # 透视除法
+    z = projected[2, :] + 1e-6  # 防止除零
     x_coords = (projected[0, :] / z).reshape(h, w).astype(np.float32)
     y_coords = (projected[1, :] / z).reshape(h, w).astype(np.float32)
     
-    # Remap
-    return cv2.remap(src_img, x_coords, y_coords, 
-                     interpolation=cv2.INTER_LINEAR, 
-                     borderMode=cv2.BORDER_CONSTANT, 
-                     borderValue=0)
-
-def process_single_frame(args):
-    """
-    处理单帧的工作函数，用于多进程
-    """
-    frame_idx, rgb_path, output_path, frame_transform, shared_data = args
+    # 使用cv2.remap进行重映射（与原始方法完全一致）
+    refocused_img = cv2.remap(src_img, 
+                              x_coords, 
+                              y_coords, 
+                              interpolation=cv2.INTER_LINEAR, 
+                              borderMode=cv2.BORDER_CONSTANT, 
+                              borderValue=0)
     
-    if not os.path.exists(rgb_path):
+    return refocused_img
+
+def process_single_frame_with_depth(args):
+    """
+    处理单帧的工作函数，使用中心相机深度图和cv2.remap进行重聚焦
+    """
+    frame_idx, rgb_path, center_depth_path, output_path, frame_transform, shared_data = args
+    
+    if not os.path.exists(rgb_path) or not os.path.exists(center_depth_path):
         return False
     
-    # Load image
+    # Load RGB image
     rgb_img = cv2.imread(rgb_path)
     if rgb_img is None:
         return False
     
-    # Refocus
-    refocused_rgb = refocus_image_fast(rgb_img, frame_transform, shared_data)
+    # Load center camera depth image
+    center_depth_img = load_depth(center_depth_path)
+    if center_depth_img is None:
+        return False
+    
+    # Refocus with center depth using cv2.remap
+    refocused_rgb = refocus_image_with_depth_remap(rgb_img, center_depth_img, frame_transform, shared_data)
     
     # Save
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -177,19 +220,12 @@ def refocus_image(src_img, src_pose, center_pose, K, depth):
                               borderValue=0)
     
     return refocused_img
-def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name, num_workers=None):
+def process_dataset(transforms_file, rgb_dir, depth_dir, output_dir, sequence_name, num_workers=None):
     """
-    Process dataset: refocus images to the depth plane specified in folder name
-    使用多进程加速处理
+    Process dataset: refocus images using depth maps with cv2.remap
     """
     if num_workers is None:
-        num_workers = min(mp.cpu_count(), 16)  # 限制最大进程数
-    
-    # Extract depth from sequence name
-    depth = extract_depth_from_folder_name(sequence_name)
-    if depth is None:
-        print(f"Could not extract depth from folder name: {sequence_name}")
-        return 0, 0, None
+        num_workers = min(mp.cpu_count(), 16)
     
     # Load transforms
     with open(transforms_file, 'r') as f:
@@ -208,7 +244,7 @@ def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name, num_wor
     center_pose = np.array(frames[center_idx]['transform_matrix'])
     
     poses = [np.array(frame['transform_matrix']) for frame in frames]
-    shared_data, frame_transforms = precompute_transforms(poses, center_pose, K, depth)
+    shared_data, frame_transforms = precompute_transforms(poses, center_pose, K, 0)  # depth不再使用
     
     # Create output directory
     os.makedirs(os.path.join(output_dir, 'rgb'), exist_ok=True)
@@ -217,21 +253,21 @@ def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name, num_wor
     args_list = []
     for i, frame_transform in enumerate(frame_transforms):
         rgb_path = os.path.join(rgb_dir, f"{i:04d}.png")
+        center_depth_path = os.path.join(depth_dir, f"{center_idx:04d}.exr")  # 使用中心帧的深度图
         output_path = os.path.join(output_dir, 'rgb', f"{i:04d}.png")
-        args_list.append((i, rgb_path, output_path, frame_transform, shared_data))
+        args_list.append((i, rgb_path, center_depth_path, output_path, frame_transform, shared_data))
     
     # Process with multiprocessing
     processed_count = 0
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        results = list(executor.map(process_single_frame, args_list))
+        results = list(executor.map(process_single_frame_with_depth, args_list))
         processed_count = sum(results)
     
-    return processed_count, len(frames), depth
+    return processed_count, len(frames)
 
 def batch_process_render_data(num_workers=None):
     """
-    Batch process all render data with refocusing
-    使用多进程加速处理
+    Batch process all render data with depth-based refocusing using cv2.remap
     """
     if num_workers is None:
         num_workers = min(mp.cpu_count(), 16)
@@ -239,7 +275,7 @@ def batch_process_render_data(num_workers=None):
     base_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/render_data"
     output_base = "./refocus_data"
     
-    # First, count total sequences for overall progress
+    # Find all sequences
     sequence_list = []
     
     for trajectory_type in os.listdir(base_dir):
@@ -252,11 +288,13 @@ def batch_process_render_data(num_workers=None):
             if not os.path.isdir(sequence_dir):
                 continue
                 
-            # Check for required files
+            # Check for required files (including depth)
             transforms_file = os.path.join(sequence_dir, "pose", "transforms.json")
             rgb_dir = os.path.join(sequence_dir, "rgb")
+            depth_dir = os.path.join(sequence_dir, "depth")
             
-            if not all(os.path.exists(p) for p in [transforms_file, rgb_dir]):
+            if not all(os.path.exists(p) for p in [transforms_file, rgb_dir, depth_dir]):
+                print(f"Skipping {sequence_name}: missing required files (rgb, depth, or pose)")
                 continue
             
             # Create output directory path
@@ -266,7 +304,7 @@ def batch_process_render_data(num_workers=None):
             if os.path.exists(output_dir):
                 continue
             
-            sequence_list.append((trajectory_type, sequence_name, transforms_file, rgb_dir, output_dir))
+            sequence_list.append((trajectory_type, sequence_name, transforms_file, rgb_dir, depth_dir, output_dir))
     
     if len(sequence_list) == 0:
         print("No sequences to process (all already exist or missing required files)")
@@ -274,45 +312,48 @@ def batch_process_render_data(num_workers=None):
     
     print(f"Found {len(sequence_list)} sequences to process")
     print(f"Using {num_workers} worker processes")
+    print("Using cv2.remap with per-pixel depth values")
     
-    # Process sequences with overall progress
+    # Process sequences
     total_processed = 0
     total_frames = 0
     
     with tqdm(sequence_list, desc="Processing sequences", unit="seq") as pbar:
-        for trajectory_type, sequence_name, transforms_file, rgb_dir, output_dir in pbar:
+        for trajectory_type, sequence_name, transforms_file, rgb_dir, depth_dir, output_dir in pbar:
             pbar.set_postfix_str(f"{trajectory_type}/{sequence_name}")
-            processed_count, frame_count, depth = process_dataset(
-                transforms_file, rgb_dir, output_dir, sequence_name, num_workers
+            processed_count, frame_count = process_dataset(
+                transforms_file, rgb_dir, depth_dir, output_dir, sequence_name, num_workers
             )
             total_processed += processed_count
             total_frames += frame_count
     
-    print(f"✓ Batch processing completed!")
+    print(f"✓ Depth-based refocusing completed!")
     print(f"  Processed {len(sequence_list)} sequences")
     print(f"  Total frames: {total_processed}/{total_frames}")
     print(f"  Success rate: {total_processed/total_frames*100:.1f}%")
 
 def main():
     if len(sys.argv) == 1:
-        # Batch mode
+        # Batch mode with depth
         batch_process_render_data()
     elif len(sys.argv) == 2:
         # Batch mode with custom worker count
         num_workers = int(sys.argv[1])
         batch_process_render_data(num_workers)
-    elif len(sys.argv) == 4:
-        # Manual mode
+    elif len(sys.argv) == 5:
+        # Manual mode with depth
         transforms_file = sys.argv[1]
         rgb_dir = sys.argv[2]
-        output_dir = sys.argv[3]
+        depth_dir = sys.argv[3]
+        output_dir = sys.argv[4]
         sequence_name = os.path.basename(output_dir)
-        process_dataset(transforms_file, rgb_dir, output_dir, sequence_name)
+        process_dataset(transforms_file, rgb_dir, depth_dir, output_dir, sequence_name)
     else:
         print("Usage:")
         print("  Batch mode: python align_poses_to_center.py [num_workers]")
-        print("  Manual mode: python align_poses_to_center.py <transforms.json> <rgb_dir> <output_dir>")
+        print("  Manual mode: python align_poses_to_center.py <transforms.json> <rgb_dir> <depth_dir> <output_dir>")
         print(f"  Default workers: {min(mp.cpu_count(), 16)}")
+        print("  Using cv2.remap with per-pixel depth values")
         sys.exit(1)
 
 if __name__ == "__main__":
