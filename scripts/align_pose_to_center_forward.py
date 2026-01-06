@@ -60,9 +60,7 @@ def refocus_image_gpu(src_img, src_depth, frame_transform, shared_data, device='
     K_inv_tensor = torch.from_numpy(K_inv).float().to(device)
     R_s2c_tensor = torch.from_numpy(R_s2c).float().to(device)
     T_s2c_tensor = torch.from_numpy(T_s2c).float().to(device)
-    
-    # Valid depth mask
-    valid_depth_mask = depth_m < -0.01
+
     
     # Create pixel coordinates and unproject
     u, v = torch.meshgrid(torch.arange(w, device=device), torch.arange(h, device=device), indexing='xy')
@@ -86,10 +84,9 @@ def refocus_image_gpu(src_img, src_depth, frame_transform, shared_data, device='
     
     # Combine masks
     valid_projection_mask = (x_coords >= 0) & (x_coords < w) & (y_coords >= 0) & (y_coords < h)
-    final_valid_mask = valid_depth_mask & valid_projection_mask
     
     # Splatting
-    output = gpu_splatting(src_tensor, x_coords, y_coords, final_valid_mask, device)
+    output = gpu_splatting(src_tensor, x_coords, y_coords, valid_projection_mask, device)
     
     return output.cpu().numpy().astype(np.uint8)
 
