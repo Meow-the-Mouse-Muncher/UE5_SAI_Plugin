@@ -43,7 +43,7 @@ def batch_export_sequences():
     Batch export all sequences in the Sequences folder with directory structure
     """
     # 手动指定地图名称 - 修改这里来指定不同的地图
-    MAP_NAME = "scene_003"
+    MAP_NAME = "scene_004"
     
     # Define paths
     sequences_content_path = "/Game/Sequences"

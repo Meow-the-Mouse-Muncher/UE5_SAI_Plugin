@@ -144,7 +144,7 @@ def process_single_frame(args):
 def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name, num_workers=None, use_gpu=True):
     """处理数据集"""
     if num_workers is None:
-        num_workers = min(mp.cpu_count(), 8) if use_gpu else min(mp.cpu_count(), 16)
+        num_workers = min(mp.cpu_count(), 16) if use_gpu else min(mp.cpu_count(), 16)
     
     device = 'cuda' if use_gpu and torch.cuda.is_available() else 'cpu'
     if use_gpu and not torch.cuda.is_available():
@@ -216,7 +216,7 @@ def process_dataset(transforms_file, rgb_dir, output_dir, sequence_name, num_wor
 def batch_process_render_data(num_workers=None, use_gpu=True):
     """批量处理渲染数据"""
     if num_workers is None:
-        num_workers = min(mp.cpu_count(), 8) if use_gpu else min(mp.cpu_count(), 16)
+        num_workers = min(mp.cpu_count(), 16) if use_gpu else min(mp.cpu_count(), 16)
     
     base_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/render_data"
     output_base = "./refocus_data" if use_gpu else "./refocus_data"

@@ -85,13 +85,18 @@ def refocus_image_gpu(src_img, src_depth, frame_transform, shared_data, device='
     # Combine masks
     valid_projection_mask = (x_coords >= 0) & (x_coords < w) & (y_coords >= 0) & (y_coords < h)
     
+    # Use transformed depth for Z-buffer (depth in center camera coordinate system)
+    center_depth = transformed_points[2, :, :]  # Z coordinate in center camera space
+    
     # Splatting
-    output = gpu_splatting(src_tensor, x_coords, y_coords, valid_projection_mask, device)
+    output = gpu_splatting_zbuffer(src_tensor, x_coords, y_coords, center_depth, valid_projection_mask, device)
     
     return output.cpu().numpy().astype(np.uint8)
 
-def gpu_splatting(src_img, x_coords, y_coords, valid_mask, device):
-    """GPU向量化splatting操作"""
+def gpu_splatting_zbuffer(src_img, x_coords, y_coords, src_depths, valid_mask, device):
+    """
+    GPU向量化splatting操作，使用Z-buffer保留深度值最大的像素（加速版本）
+    """
     h, w, c = src_img.shape
     
     # Get valid pixels
@@ -102,6 +107,7 @@ def gpu_splatting(src_img, x_coords, y_coords, valid_mask, device):
     target_x = x_coords[valid_y_idx, valid_x_idx]
     target_y = y_coords[valid_y_idx, valid_x_idx]
     src_pixels = src_img[valid_y_idx, valid_x_idx]
+    pixel_depths = src_depths[valid_y_idx, valid_x_idx]
     
     # Bilinear coordinates
     x0, y0 = torch.floor(target_x).long(), torch.floor(target_y).long()
@@ -116,27 +122,75 @@ def gpu_splatting(src_img, x_coords, y_coords, valid_mask, device):
     
     # Output tensors
     output = torch.zeros_like(src_img)
-    weight_map = torch.zeros(h, w, device=device)
     
-    # Splatting function
-    def safe_splat(x_idx, y_idx, weights, pixels):
+    # 收集所有需要处理的点
+    all_x_coords = []
+    all_y_coords = []
+    all_weights = []
+    all_pixels = []
+    all_depths = []
+    
+    # 四个角的数据
+    corners = [(x0, y0, w00), (x0, y1, w01), (x1, y0, w10), (x1, y1, w11)]
+    
+    for x_idx, y_idx, weights in corners:
+        # 边界检查
         valid = (x_idx >= 0) & (x_idx < w) & (y_idx >= 0) & (y_idx < h)
         if valid.sum() == 0:
-            return
-        
-        flat_idx = y_idx[valid] * w + x_idx[valid]
-        output.view(-1, c).index_add_(0, flat_idx, weights[valid].unsqueeze(-1) * pixels[valid])
-        weight_map.view(-1).index_add_(0, flat_idx, weights[valid])
+            continue
+            
+        all_x_coords.append(x_idx[valid])
+        all_y_coords.append(y_idx[valid])
+        all_weights.append(weights[valid])
+        all_pixels.append(src_pixels[valid])
+        all_depths.append(pixel_depths[valid])
     
-    # Splat to four corners
-    safe_splat(x0, y0, w00, src_pixels)
-    safe_splat(x0, y1, w01, src_pixels)
-    safe_splat(x1, y0, w10, src_pixels)
-    safe_splat(x1, y1, w11, src_pixels)
+    if len(all_x_coords) == 0:
+        return output
     
-    # Normalize
-    weight_mask = weight_map > 1e-6
-    output[weight_mask] = output[weight_mask] / weight_map[weight_mask].unsqueeze(-1)
+    # 合并所有数据
+    all_x = torch.cat(all_x_coords)
+    all_y = torch.cat(all_y_coords)
+    all_w = torch.cat(all_weights)
+    all_p = torch.cat(all_pixels)
+    all_d = torch.cat(all_depths)
+    
+    # 创建线性索引
+    linear_idx = all_y * w + all_x
+    
+    # 使用scatter操作进行Z-buffer测试
+    # 首先找到每个位置的最大深度
+    max_depths = torch.full((h * w,), float('-inf'), device=device)
+    max_depths.scatter_reduce_(0, linear_idx, all_d, reduce='amax', include_self=False)
+    
+    # 创建mask，只保留深度等于最大深度的像素
+    pixel_max_depths = max_depths[linear_idx]
+    keep_mask = (all_d >= pixel_max_depths - 1e-6)  # 使用小的容差避免浮点精度问题
+    
+    if keep_mask.sum() == 0:
+        return output
+    
+    # 过滤数据
+    final_x = all_x[keep_mask]
+    final_y = all_y[keep_mask]
+    final_w = all_w[keep_mask]
+    final_p = all_p[keep_mask]
+    final_linear_idx = final_y * w + final_x
+    
+    # 对于有多个相同最大深度的像素，进行加权平均
+    weighted_pixels = final_p * final_w.unsqueeze(-1)
+    
+    # 使用scatter_add进行累加
+    output_flat = output.view(-1, c)
+    weight_sum = torch.zeros(h * w, device=device)
+    
+    output_flat.scatter_add_(0, final_linear_idx.unsqueeze(-1).expand(-1, c), weighted_pixels)
+    weight_sum.scatter_add_(0, final_linear_idx, final_w)
+    
+    # 归一化
+    valid_weights = weight_sum > 1e-6
+    if valid_weights.sum() > 0:
+        output_flat[valid_weights] = output_flat[valid_weights] / weight_sum[valid_weights].unsqueeze(-1)
     
     return output
 
@@ -243,12 +297,12 @@ def batch_process_render_data(num_workers=None, use_gpu=True):
         num_workers = min(mp.cpu_count(), 8) if use_gpu else min(mp.cpu_count(), 16)
     
     base_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/render_data"
-    output_base = "./refocus_data_forward_gpu_depth" if use_gpu else "./refocus_data_forward_depth"
+    output_base = "./refocus_data_forward" if use_gpu else "./refocus_data_forward"
     
     if use_gpu and not torch.cuda.is_available():
         print("CUDA not available, falling back to CPU")
         use_gpu = False
-        output_base = "./refocus_data_forward_depth"
+        output_base = "./refocus_data_forward"
     
     # Find sequences
     sequence_list = []
