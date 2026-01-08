@@ -7,7 +7,7 @@ import numpy as np
 import sys
 import os
 os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import cv2
 import re
 from tqdm import tqdm
@@ -47,66 +47,80 @@ def precompute_transforms(poses, center_pose, K):
     
     return shared_data, frame_transforms
 
-def refocus_batch_gpu(src_imgs, center_depth, frame_transforms, shared_data, device='cuda'):
-    """批量GPU加速重聚焦"""
+def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_data, device='cuda'):
+    """GPU加速的逆向重聚焦图像处理，使用GT深度图和深度剔除"""
+    R_c2s, T_c2s = frame_transform
     K, K_inv = shared_data
-    B = len(src_imgs)
-    h, w = src_imgs[0].shape[:2]
+    h, w = src_img.shape[:2]
     
-    device = torch.device(device)
+    device = torch.device(device if torch.cuda.is_available() else 'cpu')
     
-    # Batch tensors
-    src_tensors = torch.from_numpy(np.stack(src_imgs)).float().to(device).permute(0, 3, 1, 2) / 255.0 # [B, 3, H, W]
-    depth_m = -torch.from_numpy(center_depth).float().to(device).unsqueeze(0) / 100.0 # [1, H, W]
-    
+    # Convert to tensors
+    src_tensor = torch.from_numpy(src_img).float().to(device)
+    # z_measured = torch.from_numpy(src_depth).float().to(device) / 100.0  # cm->m
+    depth_m = -torch.from_numpy(center_depth).float().to(device) / 100.0  # cm->m, negative for -Z
     K_tensor = torch.from_numpy(K).float().to(device)
     K_inv_tensor = torch.from_numpy(K_inv).float().to(device)
-    
-    # R_c2s and T_c2s stacking
-    R_c2s = torch.stack([torch.from_numpy(ft[0]) for ft in frame_transforms]).float().to(device) # [B, 3, 3]
-    T_c2s = torch.stack([torch.from_numpy(ft[1]) for ft in frame_transforms]).float().to(device) # [B, 3, 1]
+    R_c2s_tensor = torch.from_numpy(R_c2s).float().to(device)
+    T_c2s_tensor = torch.from_numpy(T_c2s).float().to(device)
     
     # Create pixel coordinates for center camera
     u, v = torch.meshgrid(torch.arange(w, device=device), torch.arange(h, device=device), indexing='xy')
-    pixels = torch.stack([u.flatten(), v.flatten(), torch.ones_like(u).flatten()], dim=0).float() # [3, HW]
+    ones = torch.ones_like(u)
+    pixels = torch.stack([u.flatten(), v.flatten(), ones.flatten()], dim=0).float()
     
     # Unproject to rays in center camera coordinate system
-    rays_center = (K_inv_tensor @ pixels).reshape(3, h, w) # [3, H, W]
+    rays_center = (K_inv_tensor @ pixels).reshape(3, h, w)  # [3, H, W]
     
     # Apply per-pixel depth and transform to source camera
-    points_3d_center = rays_center * depth_m
-    points_3d_flat = points_3d_center.reshape(3, -1).unsqueeze(0).expand(B, -1, -1) # [B, 3, HW]
+    # points_3d_center = rays_center * depth
+    points_3d_center = rays_center * depth_m.unsqueeze(0)
     
     # Transform to source camera: R_c2s @ points_3d_center + T_c2s
-    transformed_points = torch.bmm(R_c2s, points_3d_flat) + T_c2s # [B, 3, HW]
+    transformed_points = R_c2s_tensor @ points_3d_center.reshape(3, -1) + T_c2s_tensor
+    transformed_points = transformed_points.reshape(3, h, w)
     
     # Project to source camera image plane
-    projected = torch.bmm(K_tensor.unsqueeze(0).expand(B, -1, -1), transformed_points) # [B, 3, HW]
-    projected = projected.reshape(B, 3, h, w)
+    projected = K_tensor @ transformed_points.reshape(3, -1)
+    projected = projected.reshape(3, h, w)
     
     # Perspective division
-    z = projected[:, 2:3, :, :] + 1e-6
-    x_coords = projected[:, 0:1, :, :] / z
-    y_coords = projected[:, 1:2, :, :] / z
+    z = projected[2, :, :] + 1e-6
+    x_coords = projected[0, :, :] / z
+    y_coords = projected[1, :, :] / z
     
+    # Get projected depth (Z_proj) - distance from source camera
+    # z_proj = -transformed_points[2, :, :]   
+    
+    # Use GPU grid sampling for remapping
     # Normalize coordinates to [-1, 1] for grid_sample
     x_norm = 2.0 * x_coords / (w - 1) - 1.0
     y_norm = 2.0 * y_coords / (h - 1) - 1.0
     
     # Create sampling grid
-    grid = torch.cat([x_norm, y_norm], dim=1).permute(0, 2, 3, 1) # [B, H, W, 2]
-    
-    # Sample color from source
-    sampled_colors = torch.nn.functional.grid_sample(
-        src_tensors, grid, 
+    grid = torch.stack([x_norm, y_norm], dim=-1).unsqueeze(0)  # [1, H, W, 2]
+    src_tensor_norm = src_tensor.permute(2, 0, 1).unsqueeze(0) / 255.0  # [1, 3, H, W]
+    # Sample color and depth from source
+    sampled_color = torch.nn.functional.grid_sample(
+        src_tensor_norm, grid, 
         mode='bilinear', 
         padding_mode='zeros', 
         align_corners=True
     )
     
-    return (sampled_colors.permute(0, 2, 3, 1) * 255.0).cpu().numpy().astype(np.uint8)
+    # Depth culling: Z_proj < Z_measured means occlusion
 
-def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, output_dir, use_gpu=True, batch_size=4):
+    # depth_mask = z_proj < z_measured  # Keep pixels where projected depth >= measured depth
+    
+    # Apply depth mask
+    result = sampled_color.squeeze(0).permute(1, 2, 0) * 255.0  # [H, W, 3]
+    # result[depth_mask] = 0  # Set occluded pixels to black
+    
+    return result.cpu().numpy().astype(np.uint8)
+
+
+
+def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, output_dir, use_gpu=True):
     """处理数据集"""
     device = 'cuda' if use_gpu and torch.cuda.is_available() else 'cpu'
     if use_gpu and not torch.cuda.is_available():
@@ -138,47 +152,35 @@ def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, outpu
     shared_data, frame_transforms = precompute_transforms(poses, center_pose, K)
     os.makedirs(os.path.join(output_dir, 'rgb'), exist_ok=True)
     
+    # GPU processing - sequential
     processed_count = 0
-    frame_indices = list(range(len(frames)))
-    
-    # Copy center frame
-    center_rgb_path = os.path.join(rgb_dir, f"{center_idx:04d}.png")
-    if os.path.exists(center_rgb_path):
-        rgb_img = cv2.imread(center_rgb_path)
-        if rgb_img is not None:
-            output_path = os.path.join(output_dir, 'rgb', f"{center_idx:04d}.png")
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
-            if cv2.imwrite(output_path, rgb_img):
-                processed_count += 1
-
-    # Batch process other frames
-    other_indices = [i for i in frame_indices if i != center_idx]
-    
-    for i in range(0, len(other_indices), batch_size):
-        batch_idx = other_indices[i:i+batch_size]
-        curr_batch_imgs = []
-        curr_batch_transforms = []
-        curr_batch_paths = []
+    for i, frame_transform in enumerate(frame_transforms):
+        rgb_path = os.path.join(rgb_dir, f"{i:04d}.png")
+        output_path = os.path.join(output_dir, 'rgb', f"{i:04d}.png")
         
-        for idx in batch_idx:
-            rgb_path = os.path.join(rgb_dir, f"{idx:04d}.png")
+        if i == center_idx:
+            # Copy center frame
             if os.path.exists(rgb_path):
-                img = cv2.imread(rgb_path)
-                if img is not None:
-                    curr_batch_imgs.append(img)
-                    curr_batch_transforms.append(frame_transforms[idx])
-                    curr_batch_paths.append(os.path.join(output_dir, 'rgb', f"{idx:04d}.png"))
-        
-        if curr_batch_imgs:
-            results = refocus_batch_gpu(curr_batch_imgs, center_depth, curr_batch_transforms, shared_data, device)
-            for res, out_path in zip(results, curr_batch_paths):
+                rgb_img = cv2.imread(rgb_path)
+                if rgb_img is not None:
+                    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+                    if cv2.imwrite(output_path, rgb_img):
+                        processed_count += 1
+        elif os.path.exists(rgb_path):
+            rgb_img = cv2.imread(rgb_path)
+            # Load corresponding source depth map
+            src_depth_path = os.path.join(src_depth_dir, f"{i:04d}.exr")
+            src_depth = load_depth(src_depth_path)
+            
+            if rgb_img is not None and src_depth is not None:
+                refocused_rgb = refocus_image_gpu(rgb_img, src_depth, center_depth, frame_transform, shared_data, device)
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                if cv2.imwrite(out_path, res):
+                if cv2.imwrite(output_path, refocused_rgb):
                     processed_count += 1
     
     return processed_count, len(frames)
 
-def batch_process_render_data(base_dir, output_base, use_gpu=True, batch_size=4):
+def batch_process_render_data(base_dir, output_base, use_gpu=True):
     """批量处理渲染数据"""
     if use_gpu and not torch.cuda.is_available():
         print("CUDA not available, falling back to CPU")
@@ -230,7 +232,6 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True, batch_size=4)
     
     print(f"Found {len(sequence_list)} sequences to process")
     print(f"Using {'GPU' if use_gpu else 'CPU'} acceleration")
-    print(f"Processing with Batch Size: {batch_size}")
     print("Using INVERSE projection with GT depth map")
     
     total_processed = 0
@@ -240,7 +241,7 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True, batch_size=4)
         for trajectory_type, sequence_name, transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, output_dir in pbar:
             pbar.set_postfix_str(f"{trajectory_type}/{sequence_name}")
             processed_count, frame_count = process_dataset(
-                transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, output_dir, use_gpu, batch_size
+                transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, output_dir, use_gpu
             )
             total_processed += processed_count
             total_frames += frame_count
@@ -253,20 +254,17 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True, batch_size=4)
 def main():
     # ==================== 配置参数 ====================
     # 输入数据路径
-    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/sparse_data"
+    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/render_data"
     
     # 输出路径
-    OUTPUT_BASE = "./refocus_sparse_data"
+    OUTPUT_BASE = "./refocus_data"
     
     # 是否使用GPU加速
     USE_GPU = True
     
-    # Batch size
-    BATCH_SIZE = 128
-    
     # ================================================
     
-    batch_process_render_data(BASE_DIR, OUTPUT_BASE, USE_GPU, BATCH_SIZE)
+    batch_process_render_data(BASE_DIR, OUTPUT_BASE, USE_GPU)
 
 if __name__ == "__main__":
     # 多进程安全保护
