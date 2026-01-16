@@ -981,14 +981,12 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
     
     # 获取全局参数
     global_params = trajectory_cfg.get('global', {})
+    trajectory_types = global_params.get('trajectory_types', ['fix_line', 'rot_arc', 'rot_line'])  # 从配置读取轨迹类型
     camera_heights = global_params.get('camera_heights', [5000.0])  # 默认单一高度
     plane_angles = global_params.get('plane_angles', [0.0])
     num_frames = global_params.get('num_frames', 32)
     
-    unreal.log(f"Using global params: camera_heights={camera_heights}, plane_angles={plane_angles}, num_frames={num_frames}")
-    
-    # 定义要生成的轨迹类型
-    trajectory_types = ['fix_line', 'rot_arc', 'rot_line']
+    unreal.log(f"Using global params: trajectory_types={trajectory_types}, camera_heights={camera_heights}, plane_angles={plane_angles}, num_frames={num_frames}")
     results = {}
     
     # 为每种轨迹类型、每种高度和每个角度生成序列
