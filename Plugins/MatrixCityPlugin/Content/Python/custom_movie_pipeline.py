@@ -490,25 +490,33 @@ class CustomMoviePipeline():
         builder = RenderSequenceBuilder()
         
         import batch_utils
-        for (trajectory_type, camera_height), (level, sequence_name) in trajectory_results.items():
+        for key, (level, sequence_name) in trajectory_results.items():
+            # 支持 key 为 (trajectory_type, camera_height) 或 (trajectory_type, camera_height, plane_angle)
+            if len(key) == 3:
+                trajectory_type, camera_height, plane_angle = key
+            else:
+                trajectory_type, camera_height = key
+                plane_angle = 0
+
             # 将高度转换为米，格式化为3位数字
             height_in_meters = int(camera_height / 100.0)
             height_str = f"height_{height_in_meters:03d}"  # 格式化为 height_050
+            angle_label = f"ang_{int(plane_angle):03d}"
             
             # 准备OCC渲染配置
             render_config_occ = render_config.copy()
-            # 文件名格式: scene_001_Target_002_height_050_occ
-            output_name = f"{map_name}_{target_name}_{height_str}_occ"
+            # 文件名格式: scene_001_Target_002_height_050_ang_120_occ
+            output_name = f"{map_name}_{target_name}_{height_str}_{angle_label}_occ"
             render_config_occ['File_Name_Format'] = f"{trajectory_type}/{output_name}/{{render_pass}}/{{frame_number}}"
             
             # 准备GT渲染配置
             render_config_gt = render_config.copy()
-            output_name = f"{map_name}_{target_name}_{height_str}_GT"
+            output_name = f"{map_name}_{target_name}_{height_str}_{angle_label}_GT"
             render_config_gt['File_Name_Format'] = f"{trajectory_type}/{output_name}/{{render_pass}}/{{frame_number}}"
             
             # 添加OCC渲染步骤
             builder.add_occ_render(
-                step_id=f"{trajectory_type}_{height_str}_occ_render",
+                step_id=f"{trajectory_type}_{height_str}_{angle_label}_occ_render",
                 scene_config=occ_scene_config,
                 render_config=render_config_occ,
                 level_path=level,
@@ -517,7 +525,7 @@ class CustomMoviePipeline():
             
             # 添加GT渲染步骤
             builder.add_gt_render(
-                step_id=f"{trajectory_type}_{height_str}_gt_render",
+                step_id=f"{trajectory_type}_{height_str}_{angle_label}_gt_render",
                 scene_config=gt_scene_config,
                 render_config=render_config_gt,
                 level_path=level,

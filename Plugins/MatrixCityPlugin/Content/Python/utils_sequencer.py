@@ -833,15 +833,22 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
             raise RuntimeError(error_msg)
         unreal.log(f"地图 {level} 加载成功。")
     
-    # 根据地图名和目标物名生成序列名称，格式：scene_001_Target_002_height_50
+    # 根据轨迹参数确定角度（用于命名）
+    if trajectory_type == 'fix_line':
+        angle_value = trajectory_params.get('angle_degrees', 0.0)
+    else:
+        angle_value = trajectory_params.get('plane_angle_degrees', 0.0)
+
+    # 将相机高度从cm转换为米，并格式化为3位数
+    height_in_meters = str(int(camera_height / 100.0)).zfill(3)
+    angle_in_degrees = str(int(angle_value)).zfill(3)
+
+    # 根据地图名和目标物名生成序列名称，格式：scene_001_Target_002_height_050_ang_120
     if map_name and target_actor:
         target_name = target_actor.get_actor_label()
-        # 将相机高度从cm转换为米，并格式化为3位数
-        height_in_meters = str(int(camera_height / 100.0)).zfill(3)
-        sequence_name = f'{map_name}_{target_name}_height_{height_in_meters}'
+        sequence_name = f'{map_name}_{target_name}_height_{height_in_meters}_ang_{angle_in_degrees}'
     else:
-        height_in_meters = str(int(camera_height / 100.0)).zfill(3)
-        sequence_name = f'aerial_train_{height_in_meters}'  # 默认名称
+        sequence_name = f'aerial_train_{height_in_meters}_ang_{angle_in_degrees}'  # 默认名称
     
     # 根据轨迹类型生成相机轨迹
     camera_trans = None
@@ -975,42 +982,49 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
     # 获取全局参数
     global_params = trajectory_cfg.get('global', {})
     camera_heights = global_params.get('camera_heights', [5000.0])  # 默认单一高度
+    plane_angles = global_params.get('plane_angles', [0.0])
     num_frames = global_params.get('num_frames', 32)
     
-    unreal.log(f"Using global params: camera_heights={camera_heights}, num_frames={num_frames}")
+    unreal.log(f"Using global params: camera_heights={camera_heights}, plane_angles={plane_angles}, num_frames={num_frames}")
     
     # 定义要生成的轨迹类型
     trajectory_types = ['fix_line', 'rot_arc', 'rot_line']
     results = {}
     
-    # 为每种轨迹类型和每种高度生成序列
+    # 为每种轨迹类型、每种高度和每个角度生成序列
     for traj_type in trajectory_types:
         for camera_height in camera_heights:
-            height_in_meters = str(int(camera_height / 100.0)).zfill(3)
-            unreal.log(f"Generating trajectory: {traj_type} at height {height_in_meters}m")
-            
-            # 获取该轨迹类型的参数
-            traj_params = trajectory_cfg.get(traj_type, {})
-            
-            try:
-                # 生成单个轨迹序列
-                level, sequence_name = generate_single_trajectory(
-                    target_actor=target_actor,
-                    map_name=map_name,
-                    trajectory_type=traj_type,
-                    trajectory_params=traj_params,
-                    camera_height=camera_height,
-                    num_frames=num_frames
-                )
+            for plane_angle in plane_angles:
+                height_in_meters = str(int(camera_height / 100.0)).zfill(3)
+                angle_in_degrees = str(int(plane_angle)).zfill(3)
+                unreal.log(f"Generating trajectory: {traj_type} at height {height_in_meters}m, angle {angle_in_degrees}")
                 
-                # 使用 (轨迹类型, 高度) 作为键
-                results[(traj_type, camera_height)] = (level, sequence_name)
-                unreal.log(f"Successfully generated {traj_type} trajectory at {height_in_meters}m: {sequence_name}")
+                # 获取该轨迹类型的参数，并注入当前角度
+                traj_params = trajectory_cfg.get(traj_type, {}) or {}
+                traj_params_copy = dict(traj_params)
+                # 兼容 fix_line 使用的 'angle_degrees' 与 rot_* 使用的 'plane_angle_degrees'
+                traj_params_copy['plane_angle_degrees'] = plane_angle
+                traj_params_copy['angle_degrees'] = plane_angle
                 
-            except Exception as e:
-                unreal.log_error(f"Failed to generate {traj_type} trajectory at {height_in_meters}m: {e}")
-                # 继续生成其他轨迹类型和高度
-                continue
+                try:
+                    # 生成单个轨迹序列
+                    level, sequence_name = generate_single_trajectory(
+                        target_actor=target_actor,
+                        map_name=map_name,
+                        trajectory_type=traj_type,
+                        trajectory_params=traj_params_copy,
+                        camera_height=camera_height,
+                        num_frames=num_frames
+                    )
+                    
+                    # 使用 (轨迹类型, 高度, 角度) 作为键
+                    results[(traj_type, camera_height, plane_angle)] = (level, sequence_name)
+                    unreal.log(f"Successfully generated {traj_type} trajectory at {height_in_meters}m angle {angle_in_degrees}: {sequence_name}")
+                    
+                except Exception as e:
+                    unreal.log_error(f"Failed to generate {traj_type} trajectory at {height_in_meters}m angle {angle_in_degrees}: {e}")
+                    # 继续生成其他轨迹类型、高度和角度
+                    continue
     
     unreal.log(f"Generated {len(results)} trajectory sequences")
     return results

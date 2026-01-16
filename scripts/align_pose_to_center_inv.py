@@ -254,10 +254,10 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
 def main():
     # ==================== 配置参数 ====================
     # 输入数据路径
-    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/render_data"
+    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/sparse_data"
     
     # 输出路径
-    OUTPUT_BASE = "./refocus_data"
+    OUTPUT_BASE = "./refocus_sparse_data"
     
     # 是否使用GPU加速
     USE_GPU = True

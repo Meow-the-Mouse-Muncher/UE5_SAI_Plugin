@@ -352,7 +352,7 @@ def batch_process_by_category(scale=100):
     
     # Base paths
     project_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar"
-    fbx_dir = os.path.join(project_dir, "Content","Exported_FBX_sparse")
+    fbx_dir = os.path.join(project_dir, "Content","Exported_FBX_test")
     
     # Use output path from config if available
     if 'Output_Path' in config:

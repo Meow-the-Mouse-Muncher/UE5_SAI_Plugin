@@ -43,12 +43,12 @@ def batch_export_sequences():
     Batch export all sequences in the Sequences folder with directory structure
     """
     # 手动指定地图名称 - 修改这里来指定不同的地图
-    MAP_NAME = "scene_009"
+    MAP_NAME = "scene_010"
     
     # Define paths
     sequences_content_path = "/Game/Sequences"
     project_dir = unreal.Paths.project_dir()
-    base_output_dir = os.path.join(project_dir,"Content", "Exported_FBX_sparse")
+    base_output_dir = os.path.join(project_dir,"Content", "Exported_FBX_test")
     
     # Create base output directory
     if not os.path.exists(base_output_dir):

@@ -3,26 +3,26 @@
 
 # 全局共用参数
 global:
-  camera_heights: [5000.0, 6000.0,7000.0,8000.0, 10000.0,12000.0] # 相机高度列表（UE单位：cm）
+  # camera_heights: [5000.0, 6000.0,7000.0,8000.0, 10000.0,12000.0] # 相机高度列表（UE单位：cm）
+  camera_heights: [7000.0]
   # 
                                              # 对应 30米、50米、80米
                                              # fix_line使用为height_offset，rot_arc使用为radius，rot_line使用为height
   num_frames: 33                             # 图像张数（帧数）
+  # plane_angles: [0, 120, 240]               # 角度列表（度），作为与高度类似的全局共用参数
+  plane_angles: [90]                         
 
 # fix_line 轨迹参数
 fix_line:
-  angle_degrees: 45           # 与x轴的夹角（度）, 0度表示沿x轴正方向
   trajectory_length: 4000.0    # 运动轨迹的长度（UE单位：cm，5000cm = 50米）
 
 # rot_arc 轨迹参数（圆弧轨迹）
 rot_arc:
   arc_angle_degrees: 90.0     # 圆弧的角度范围（度），90度表示1/4圆弧
-  plane_angle_degrees: 45.0    # 垂直平面与X轴的夹角（度）
 
 # rot_line 轨迹参数（直线轨迹，相机始终看向目标物）
 rot_line:
   arc_angle_degrees: 90.0     # 弧度角度范围（度）
-  plane_angle_degrees: 45    # 直线与X轴的夹角（度）
 
 
 # 序列设置
