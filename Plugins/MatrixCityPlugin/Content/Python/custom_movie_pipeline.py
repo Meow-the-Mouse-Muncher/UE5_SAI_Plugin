@@ -650,13 +650,36 @@ class CustomMoviePipeline():
     def _on_map_targets_completed(cls):
         """所有目标物处理完成"""
         map_context = cls._current_map_context
-        unreal.log(f"All targets completed for map: {map_context['map_name']}")
+        map_name = map_context['map_name']
+        executor = map_context.get('executor')
+        unreal.log(f"All targets completed for map: {map_name}")
+        
+        # 渲染完成后自动导出FBX
+        try:
+            from export_sequences_to_fbx import export_sequences_for_map
+            unreal.log(f"[*] Starting FBX export for map: {map_name}")
+            export_sequences_for_map(map_name)
+            unreal.log(f"[*] FBX export completed for map: {map_name}")
+        except Exception as e:
+            unreal.log_error(f"Failed to export FBX for map {map_name}: {e}")
         
         # 重置批量目标物渲染状态
         cls._is_batch_target_rendering = False
         cls._target_render_queue = []
         cls._current_target_index = 0
         cls._current_map_context = None
+        
+        # 发送完成信号并退出编辑器
+        if executor:
+            try:
+                executor.send_socket_message("Pipeline Finished")
+                unreal.log("[*] Sent 'Pipeline Finished' signal to socket")
+            except Exception as e:
+                unreal.log_warning(f"Failed to send socket message: {e}")
+        
+        # 退出编辑器
+        unreal.log("[*] Exiting Unreal Editor...")
+        unreal.SystemLibrary.quit_editor()
 
     def onQueueFinishedCallback(executor: unreal.MoviePipelineLinearExecutorBase, success: bool):
         """On queue finished callback.

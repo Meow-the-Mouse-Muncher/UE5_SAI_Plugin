@@ -3,6 +3,7 @@ import asyncio
 import datetime
 import time
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -101,12 +102,14 @@ async def run_server(host, port):
     loop_.create_task(handle_client(client, host, port, loop_))
 
 
-async def run_cmd(command):
+async def run_cmd(command, gpu_id=None):
     global p, unreal_loaded
     unreal_loaded = False
-    # p = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-    # On Linux, use shell=True to handle the command string with arguments
-    p = subprocess.Popen(command, shell=True)
+    env = dict(os.environ)
+    if gpu_id is not None:
+        env['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
+        logging.info(f'[*] Setting CUDA_VISIBLE_DEVICES={gpu_id}')
+    p = subprocess.Popen(command, shell=True, env=env)
     logging.info('[*] Starting Unreal Engine...')
     logging.info(f'[*] Unreal Engine PID: {p.pid}')
 
@@ -139,8 +142,7 @@ async def run_cmd(command):
                 logging.info('------------------')
                 logging.info('[*] Restarting Unreal Engine...')
                 unreal_loaded = False
-                # p = subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
-                p = subprocess.Popen(command, shell=True)
+                p = subprocess.Popen(command, shell=True, env=env)
                 logging.info(f'[*] Unreal Engine PID: {p.pid}')
         except AsyncioCancelledError as e:
             break
@@ -148,7 +150,7 @@ async def run_cmd(command):
         # logging.info('running', poll)
 
 
-def main(config_file: str='misc/user.json'):
+def main(config_file: str='misc/user.json', gpu_id: Optional[int]=None, port: int=9999, map_filter: Optional[List[str]]=None):
     colorama.init(autoreset=True)
 
     config_file = Path(config_file).resolve()
@@ -188,6 +190,12 @@ def main(config_file: str='misc/user.json'):
         f'LOG=Pipeline.log',
         f'-LOCALLOGTIMES',
     ]
+    
+    # 添加 GPU 选择参数
+    if gpu_id is not None:
+        command.append(f'-graphicsadapter={gpu_id}')
+        logging.info(f'[*] Setting GPU adapter to: {gpu_id}')
+    
     command = ' '.join(map(str, command))
     logging.info(colorama.Fore.BLUE + command)
 
@@ -195,13 +203,14 @@ def main(config_file: str='misc/user.json'):
     logging.info(colorama.Fore.YELLOW + f'[*] UE log file: {ue_log_file.as_uri()}')
 
     host = '127.0.0.1'
-    port = 9999
+    # port参数从函数参数传入
+    logging.info(f'[*] Using port: {port}, GPU: {gpu_id if gpu_id is not None else "default"}')
 
     loop = asyncio.get_event_loop()
     try:
         print('now we need cmd pipeline')
         loop.create_task(run_server(host, port))
-        loop.run_until_complete(run_cmd(command))
+        loop.run_until_complete(run_cmd(command, gpu_id=gpu_id))
 
         # asyncio.ensure_future(run_server(host, port)),
         # asyncio.ensure_future(run_cmd(command))
@@ -228,6 +237,9 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='main')
     parser.add_argument('--config_file', '-f', type=str, default='misc/user.json')
+    parser.add_argument('--gpu_id', '-g', type=int, default=None, help='GPU ID to use (e.g., 0, 1)')
+    parser.add_argument('--port', '-p', type=int, default=9999, help='Socket port to use')
+    parser.add_argument('--maps', '-m', type=str, nargs='*', default=None, help='Specific maps to process')
     args = parser.parse_args()
 
-    main(args.config_file)
+    main(args.config_file, gpu_id=args.gpu_id, port=args.port, map_filter=args.maps)
