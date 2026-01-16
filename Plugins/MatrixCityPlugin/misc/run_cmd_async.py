@@ -135,19 +135,16 @@ async def run_cmd(command, gpu_id=None):
                 except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                     pass
 
-            if poll is not None or crashed:
-                if p.poll() is None:
-                    p.kill()
-                logging.error(f'[!] Unreal Engine crashed/exited with poll code {poll}')
-                logging.info('------------------')
-                logging.info('[*] Restarting Unreal Engine...')
-                unreal_loaded = False
-                p = subprocess.Popen(command, shell=True, env=env)
-                logging.info(f'[*] Unreal Engine PID: {p.pid}')
+            # 如果进程已退出，不再重启，直接退出循环
+            if poll is not None:
+                if crashed:
+                    logging.error(f'[!] Unreal Engine crashed with poll code {poll}')
+                else:
+                    logging.info(f'[*] Unreal Engine exited with code {poll}')
+                break
+                
         except AsyncioCancelledError as e:
             break
-            # continue
-        # logging.info('running', poll)
 
 
 def main(config_file: str='misc/user.json', gpu_id: Optional[int]=None, port: int=9999, map_filter: Optional[List[str]]=None):

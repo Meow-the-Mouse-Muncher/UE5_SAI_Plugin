@@ -3,8 +3,11 @@
 并行渲染调度器 - 支持多GPU并行处理多个地图
 
 使用示例:
-    # 使用2个GPU并行渲染所有地图
+    # 使用2个GPU并行渲染所有地图（每个GPU 1个进程）
     python run_parallel.py --num_gpus 2
+    
+    # 每个GPU启动2个进程（总共4个进程）
+    python run_parallel.py --num_gpus 2 --processes_per_gpu 2
     
     # 指定GPU ID和配置文件
     python run_parallel.py --num_gpus 2 --gpu_ids 0,1 --config misc/user.json
@@ -181,6 +184,8 @@ def main():
                         help='配置文件路径 (默认: misc/user.json)')
     parser.add_argument('--num_gpus', '-n', type=int, default=2,
                         help='使用的GPU数量 (默认: 2)')
+    parser.add_argument('--processes_per_gpu', '-p', type=int, default=2,
+                        help='每个GPU启动的进程数 (默认: 1)')
     parser.add_argument('--gpu_ids', type=str, default=None,
                         help='指定GPU ID，用逗号分隔 (例如: 0,1)。不指定则使用0到num_gpus-1')
     parser.add_argument('--base_port', type=int, default=9999,
@@ -219,33 +224,44 @@ def main():
     else:
         gpu_ids = list(range(args.num_gpus))
     
+    # 计算总worker数
+    total_workers = args.num_gpus * args.processes_per_gpu
+    
     logging.info(colorama.Fore.YELLOW + "\n" + "=" * 70)
     logging.info(colorama.Fore.YELLOW + "并行渲染配置:")
     logging.info(colorama.Fore.YELLOW + f"  GPU数量: {args.num_gpus}")
+    logging.info(colorama.Fore.YELLOW + f"  每个GPU的进程数: {args.processes_per_gpu}")
+    logging.info(colorama.Fore.YELLOW + f"  总Worker数: {total_workers}")
     logging.info(colorama.Fore.YELLOW + f"  GPU IDs: {gpu_ids}")
     logging.info(colorama.Fore.YELLOW + f"  总地图数: {len(maps)}")
     logging.info(colorama.Fore.YELLOW + f"  起始端口: {args.base_port}")
     logging.info(colorama.Fore.YELLOW + "=" * 70 + "\n")
     
-    # 分配地图
-    map_partitions = split_maps(maps, args.num_gpus)
+    # 分配地图 - 分成 total_workers 份
+    map_partitions = split_maps(maps, total_workers)
     
+    # 显示任务分配
     for i, partition in enumerate(map_partitions):
-        logging.info(f"Worker {i} (GPU {gpu_ids[i]}): {len(partition)} 个地图 - {partition}")
+        gpu_idx = i // args.processes_per_gpu  # 计算该worker属于哪个GPU
+        gpu_id = gpu_ids[gpu_idx]
+        logging.info(f"Worker {i} (GPU {gpu_id}, 进程 {i % args.processes_per_gpu + 1}/{args.processes_per_gpu}): {len(partition)} 个地图 - {partition}")
     
     # 创建进程池
-    logging.info(colorama.Fore.CYAN + f"\n启动 {args.num_gpus} 个并行Worker...\n")
+    logging.info(colorama.Fore.CYAN + f"\n启动 {total_workers} 个并行Worker...\n")
     
     processes = []
-    for i in range(args.num_gpus):
-        port = args.base_port + i
+    for i in range(total_workers):
+        gpu_idx = i // args.processes_per_gpu  # 计算该worker使用哪个GPU
+        gpu_id = gpu_ids[gpu_idx]
+        port = args.base_port + i  # 每个worker使用唯一端口
+        
         p = mp.Process(
             target=run_worker,
-            args=(i, map_partitions[i], gpu_ids[i], port, str(config_file))
+            args=(i, map_partitions[i], gpu_id, port, str(config_file))
         )
         p.start()
         processes.append(p)
-        logging.info(f"Worker {i} 已启动 (PID: {p.pid})")
+        logging.info(f"Worker {i} 已启动 (PID: {p.pid}, GPU: {gpu_id}, Port: {port})")
     
     # 等待所有进程完成
     logging.info(colorama.Fore.CYAN + "\n等待所有Worker完成...\n")
