@@ -6,12 +6,12 @@
     "scene_008",
     "scene_009",
     "scene_013"
-  ], 
+  ],
   "camera_name": "CineCameraActor1",
   "render_config": "misc/render_SAI_config.yaml",
   "python_script": "Content/Python/pipeline.py",
   "batch_mode": true,
   "target_prefix": "Target_",
-  "occlusion_prefix": "SM_"
+  "occlusion_prefix": "SM_",
+  "ue_map": "/Game/Map/scene_013"
 }
-

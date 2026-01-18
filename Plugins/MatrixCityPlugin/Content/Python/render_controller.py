@@ -266,12 +266,46 @@ class RenderController:
         if self.on_step_complete:
             self.on_step_complete(step, self.current_context)
         
+        # 【修复】在渲染步骤之间添加 GPU 同步等待
+        # 防止 Vulkan 渲染查询未完成就被销毁导致 SIGSEGV 崩溃
+        self._wait_for_gpu_flush()
+        
         # 移动到下一步
         self.current_step_index += 1
         self.state = RenderState.PREPARING
         
         # 执行下一步
         self._execute_current_step()
+    
+    def _wait_for_gpu_flush(self, wait_time: float = 1.0):
+        """等待 GPU 完成所有挂起的渲染命令
+        
+        Args:
+            wait_time: 等待时间（秒），默认1秒
+        """
+        import time
+        
+        unreal.log(f"[GPU Sync] Waiting {wait_time}s for GPU to complete pending commands...")
+        
+        try:
+            # 1. 强制垃圾回收，释放 Python 端的引用
+            unreal.SystemLibrary.collect_garbage()
+            
+            # 2. 刷新 Slate 应用程序，处理挂起的 UI 事件
+            # 这有助于确保渲染线程完成当前帧
+            
+            # 3. 等待一段时间让 GPU 完成清理
+            time.sleep(wait_time)
+            
+            # 4. 再次 GC 确保资源释放
+            unreal.SystemLibrary.collect_garbage()
+            
+            unreal.log("[GPU Sync] GPU flush completed")
+            
+        except Exception as e:
+            unreal.log_warning(f"[GPU Sync] Warning during GPU flush: {e}")
+            # 即使出错也等待一下
+            time.sleep(wait_time)
     
     def _on_sequence_complete(self):
         """序列完成处理"""

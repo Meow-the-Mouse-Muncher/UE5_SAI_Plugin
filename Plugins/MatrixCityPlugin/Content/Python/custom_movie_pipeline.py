@@ -649,10 +649,17 @@ class CustomMoviePipeline():
     @classmethod
     def _on_map_targets_completed(cls):
         """所有目标物处理完成"""
+        import time
+        
         map_context = cls._current_map_context
         map_name = map_context['map_name']
         executor = map_context.get('executor')
         unreal.log(f"All targets completed for map: {map_name}")
+        
+        # 【修复】在进行任何清理操作前，先等待 GPU 完成所有渲染命令
+        # 这是解决 Vulkan SIGSEGV 崩溃的关键
+        unreal.log("[*] Waiting for GPU to complete all pending render commands...")
+        cls._flush_gpu_and_wait(wait_cycles=3, cycle_time=1.0)
         
         # 渲染完成后自动导出FBX
         try:
@@ -677,9 +684,41 @@ class CustomMoviePipeline():
             except Exception as e:
                 unreal.log_warning(f"Failed to send socket message: {e}")
         
+        # 【修复】退出前再次等待 GPU，确保所有资源正确释放
+        unreal.log("[*] Final GPU flush before exit...")
+        cls._flush_gpu_and_wait(wait_cycles=2, cycle_time=1.5)
+        
         # 退出编辑器
         unreal.log("[*] Exiting Unreal Editor...")
         unreal.SystemLibrary.quit_editor()
+    
+    @classmethod
+    def _flush_gpu_and_wait(cls, wait_cycles: int = 3, cycle_time: float = 1.0):
+        """强制刷新 GPU 并等待所有渲染命令完成
+        
+        这个函数通过多次 GC 和等待来确保 Vulkan 渲染查询完成，
+        防止在资源清理时出现 SIGSEGV 崩溃。
+        
+        Args:
+            wait_cycles: 等待循环次数
+            cycle_time: 每个循环的等待时间（秒）
+        """
+        import time
+        
+        for i in range(wait_cycles):
+            try:
+                # 强制垃圾回收
+                unreal.SystemLibrary.collect_garbage()
+                unreal.log(f"[GPU Flush] Cycle {i+1}/{wait_cycles}: GC completed, waiting {cycle_time}s...")
+                
+                # 等待 GPU 完成
+                time.sleep(cycle_time)
+                
+            except Exception as e:
+                unreal.log_warning(f"[GPU Flush] Warning in cycle {i+1}: {e}")
+                time.sleep(cycle_time)
+        
+        unreal.log("[GPU Flush] All cycles completed, GPU should be ready")
 
     def onQueueFinishedCallback(executor: unreal.MoviePipelineLinearExecutorBase, success: bool):
         """On queue finished callback.
@@ -690,8 +729,24 @@ class CustomMoviePipeline():
             executor (unreal.MoviePipelineLinearExecutorBase): The executor of the queue.
             success (bool): Whether the queue finished successfully.
         """
+        import time
+        
         mss = f"Render completed. Success: {success}"
         unreal.log(mss)
+        
+        # 【关键修复】在回调中立即添加 GPU 同步等待
+        # 这必须在 _on_render_complete 之前执行，防止 PIE 世界过早清理
+        unreal.log("[GPU Sync] Immediate GPU flush after render completion...")
+        try:
+            # 多次 GC + 等待，确保 Vulkan 渲染查询完成
+            for i in range(3):
+                unreal.SystemLibrary.collect_garbage()
+                unreal.log(f"[GPU Sync] Flush cycle {i+1}/3, waiting 1s...")
+                time.sleep(1.0)
+            unreal.log("[GPU Sync] GPU flush completed in callback")
+        except Exception as e:
+            unreal.log_warning(f"[GPU Sync] Warning during flush: {e}")
+            time.sleep(2.0)  # 即使出错也等待
         
         # 如果有渲染控制器，通知它渲染完成
         if CustomMoviePipeline._render_controller:

@@ -184,7 +184,7 @@ def main():
                         help='配置文件路径 (默认: misc/user.json)')
     parser.add_argument('--num_gpus', '-n', type=int, default=2,
                         help='使用的GPU数量 (默认: 2)')
-    parser.add_argument('--processes_per_gpu', '-p', type=int, default=2,
+    parser.add_argument('--processes_per_gpu', '-p', type=int, default=1,
                         help='每个GPU启动的进程数 (默认: 1)')
     parser.add_argument('--gpu_ids', type=str, default=None,
                         help='指定GPU ID，用逗号分隔 (例如: 0,1)。不指定则使用0到num_gpus-1')
