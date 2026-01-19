@@ -696,7 +696,8 @@ class CustomMoviePipeline():
     def _flush_gpu_and_wait(cls, wait_cycles: int = 3, cycle_time: float = 1.0):
         """强制刷新 GPU 并等待所有渲染命令完成
         
-        这个函数通过多次 GC 和等待来确保 Vulkan 渲染查询完成，
+        关键：必须使用 UE 的渲染命令刷新，而不只是 Python sleep
+        这个函数通过刷新渲染命令队列和 GC 来确保 Vulkan 渲染查询完成，
         防止在资源清理时出现 SIGSEGV 崩溃。
         
         Args:
@@ -707,11 +708,18 @@ class CustomMoviePipeline():
         
         for i in range(wait_cycles):
             try:
-                # 强制垃圾回收
-                unreal.SystemLibrary.collect_garbage()
-                unreal.log(f"[GPU Flush] Cycle {i+1}/{wait_cycles}: GC completed, waiting {cycle_time}s...")
+                # 【关键】使用控制台命令强制刷新渲染命令队列
+                # 这会同步等待 GPU 完成所有挂起的渲染操作
+                unreal.SystemLibrary.execute_console_command(
+                    None, "r.FlushRenderingCommands", False
+                )
                 
-                # 等待 GPU 完成
+                # 强制垃圾回收释放 Python 端引用
+                unreal.SystemLibrary.collect_garbage()
+                
+                unreal.log(f"[GPU Flush] Cycle {i+1}/{wait_cycles}: Flushed rendering commands + GC, waiting {cycle_time}s...")
+                
+                # 额外等待确保稳定
                 time.sleep(cycle_time)
                 
             except Exception as e:
@@ -738,11 +746,16 @@ class CustomMoviePipeline():
         # 这必须在 _on_render_complete 之前执行，防止 PIE 世界过早清理
         unreal.log("[GPU Sync] Immediate GPU flush after render completion...")
         try:
-            # 多次 GC + 等待，确保 Vulkan 渲染查询完成
+            # 使用渲染命令刷新而不是简单 sleep
+            # 这是解决 Vulkan SIGSEGV 的关键
             for i in range(3):
+                # 强制刷新渲染命令队列 - 这是同步操作
+                unreal.SystemLibrary.execute_console_command(
+                    None, "r.FlushRenderingCommands", False
+                )
                 unreal.SystemLibrary.collect_garbage()
-                unreal.log(f"[GPU Sync] Flush cycle {i+1}/3, waiting 1s...")
-                time.sleep(1.0)
+                unreal.log(f"[GPU Sync] Flush cycle {i+1}/3 completed")
+                time.sleep(0.5)
             unreal.log("[GPU Sync] GPU flush completed in callback")
         except Exception as e:
             unreal.log_warning(f"[GPU Sync] Warning during flush: {e}")
