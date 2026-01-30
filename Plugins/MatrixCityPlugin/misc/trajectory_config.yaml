@@ -4,14 +4,14 @@
 # 全局共用参数
 global:
   trajectory_types: ['fix_line','rot_arc']  # 要生成的轨迹类型列表，可以选择性启用
-  camera_heights: [5000.0, 6000.0,7000.0,8000.0, 10000.0,12000.0] # 相机高度列表（UE单位：cm）
-  # camera_heights: [7000.0]
+  # camera_heights: [5000.0, 6000.0,7000.0,8000.0, 10000.0,12000.0] # 相机高度列表（UE单位：cm）
+  camera_heights: [5000.0, 8000.0, 12000.0]
   # 
                                              # 对应 30米、50米、80米
                                              # fix_line使用为height_offset，rot_arc使用为radius，rot_line使用为height
   num_frames: 33                             # 图像张数（帧数）
-  plane_angles: [0, 120, 240]               # 角度列表（度），作为与高度类似的全局共用参数
-  # plane_angles: [90]                         
+  # plane_angles: [0, 120, 240]               # 角度列表（度），作为与高度类似的全局共用参数
+  plane_angles: [0]                         
 
 # fix_line 轨迹参数
 fix_line:
@@ -34,80 +34,3 @@ sequence:
 # 相机设置
 camera:
   name: 'CineCameraActor1'    # 场景中相机的名称
-
-# 示例配置说明:
-
-# 全局参数:
-# camera_heights: 所有轨迹共用的相机高度参数列表
-#   - fix_line: 作为height_offset（相机相对于目标物的高度偏移）
-#   - rot_arc: 作为radius（圆弧半径）
-#   - rot_line: 作为height（相机到目标物的水平距离）
-# num_frames: 所有轨迹共用的帧数
-
-# fix_line轨迹（直线轨迹）:
-# 1. 在目标物正上方生成一条直线轨迹，相机垂直向下看
-# 2. angle_degrees: 0度表示沿x轴，90度表示沿y轴，45度表示东北方向
-# 3. trajectory_length: 轨迹总长度，相机会在这条线上从一端移动到另一端
-
-# rot_arc轨迹（圆弧轨迹）:
-# 1. 以目标物为中心生成圆弧轨迹，相机始终对准目标物
-# 2. 圆弧轨迹在包含目标物Z轴的垂直平面内
-# 3. arc_angle_degrees: 圆弧的角度范围，90度表示1/4圆，180度表示半圆
-# 4. plane_angle_degrees: 垂直平面与X轴的夹角
-#    - 0度: 圆弧在XZ平面内
-#    - 90度: 圆弧在YZ平面内
-#    - 45度: 圆弧在倾斜45度的垂直平面内
-
-# rot_line轨迹（直线轨迹，相机始终看向目标物）:
-# 1. 以目标物为中心，按角度均匀采样生成直线轨迹，相机始终对准目标物
-# 2. 相机在指定高度的水平面上，以目标物为中心做圆弧运动，但采样点连成直线
-# 3. arc_angle_degrees: 角度范围，用于角度均匀采样（与rot_arc相同的采样方式）
-# 4. plane_angle_degrees: 直线的中心方向与X轴的夹角
-#    - 0度: 直线中心朝向X轴正方向
-#    - 90度: 直线中心朝向Y轴正方向
-#    - 45度: 直线中心朝向东北方向
-# 5. 采样方式: 按角度均匀分布，而不是按距离均匀分布
-
-# 输出文件结构:
-# 轨迹序列文件:
-# /Game/Sequences/
-# ├── fix_line/
-# │   └── scene_001_Target_002_50.uasset
-# ├── rot_arc/
-# │   └── scene_001_Target_002_50.uasset
-# └── rot_line/
-#     └── scene_001_Target_002_50.uasset
-#
-# 渲染数据文件:
-# render_data/
-# ├── fix_line/
-# │   ├── scene_001_Target_002_height_030_occ/
-# │   │   ├── rgb/00001.png, 00002.png, ...
-# │   │   ├── depth/00001.exr, 00002.exr, ...
-# │   │   └── mask/00001.exr, 00002.exr, ...
-# │   ├── scene_001_Target_002_height_030_GT/
-# │   ├── scene_001_Target_002_height_050_occ/
-# │   ├── scene_001_Target_002_height_050_GT/
-# │   ├── scene_001_Target_002_height_080_occ/
-# │   └── scene_001_Target_002_height_080_GT/
-# ├── rot_arc/
-# │   ├── scene_001_Target_002_height_030_occ/
-# │   ├── scene_001_Target_002_height_030_GT/
-# │   └── ... (其他高度)
-# └── rot_line/
-#     ├── scene_001_Target_002_height_030_occ/
-#     ├── scene_001_Target_002_height_030_GT/
-#     └── ... (其他高度)
-#
-# 文件命名说明:
-# - scene_001: 地图名称
-# - Target_002: 目标物名称
-# - height_050: 相机高度（米，3位数字格式）
-
-# 常用角度参考:
-# 0度   - 沿x轴正方向（东）
-# 90度  - 沿y轴正方向（北）
-# 180度 - 沿x轴负方向（西）
-# 270度 - 沿y轴负方向（南）
-# 45度  - 东北方向
-# 135度 - 西北方向

@@ -10,6 +10,7 @@ os.environ["OPENCV_IO_ENABLE_OPENEXR"] = "1"
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 import cv2
 import re
+import h5py
 from tqdm import tqdm
 from concurrent.futures import ProcessPoolExecutor
 import multiprocessing as mp
@@ -120,8 +121,8 @@ def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_
 
 
 
-def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, output_dir, use_gpu=True):
-    """处理数据集"""
+def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_depth_dir, h5_path, use_gpu=True):
+    """处理数据集并保存为H5"""
     device = 'cuda' if use_gpu and torch.cuda.is_available() else 'cpu'
     if use_gpu and not torch.cuda.is_available():
         print("CUDA not available, falling back to CPU")
@@ -147,38 +148,77 @@ def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, outpu
     center_depth = load_depth(center_depth_path)
     if center_depth is None:
         print(f"Failed to load center depth map: {center_depth_path}")
-        return 0, 0
+        return False
+
+    # Load center RGB from GT directory (Ground Truth Target)
+    center_gt_rgb_path = os.path.join(gt_rgb_dir, f"{center_idx:04d}.png")
+    center_gt_rgb = cv2.imread(center_gt_rgb_path)
+    center_gt_rgb = cv2.cvtColor(center_gt_rgb, cv2.COLOR_BGR2RGB)
+
+    h, w = center_gt_rgb.shape[:2]
     
     shared_data, frame_transforms = precompute_transforms(poses, center_pose, K)
-    os.makedirs(os.path.join(output_dir, 'rgb'), exist_ok=True)
+    
+    # Prepare data containers
+    refocused_imgs = np.zeros((len(frames), h, w, 3), dtype=np.uint8)
+    occ_center_rgb = None
     
     # GPU processing - sequential
     processed_count = 0
     for i, frame_transform in enumerate(frame_transforms):
         rgb_path = os.path.join(rgb_dir, f"{i:04d}.png")
-        output_path = os.path.join(output_dir, 'rgb', f"{i:04d}.png")
+        
+        if not os.path.exists(rgb_path):
+            continue
+
+        rgb_img = cv2.imread(rgb_path)
+        rgb_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB)
+        if rgb_img is None:
+            continue
         
         if i == center_idx:
-            # Copy center frame
-            if os.path.exists(rgb_path):
-                rgb_img = cv2.imread(rgb_path)
-                if rgb_img is not None:
-                    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                    if cv2.imwrite(output_path, rgb_img):
-                        processed_count += 1
+            # Copy center frame (identity transform)
+            occ_center_rgb = rgb_img.copy()
+            refocused_imgs[i] = rgb_img
+            processed_count += 1
         elif os.path.exists(rgb_path):
-            rgb_img = cv2.imread(rgb_path)
             # Load corresponding source depth map
             src_depth_path = os.path.join(src_depth_dir, f"{i:04d}.exr")
             src_depth = load_depth(src_depth_path)
             
-            if rgb_img is not None and src_depth is not None:
+            if src_depth is not None:
                 refocused_rgb = refocus_image_gpu(rgb_img, src_depth, center_depth, frame_transform, shared_data, device)
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                if cv2.imwrite(output_path, refocused_rgb):
-                    processed_count += 1
-    
-    return processed_count, len(frames)
+                refocused_imgs[i] = refocused_rgb
+                processed_count += 1
+                
+    # Save to H5
+    os.makedirs(os.path.dirname(h5_path), exist_ok=True)
+    try:
+        with h5py.File(h5_path, 'w') as f:
+            # --- GT Group ---
+            gt_g = f.create_group('GT')
+            gt_g.create_dataset('rgb', data=center_gt_rgb)
+
+            # --- occ_ref Group ---
+            ref_g = f.create_group('occ_ref')
+            # 排除中间帧，因为它会保存在 occ_center 中
+            ref_imgs_filtered = np.delete(refocused_imgs, center_idx, axis=0)
+            ref_g.create_dataset('rgb', data=ref_imgs_filtered)
+
+
+            # --- occ_center Group ---
+            center_g = f.create_group('occ_center')
+            if occ_center_rgb is not None:
+                center_g.create_dataset('rgb', data=occ_center_rgb)
+            else:
+                center_g.create_dataset('rgb', data=refocused_imgs[center_idx])
+            
+        return True
+    except Exception as e:
+        print(f"Error saving {h5_path}: {e}")
+        if os.path.exists(h5_path):
+            os.remove(h5_path)
+        return False
 
 def batch_process_render_data(base_dir, output_base, use_gpu=True):
     """批量处理渲染数据"""
@@ -186,45 +226,61 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
         print("CUDA not available, falling back to CPU")
         use_gpu = False
     
-    # Find all sequences (both OCC and GT)
+    # Find all sequences (Start from OCC and find matching GT)
     sequence_list = []
-    for trajectory_type in os.listdir(base_dir):
+    
+    if os.path.exists(base_dir):
+        trajectories = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+    else:
+        print(f"Base dir {base_dir} does not exist")
+        return
+
+    for trajectory_type in trajectories:
         trajectory_dir = os.path.join(base_dir, trajectory_type)
-        if not os.path.isdir(trajectory_dir):
-            continue
             
         for sequence_name in os.listdir(trajectory_dir):
-            # Process both OCC and GT sequences
-            if not (sequence_name.endswith('_occ') or sequence_name.endswith('_GT')):
-                continue
-                
-            sequence_dir = os.path.join(trajectory_dir, sequence_name)
-            if not os.path.isdir(sequence_dir):
+            # We focus on OCC sequences to fix them
+            if not sequence_name.endswith('_occ'):
                 continue
             
-            # Determine GT depth directory (for center frame) and source depth directory
-            if sequence_name.endswith('_occ'):
-                # OCC sequence uses GT depth for center, OCC depth for source frames
-                gt_sequence_name = sequence_name.replace('_occ', '_GT')
-                gt_sequence_dir = os.path.join(trajectory_dir, gt_sequence_name)
-                src_depth_dir = os.path.join(sequence_dir, "depth")  # OCC depth for source frames
-            else:
-                # GT sequence uses its own depth for both center and source frames
-                gt_sequence_dir = sequence_dir
-                src_depth_dir = os.path.join(sequence_dir, "depth")  # GT depth for source frames
-            
-            transforms_file = os.path.join(sequence_dir, "pose", "transforms.json")
-            rgb_dir = os.path.join(sequence_dir, "rgb")
-            gt_depth_dir = os.path.join(gt_sequence_dir, "depth")  # GT depth for center frame
-            
-            if not all(os.path.exists(p) for p in [transforms_file, rgb_dir, gt_depth_dir, src_depth_dir]):
+            occ_sequence_dir = os.path.join(trajectory_dir, sequence_name)
+            if not os.path.isdir(occ_sequence_dir):
                 continue
             
-            output_dir = os.path.join(output_base, trajectory_type, sequence_name)
-            if os.path.exists(output_dir):
+            # Find matching GT sequence
+            gt_sequence_name = sequence_name.replace('_occ', '_GT')
+            gt_sequence_dir = os.path.join(trajectory_dir, gt_sequence_name)
+            
+            if not os.path.isdir(gt_sequence_dir):
                 continue
             
-            sequence_list.append((trajectory_type, sequence_name, transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, output_dir))
+            # OCC Inputs
+            transforms_file = os.path.join(occ_sequence_dir, "pose", "transforms.json")
+            rgb_dir = os.path.join(occ_sequence_dir, "rgb")
+            src_depth_dir = os.path.join(occ_sequence_dir, "depth") # OCC depth for source frames refocusing
+            
+            # GT Inputs
+            gt_rgb_dir = os.path.join(gt_sequence_dir, "rgb") # New: Needed for GT target
+            gt_depth_dir = os.path.join(gt_sequence_dir, "depth") # GT depth for center frame (and target)
+            
+            if not all(os.path.exists(p) for p in [transforms_file, rgb_dir, src_depth_dir, gt_rgb_dir, gt_depth_dir]):
+                continue
+            
+            # Output H5 path
+            base_name = sequence_name.replace('_occ', '')
+            h5_output_path = os.path.join(output_base, trajectory_type, f"{base_name}.h5")
+            
+            if os.path.exists(h5_output_path):
+                continue
+            
+            sequence_list.append((
+                transforms_file, 
+                rgb_dir, 
+                gt_rgb_dir,
+                gt_depth_dir, 
+                src_depth_dir, 
+                h5_output_path
+            ))
     
     if len(sequence_list) == 0:
         print("No sequences to process")
@@ -232,31 +288,26 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
     
     print(f"Found {len(sequence_list)} sequences to process")
     print(f"Using {'GPU' if use_gpu else 'CPU'} acceleration")
-    print("Using INVERSE projection with GT depth map")
     
-    total_processed = 0
-    total_frames = 0
+    success_count = 0
     
     with tqdm(sequence_list, desc="Processing sequences", unit="seq") as pbar:
-        for trajectory_type, sequence_name, transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, output_dir in pbar:
-            pbar.set_postfix_str(f"{trajectory_type}/{sequence_name}")
-            processed_count, frame_count = process_dataset(
-                transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, output_dir, use_gpu
-            )
-            total_processed += processed_count
-            total_frames += frame_count
+        for args in pbar:
+            h5_path = args[-1]
+            pbar.set_description(f"Processing {os.path.basename(h5_path)}")
+            # args: transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_depth_dir, h5_path
+            result = process_dataset(*args, use_gpu)
+            if result:
+                success_count += 1
     
     print(f"✓ Processing completed!")
     print(f"  Sequences: {len(sequence_list)}")
-    print(f"  Frames: {total_processed}/{total_frames}")
-    print(f"  Success rate: {total_processed/total_frames*100:.1f}%")
+    print(f"  Successful: {success_count}")
 
 def main():
     # ==================== 配置参数 ====================
-    # 输入数据路径
     BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/train_data"
     
-    # 输出路径
     OUTPUT_BASE = "/home_ssd/sjy/deocc_swin/train_data"
     
     # 是否使用GPU加速

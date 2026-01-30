@@ -159,6 +159,13 @@ def generate_3dgs_transforms_direct(out_data, output_dir, config, scale=100):
     fbx_name = os.path.basename(output_dir)
     # 获取父目录（轨迹类型目录）
     parent_dir = os.path.dirname(output_dir)
+    
+    # 检查父目录是否存在，不存在则跳过
+    if not os.path.exists(parent_dir):
+        print(f"Parent directory not found: {parent_dir}")
+        print(f"Skipping transform generation for: {fbx_name}")
+        return []
+    
     output_files = []
     
     # 为 GT 和 occ 都创建目录和 JSON 文件
@@ -400,10 +407,7 @@ def batch_process_by_category(scale=100):
         
         print(f"Found {len(fbx_files)} files for {category}")
         total_files += len(fbx_files)
-        
-        # Create category output directory
         category_output_dir = os.path.join(output_base_dir, category)
-        
         # Process each FBX file
         for fbx_path in fbx_files:
             print(f"\nProcessing: {os.path.basename(fbx_path)}")
