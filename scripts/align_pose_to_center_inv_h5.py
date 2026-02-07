@@ -48,7 +48,7 @@ def precompute_transforms(poses, center_pose, K):
     
     return shared_data, frame_transforms
 
-def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_data, device='cuda'):
+def refocus_image_gpu(src_img, center_depth, frame_transform, shared_data, device='cuda'):
     """GPU加速的逆向重聚焦图像处理，使用GT深度图和深度剔除"""
     R_c2s, T_c2s = frame_transform
     K, K_inv = shared_data
@@ -58,7 +58,6 @@ def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_
     
     # Convert to tensors
     src_tensor = torch.from_numpy(src_img).float().to(device)
-    # z_measured = torch.from_numpy(src_depth).float().to(device) / 100.0  # cm->m
     depth_m = -torch.from_numpy(center_depth).float().to(device) / 100.0  # cm->m, negative for -Z
     K_tensor = torch.from_numpy(K).float().to(device)
     K_inv_tensor = torch.from_numpy(K_inv).float().to(device)
@@ -74,7 +73,6 @@ def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_
     rays_center = (K_inv_tensor @ pixels).reshape(3, h, w)  # [3, H, W]
     
     # Apply per-pixel depth and transform to source camera
-    # points_3d_center = rays_center * depth
     points_3d_center = rays_center * depth_m.unsqueeze(0)
     
     # Transform to source camera: R_c2s @ points_3d_center + T_c2s
@@ -90,8 +88,6 @@ def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_
     x_coords = projected[0, :, :] / z
     y_coords = projected[1, :, :] / z
     
-    # Get projected depth (Z_proj) - distance from source camera
-    # z_proj = -transformed_points[2, :, :]   
     
     # Use GPU grid sampling for remapping
     # Normalize coordinates to [-1, 1] for grid_sample
@@ -109,13 +105,7 @@ def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_
         align_corners=True
     )
     
-    # Depth culling: Z_proj < Z_measured means occlusion
-
-    # depth_mask = z_proj < z_measured  # Keep pixels where projected depth >= measured depth
-    
-    # Apply depth mask
     result = sampled_color.squeeze(0).permute(1, 2, 0) * 255.0  # [H, W, 3]
-    # result[depth_mask] = 0  # Set occluded pixels to black
     
     return result.cpu().numpy().astype(np.uint8)
 
@@ -149,6 +139,12 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
     if center_depth is None:
         print(f"Failed to load center depth map: {center_depth_path}")
         return False
+    depth_min = np.min(center_depth)
+    depth_max = np.max(center_depth)
+    avg_depth = (depth_min + depth_max) / 2.0
+    center_depth = np.full_like(center_depth, avg_depth)
+    
+
 
     # Load center RGB from GT directory (Ground Truth Target)
     center_gt_rgb_path = os.path.join(gt_rgb_dir, f"{center_idx:04d}.png")
@@ -183,13 +179,9 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
             processed_count += 1
         elif os.path.exists(rgb_path):
             # Load corresponding source depth map
-            src_depth_path = os.path.join(src_depth_dir, f"{i:04d}.exr")
-            src_depth = load_depth(src_depth_path)
-            
-            if src_depth is not None:
-                refocused_rgb = refocus_image_gpu(rgb_img, src_depth, center_depth, frame_transform, shared_data, device)
-                refocused_imgs[i] = refocused_rgb
-                processed_count += 1
+            refocused_rgb = refocus_image_gpu(rgb_img, center_depth, frame_transform, shared_data, device)
+            refocused_imgs[i] = refocused_rgb
+            processed_count += 1
                 
     # Save to H5
     os.makedirs(os.path.dirname(h5_path), exist_ok=True)

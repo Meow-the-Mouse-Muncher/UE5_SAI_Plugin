@@ -48,7 +48,7 @@ def batch_export_sequences():
     # Define paths
     sequences_content_path = "/Game/Sequences"
     project_dir = unreal.Paths.project_dir()
-    base_output_dir = os.path.join(project_dir,"Content", "Exported_FBX_test")
+    base_output_dir = os.path.join(project_dir,"Content", "Exported_FBX")
     
     # Create base output directory
     if not os.path.exists(base_output_dir):

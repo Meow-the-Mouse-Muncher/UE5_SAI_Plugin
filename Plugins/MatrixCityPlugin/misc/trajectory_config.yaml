@@ -4,14 +4,14 @@
 # 全局共用参数
 global:
   trajectory_types: ['fix_line','rot_arc']  # 要生成的轨迹类型列表，可以选择性启用
-  # camera_heights: [5000.0, 6000.0,7000.0,8000.0, 10000.0,12000.0] # 相机高度列表（UE单位：cm）
-  camera_heights: [5000.0, 8000.0, 12000.0]
+  camera_heights: [5000.0, 6000.0,7000.0,8000.0, 10000.0,12000.0] # 相机高度列表（UE单位：cm）
+  # camera_heights: [5000.0, 8000.0, 12000.0]
   # 
                                              # 对应 30米、50米、80米
                                              # fix_line使用为height_offset，rot_arc使用为radius，rot_line使用为height
   num_frames: 33                             # 图像张数（帧数）
-  # plane_angles: [0, 120, 240]               # 角度列表（度），作为与高度类似的全局共用参数
-  plane_angles: [0]                         
+  plane_angles: [0, 120, 240]               # 角度列表（度），作为与高度类似的全局共用参数
+  # plane_angles: [0]                         
 
 # fix_line 轨迹参数
 fix_line:
