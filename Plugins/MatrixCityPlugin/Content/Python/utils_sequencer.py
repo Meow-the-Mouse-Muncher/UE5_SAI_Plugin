@@ -979,6 +979,156 @@ def rot_arc(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_deg
 
 
 
+def catmull_rom_spline(P0, P1, P2, P3, num_points):
+    """
+    计算 Catmull-Rom 样条曲线的一段
+    P0, P1, P2, P3: 控制点 (numpy array)
+    num_points: 插值点数量
+    """
+    curve = []
+    for i in range(num_points):
+        t = i / (num_points - 1) if num_points > 1 else 0
+        t2 = t * t
+        t3 = t2 * t
+        
+        # Catmull-Rom matrix
+        # 0.5 * [(-t3 + 2t2 - t) * P0 + (3t3 - 5t2 + 2) * P1 + (-3t3 + 4t2 + t) * P2 + (t3 - t2) * P3]
+        
+        point = 0.5 * (
+            (-t3 + 2*t2 - t) * P0 +
+            (3*t3 - 5*t2 + 2) * P1 +
+            (-3*t3 + 4*t2 + t) * P2 +
+            (t3 - t2) * P3
+        )
+        curve.append(point)
+    return curve
+
+def random_sphere_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degrees, mid_height, plane_angle_degrees=0.0, current_frame=0):
+    """
+    生成球层内的随机连续轨迹 (Random Sphere Shell Walk with Spline)
+    [Constraint] 中间帧(num_frames//2) 位于 (0, 0, mid_height)
+    """
+    # 获取目标物位置
+    target_location = target_actor.get_actor_location()
+    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
+    
+    # --- 1. 确定控制点数量 (奇数) ---
+    # 控制点数量：每 10 帧一个控制点，至少 5 个
+    num_control_points = max(5, num_frames // 6)
+    if num_control_points % 2 == 0:
+        num_control_points += 1 # 强制为奇数，以便有确定的中间点
+        
+    mid_cp_idx = num_control_points // 2
+    
+    control_points = []
+    
+    # 随机采样函数
+    def sample_point():
+        r = random.uniform(min_radius, max_radius)
+        # Uniform sampling on sphere cap: cos(theta) ~ U[cos(max_angle), 1]
+        max_theta_rad = math.radians(arc_angle_degrees / 2.0)
+        min_cos = math.cos(max_theta_rad)
+        cos_theta = random.uniform(min_cos, 1.0)
+        theta = math.acos(cos_theta)
+        phi = random.uniform(0, 2 * math.pi)
+        
+        sin_theta = math.sin(theta)
+        x = r * sin_theta * math.cos(phi)
+        y = r * sin_theta * math.sin(phi)
+        z = r * cos_theta # Z is up relative to target
+        return np.array([x, y, z])
+
+    # --- 2. 生成控制点 (锚定中间点) ---
+    for i in range(num_control_points):
+        if i == mid_cp_idx:
+            # 中间点：强制在 Z 轴上，高度为指定的 mid_height
+            z = mid_height
+            # 确保 mid_height 在 min/max 范围内 (虽然由调用者保证，但防御性编程)
+            z = max(min_radius, min(max_radius, z))
+            control_points.append(np.array([0.0, 0.0, z]))
+        else:
+            control_points.append(sample_point())
+            
+    # --- 3. 分配帧数 ---
+    num_segments_total = num_control_points - 1
+    num_segments_half = num_segments_total // 2
+    
+    frames_first_half = num_frames // 2
+    frames_second_half = num_frames - frames_first_half
+    
+    def distribute_frames(total_f, n_segs):
+        if n_segs == 0: return []
+        base = total_f // n_segs
+        rem = total_f % n_segs
+        return [base + 1 if i < rem else base for i in range(n_segs)]
+        
+    frames_per_segment = distribute_frames(frames_first_half, num_segments_half) + \
+                         distribute_frames(frames_second_half, num_segments_half)
+
+    # --- 4. 生成样条曲线 ---
+    full_path = []
+    cps = [control_points[0]] + control_points + [control_points[-1]]
+    
+    for i in range(num_segments_total):
+        p0 = cps[i]
+        p1 = cps[i+1]
+        p2 = cps[i+2]
+        p3 = cps[i+3]
+        n_points = frames_per_segment[i]
+        if n_points > 0:
+            segment_points = catmull_rom_spline(p0, p1, p2, p3, n_points)
+            full_path.extend(segment_points)
+    
+    # --- 5. 应用 Plane Angle 旋转并生成相机关键帧 ---
+    camera_trans = []
+    previous_yaw = 0.0
+    
+    # 预计算旋转矩阵 (绕 Z 轴)
+    rad_angle = math.radians(plane_angle_degrees)
+    cos_a = math.cos(rad_angle)
+    sin_a = math.sin(rad_angle)
+    
+    for i, pos_local in enumerate(full_path):
+        # 旋转局部坐标
+        # pos_local = [x, y, z]
+        # x_new = x cos - y sin
+        # y_new = x sin + y cos
+        rot_x = pos_local[0] * cos_a - pos_local[1] * sin_a
+        rot_y = pos_local[0] * sin_a + pos_local[1] * cos_a
+        rot_z = pos_local[2]
+        
+        # 转换到世界坐标
+        camera_x = target_x + rot_x
+        camera_y = target_y + rot_y
+        camera_z = target_z + rot_z
+        
+        # 计算朝向 (LookAt)
+        look_vector_x = target_x - camera_x
+        look_vector_y = target_y - camera_y
+        look_vector_z = target_z - camera_z
+        
+        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
+        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
+        
+        if horizontal_distance < 1e-6:
+            yaw = previous_yaw
+        else:
+            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
+            previous_yaw = yaw
+            
+        roll = 0.0
+        
+        camera_trans.append(
+            SequenceKey(
+                frame=current_frame + i,
+                location=(camera_x, camera_y, camera_z),
+                rotation=(roll, pitch, yaw)
+            )
+        )
+        
+    end_frame = current_frame + num_frames
+    return camera_trans, end_frame
+
 def generate_single_trajectory(target_actor, map_name, trajectory_type, trajectory_params, camera_height, num_frames):
     """生成单个轨迹类型的序列
     
@@ -1113,6 +1263,26 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
                 plane_angle_degrees=plane_angle_degrees,
                 current_frame=current_frame
             )
+        elif trajectory_type == 'random_sphere_shell':
+            # 使用 random_sphere_shell 轨迹
+            arc_angle_degrees = trajectory_params.get('arc_angle_degrees', 90.0)
+            plane_angle_degrees = trajectory_params.get('plane_angle_degrees', 0.0)
+            min_radius = trajectory_params.get('min_radius', 5000.0)
+            max_radius = trajectory_params.get('max_radius', 12000.0)
+            
+            # 这里的 camera_height 在调用方（main）已经是当前遍历的特定高度了
+            # 所以直接作为中间高度传入
+            
+            camera_trans, current_frame = random_sphere_shell(
+                target_actor=target_actor,
+                num_frames=num_frames,
+                min_radius=min_radius,
+                max_radius=max_radius,
+                arc_angle_degrees=arc_angle_degrees,
+                mid_height=camera_height, # 明确指定中间帧高度
+                plane_angle_degrees=plane_angle_degrees,
+                current_frame=current_frame
+            )
 
     seq_length = current_frame  # 使用计算出的序列长度
     
@@ -1227,6 +1397,16 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
                 traj_params_copy['angle_degrees'] = plane_angle
                 traj_params_copy['trajectory_size'] = trajectory_size # 注入全局 trajectory_size
                 
+                # 对于 random_sphere_shell，我们也需要 min/max radius，
+                # 但它们可以从 camera_heights 中推断，或者在 config 中指定。
+                # 按照用户要求，我们将中间帧高度确定为当前的 camera_height
+                # min/max radius 可以作为边界。
+                if traj_type == 'random_sphere_shell':
+                     # 使用 camera_heights 的最小值和最大值作为球壳边界，
+                     # 确保生成的点在合理范围内，而中间点正好是当前的 camera_height
+                     traj_params_copy['min_radius'] = min(camera_heights)
+                     traj_params_copy['max_radius'] = max(camera_heights)
+
                 try:
                     # 生成单个轨迹序列
                     level, sequence_name = generate_single_trajectory(
