@@ -87,14 +87,27 @@ def batch_export_sequences():
         asset_path = str(asset_data.package_name)
         
         # Extract category from path
-        if "/fix_line/" in asset_path:
-            category = "fix_line"
-        elif "/rot_arc/" in asset_path:
-            category = "rot_arc"
-        elif "/rot_line/" in asset_path:
-            category = "rot_line"
-        else:
-            category = "other"
+        # 尝试动态从路径中提取类别 (文件夹名)
+        category = "other"
+        if asset_path.startswith(sequences_content_path + "/"):
+            # remove prefix: /Game/Sequences/Category/Asset -> Category/Asset
+            rel_path = asset_path[len(sequences_content_path) + 1:]
+            parts = rel_path.split("/")
+            if len(parts) > 1:
+                category = parts[0]
+        
+        # 如果动态提取失败（例如在根目录下），则尝试使用关键字（兼容旧逻辑）
+        if category == "other":
+            if "/fix_line/" in asset_path:
+                category = "fix_line"
+            elif "/rot_arc/" in asset_path:
+                category = "rot_arc"
+            elif "/rot_line/" in asset_path:
+                category = "rot_line"
+            elif "/plane_grid/" in asset_path:
+                category = "plane_grid"
+            elif "/rot_spiral/" in asset_path:
+                category = "rot_spiral"
         
         if category not in categories:
             categories[category] = []

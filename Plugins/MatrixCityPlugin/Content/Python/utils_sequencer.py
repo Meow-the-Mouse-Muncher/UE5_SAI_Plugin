@@ -488,7 +488,7 @@ def generate_sequence(
 
     return new_sequence
 
-def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_length, current_frame=0):
+def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_size, current_frame=0):
     """
     在目标物正上方生成直线轨迹
     
@@ -497,7 +497,7 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
         num_frames (int): 图像张数（帧数）
         angle_degrees (float): 与x轴的夹角（度）- 直线的方向角度
         height_offset (float): 相对于目标物的高度偏移（UE单位：cm）
-        trajectory_length (float): 运动轨迹的长度（UE单位：cm）
+        trajectory_size (float): 运动轨迹的长度（UE单位：cm）
         current_frame (int): 起始帧数，默认为0
     
     Returns:
@@ -519,13 +519,13 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
     
     # 修正：计算起点和终点，确保起点在angle_degrees的反方向
     # 这样轨迹从angle_degrees的反方向开始，向angle_degrees方向移动
-    half_length = trajectory_length / 2.0
+    half_length = trajectory_size / 2.0
     
     # 起点：从目标物沿angle_degrees反方向偏移half_length
     start_x = target_x - half_length * dx
     start_y = target_y - half_length * dy
     
-    # 终点：从目标物沿angle_degrees正方向偏移half_length  
+    # 终点：从目标物沿angle_degrees正方向偏移half_length
     end_x = target_x + half_length * dx
     end_y = target_y + half_length * dy
     
@@ -572,6 +572,178 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
             )
         )
     
+    end_frame = current_frame + num_frames
+    return camera_trans, end_frame
+
+
+def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_degrees, current_frame=0):
+    """
+    在目标物正上方生成方阵扫描轨迹 (Snake Scan)
+    相机朝向与 fix_line 一致：Pitch -90 (俯视), Yaw 指向目标
+    
+    Args:
+        target_actor: 目标物Actor
+        num_frames (int): 图像张数（帧数）
+        trajectory_size (float): 方阵边长（UE单位：cm）
+        height_offset (float): 相对于目标物的高度偏移（UE单位：cm）
+        angle_degrees (float): 方阵的旋转角度（度）
+        current_frame (int): 起始帧数
+    """
+    # 获取目标物位置
+    target_location = target_actor.get_actor_location()
+    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
+    
+    # 计算相机高度
+    camera_z = target_z + height_offset
+    
+    # 网格参数
+    side_count = math.ceil(math.sqrt(num_frames))
+    if side_count < 2: side_count = 2
+    
+    step = trajectory_size / (side_count - 1) if side_count > 1 else 0
+    start_offset = -trajectory_size / 2.0
+    
+    # 旋转角度
+    angle_radians = math.radians(angle_degrees)
+    cos_a = math.cos(angle_radians)
+    sin_a = math.sin(angle_radians)
+    
+    camera_trans = []
+    previous_yaw = 0.0
+    
+    for i in range(num_frames):
+        row = i // side_count
+        col = i % side_count
+        
+        # 蛇形扫描 (Zigzag)
+        if row % 2 == 1:
+            col = side_count - 1 - col
+            
+        # 未旋转的局部坐标 (以目标为中心)
+        local_x = start_offset + col * step
+        local_y = start_offset + row * step
+        
+        # 旋转并平移到世界坐标
+        # x' = x*cos - y*sin
+        # y' = x*sin + y*cos
+        rel_x = local_x * cos_a - local_y * sin_a
+        rel_y = local_x * sin_a + local_y * cos_a
+        
+        camera_x = target_x + rel_x
+        camera_y = target_y + rel_y
+        
+        # 计算朝向 (复制 fix_line 逻辑)
+        look_vector_x = target_x - camera_x
+        look_vector_y = target_y - camera_y
+        look_vector_z = target_z - camera_z
+        
+        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
+        pitch = -90.0
+        
+        if horizontal_distance < 1e-6:
+            yaw = previous_yaw
+        else:
+            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
+            previous_yaw = yaw
+            
+        roll = 0.0
+        
+        camera_trans.append(
+            SequenceKey(
+                frame=current_frame + i,
+                location=(camera_x, camera_y, camera_z),
+                rotation=(roll, pitch, yaw)
+            )
+        )
+        
+    end_frame = current_frame + num_frames
+    return camera_trans, end_frame
+
+
+def rot_spiral(target_actor, num_frames, num_turns, arc_angle_degrees, radius, start_angle, current_frame=0):
+    """
+    以目标物为中心生成螺旋上升轨迹 (Spiral on Spherical Cap)
+    从球冠边缘螺旋上升至顶点
+    
+    Args:
+        target_actor: 目标物Actor
+        num_frames (int): 图像张数（帧数）
+        num_turns (float): 螺旋圈数
+        arc_angle_degrees (float): 球冠开角（度），决定起始仰角 = 90 - arc/2
+        radius (float): 螺旋半径（半球面半径，UE单位：cm）
+        start_angle (float): 起始方位角偏移（度）
+        current_frame (int): 起始帧数
+    """
+    # 获取目标物位置
+    target_location = target_actor.get_actor_location()
+    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
+    
+    # 计算仰角范围
+    # 顶点为90度，球冠边缘为 90 - arc/2
+    elevation_max = 90.0
+    elevation_min = 90.0 - arc_angle_degrees / 2.0
+    
+    camera_trans = []
+    previous_yaw = 0.0
+    
+    for i in range(num_frames):
+        # 计算进度 t (0.0 到 1.0)
+        t = i / (num_frames - 1) if num_frames > 1 else 0.0
+        
+        # 计算当前仰角 (线性插值)
+        current_elev_deg = elevation_min + t * (elevation_max - elevation_min)
+        current_elev_rad = math.radians(current_elev_deg)
+        
+        # 计算当前方位角 (螺旋)
+        # 旋转总角度 = num_turns * 360
+        current_azimuth_deg = start_angle + t * num_turns * 360.0
+        current_azimuth_rad = math.radians(current_azimuth_deg)
+        
+        # 球坐标转笛卡尔坐标 (Z轴向上)
+        # z = r * sin(elev)
+        # r_xy = r * cos(elev)
+        # x = r_xy * cos(azimuth) + target_x
+        # y = r_xy * sin(azimuth) + target_y
+        
+        local_z = radius * math.sin(current_elev_rad)
+        r_xy = radius * math.cos(current_elev_rad)
+        
+        # 计算相对于目标的偏移
+        offset_x = r_xy * math.cos(current_azimuth_rad)
+        offset_y = r_xy * math.sin(current_azimuth_rad)
+        
+        camera_x = target_x + offset_x
+        camera_y = target_y + offset_y
+        camera_z = target_z + local_z
+        
+        # 计算相机旋转 (LookAt Target)
+        # 计算从相机到目标物的向量
+        look_vector_x = target_x - camera_x
+        look_vector_y = target_y - camera_y
+        look_vector_z = target_z - camera_z
+        
+        # 计算俯仰角（pitch）
+        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
+        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
+        
+        # 计算偏航角（yaw）
+        if horizontal_distance < 1e-6:
+             # 极点处理：保持之前的 yaw
+             yaw = previous_yaw
+        else:
+            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
+            previous_yaw = yaw
+            
+        roll = 0.0
+        
+        camera_trans.append(
+            SequenceKey(
+                frame=current_frame + i,
+                location=(camera_x, camera_y, camera_z),
+                rotation=(roll, pitch, yaw)
+            )
+        )
+        
     end_frame = current_frame + num_frames
     return camera_trans, end_frame
 
@@ -856,14 +1028,43 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
         if trajectory_type == 'fix_line':
             # 使用fix_line轨迹
             angle_degrees = trajectory_params.get('angle_degrees', 0.0)
-            trajectory_length = trajectory_params.get('trajectory_length', 4000.0)
+            trajectory_size = trajectory_params.get('trajectory_size', 4000.0)
             
             camera_trans, current_frame = fix_line(
                 target_actor=target_actor,
                 num_frames=num_frames,
                 angle_degrees=angle_degrees,
                 height_offset=camera_height,  # 使用共用的camera_height
-                trajectory_length=trajectory_length,
+                trajectory_size=trajectory_size,
+                current_frame=current_frame
+            )
+        elif trajectory_type == 'plane_grid':
+            # 使用plane_grid轨迹
+            angle_degrees = trajectory_params.get('angle_degrees', 0.0)
+            trajectory_size = trajectory_params.get('trajectory_size', 4000.0)
+
+            camera_trans, current_frame = plane_grid(
+                target_actor=target_actor,
+                num_frames=num_frames,
+                trajectory_size=trajectory_size,
+                height_offset=camera_height,
+                angle_degrees=angle_degrees,
+                current_frame=current_frame
+            )
+        elif trajectory_type == 'rot_spiral':
+            # 使用rot_spiral轨迹
+            num_turns = trajectory_params.get('num_turns', 3.0)
+            arc_angle_degrees = trajectory_params.get('arc_angle_degrees', 90.0)
+            # 使用 global plane_angles 作为起始方位角
+            start_angle = trajectory_params.get('plane_angle_degrees', 0.0)
+            
+            camera_trans, current_frame = rot_spiral(
+                target_actor=target_actor,
+                num_frames=num_frames,
+                num_turns=num_turns,
+                arc_angle_degrees=arc_angle_degrees,
+                radius=camera_height, # 使用共用的camera_height
+                start_angle=start_angle,
                 current_frame=current_frame
             )
         elif trajectory_type == 'rot_arc':
@@ -983,6 +1184,7 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
     global_params = trajectory_cfg.get('global', {})
     trajectory_types = global_params.get('trajectory_types', ['fix_line', 'rot_arc', 'rot_line'])  # 从配置读取轨迹类型
     camera_heights = global_params.get('camera_heights', [5000.0])  # 默认单一高度
+    trajectory_size = global_params.get('trajectory_size', 4000.0)  # 获取全局 trajectory_size
     plane_angles = global_params.get('plane_angles', [0.0])
     num_frames = global_params.get('num_frames', 32)
     
@@ -1003,6 +1205,7 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
                 # 兼容 fix_line 使用的 'angle_degrees' 与 rot_* 使用的 'plane_angle_degrees'
                 traj_params_copy['plane_angle_degrees'] = plane_angle
                 traj_params_copy['angle_degrees'] = plane_angle
+                traj_params_copy['trajectory_size'] = trajectory_size # 注入全局 trajectory_size
                 
                 try:
                     # 生成单个轨迹序列

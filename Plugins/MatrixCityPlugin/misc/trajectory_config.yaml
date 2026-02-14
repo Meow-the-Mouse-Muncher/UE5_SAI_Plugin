@@ -1,21 +1,33 @@
 # 轨迹配置文件
-# 支持的轨迹类型: 'fix_line', 'rot_arc', 'rot_line'
+# 支持的轨迹类型: 'fix_line', 'rot_arc', 
 
 # 全局共用参数
 global:
-  trajectory_types: ['fix_line','rot_arc']  # 要生成的轨迹类型列表，可以选择性启用
+  trajectory_types: ['plane_grid', 'rot_spiral']  # 要生成的轨迹类型列表，可以选择性启用
   camera_heights: [5000.0, 6000.0,7000.0,8000.0, 10000.0,12000.0] # 相机高度列表（UE单位：cm）
   # camera_heights: [5000.0, 8000.0, 12000.0]
-  # 
+  #
                                              # 对应 30米、50米、80米
                                              # fix_line使用为height_offset，rot_arc使用为radius，rot_line使用为height
+  trajectory_size: 4000.0                    # 轨迹尺寸/范围（UE单位：cm）。fix_line用作长度，plane_grid用作边长
   num_frames: 33                             # 图像张数（帧数）
   plane_angles: [0, 120, 240]               # 角度列表（度），作为与高度类似的全局共用参数
-  # plane_angles: [0]                         
+  # plane_angles: [0]
 
 # fix_line 轨迹参数
 fix_line:
-  trajectory_length: 4000.0    # 运动轨迹的长度（UE单位：cm，5000cm = 50米）
+  # trajectory_length: 4000.0    # 已移至全局 trajectory_size
+
+# plane_grid 轨迹参数 (方阵扫描)
+plane_grid:
+  # 使用全局 trajectory_size 作为边长
+  # 使用全局 plane_angles 作为旋转角度
+
+# rot_spiral 轨迹参数（螺旋上升）
+rot_spiral:
+  num_turns: 2.0              # 螺旋圈数
+  arc_angle_degrees: 90.0     # 螺旋球冠的开角（度），决定起始仰角 = 90 - arc/2
+  # 使用全局 plane_angles 作为起始方位角
 
 # rot_arc 轨迹参数（圆弧轨迹）
 rot_arc:

@@ -298,9 +298,9 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
 
 def main():
     # ==================== 配置参数 ====================
-    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/train_data"
+    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/test_data"
     
-    OUTPUT_BASE = "/home_ssd/sjy/deocc_swin/train_data"
+    OUTPUT_BASE = "/home_ssd/sjy/deocc_swin/test_data"
     
     # 是否使用GPU加速
     USE_GPU = True
