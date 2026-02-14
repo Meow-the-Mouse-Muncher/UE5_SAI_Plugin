@@ -257,7 +257,7 @@ def main():
     BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/train_data"
     
     # 输出路径
-    OUTPUT_BASE = "/home_ssd/sjy/deocc_swin/train_data"
+    OUTPUT_BASE = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/refocused_output"
     
     # 是否使用GPU加速
     USE_GPU = True

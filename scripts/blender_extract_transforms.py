@@ -358,7 +358,7 @@ def batch_process_by_category(scale=100):
     config = load_config()
     
     # Base paths
-    project_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar"
+    project_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Content"
     fbx_dir = os.path.join(project_dir,"Exported_FBX")
     
     # Use output path from config if available

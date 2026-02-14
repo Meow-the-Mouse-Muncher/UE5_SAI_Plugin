@@ -579,12 +579,13 @@ def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_
 def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_degrees, current_frame=0):
     """
     在目标物正上方生成方阵扫描轨迹 (Snake Scan)
+    [Update] 居中逻辑：确保中间帧(num_frames//2)精确位于目标物正上方 (0,0)
     相机朝向与 fix_line 一致：Pitch -90 (俯视), Yaw 指向目标
     
     Args:
         target_actor: 目标物Actor
         num_frames (int): 图像张数（帧数）
-        trajectory_size (float): 方阵边长（UE单位：cm）
+        trajectory_size (float): 方阵的参考尺寸（步长依据），非严格边界
         height_offset (float): 相对于目标物的高度偏移（UE单位：cm）
         angle_degrees (float): 方阵的旋转角度（度）
         current_frame (int): 起始帧数
@@ -600,13 +601,28 @@ def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_d
     side_count = math.ceil(math.sqrt(num_frames))
     if side_count < 2: side_count = 2
     
+    # 计算步长 (Step)
+    # 使用 trajectory_size 作为覆盖范围参考
     step = trajectory_size / (side_count - 1) if side_count > 1 else 0
-    start_offset = -trajectory_size / 2.0
     
     # 旋转角度
     angle_radians = math.radians(angle_degrees)
     cos_a = math.cos(angle_radians)
     sin_a = math.sin(angle_radians)
+    
+    # --- 计算中间帧的偏移量 ---
+    mid_index = num_frames // 2
+    mid_row = mid_index // side_count
+    mid_col = mid_index % side_count
+    
+    # 中间帧的蛇形逻辑
+    if mid_row % 2 == 1:
+        mid_col = side_count - 1 - mid_col
+        
+    # 中间帧的未旋转局部坐标 (相对于 grid start (0,0))
+    # 注意：这里我们假设网格从(0,0)开始生长，然后减去中间帧坐标来实现居中
+    mid_local_x = mid_col * step
+    mid_local_y = mid_row * step
     
     camera_trans = []
     previous_yaw = 0.0
@@ -619,9 +635,13 @@ def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_d
         if row % 2 == 1:
             col = side_count - 1 - col
             
-        # 未旋转的局部坐标 (以目标为中心)
-        local_x = start_offset + col * step
-        local_y = start_offset + row * step
+        # 原始局部坐标 (相对于 grid start)
+        raw_local_x = col * step
+        raw_local_y = row * step
+        
+        # 居中修正后的局部坐标 (中间帧位于 0,0)
+        local_x = raw_local_x - mid_local_x
+        local_y = raw_local_y - mid_local_y
         
         # 旋转并平移到世界坐标
         # x' = x*cos - y*sin
