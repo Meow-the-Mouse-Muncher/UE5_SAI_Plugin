@@ -1003,7 +1003,7 @@ def catmull_rom_spline(P0, P1, P2, P3, num_points):
         curve.append(point)
     return curve
 
-def random_sphere_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degrees, mid_height, plane_angle_degrees=0.0, current_frame=0):
+def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degrees, mid_height, plane_angle_degrees=0.0, current_frame=0):
     """
     生成球层内的随机连续轨迹 (Random Sphere Shell Walk with Spline)
     [Constraint] 中间帧(num_frames//2) 位于 (0, 0, mid_height)
@@ -1263,8 +1263,8 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
                 plane_angle_degrees=plane_angle_degrees,
                 current_frame=current_frame
             )
-        elif trajectory_type == 'random_sphere_shell':
-            # 使用 random_sphere_shell 轨迹
+        elif trajectory_type == 'rand_shell':
+            # 使用 rand_shell 轨迹
             arc_angle_degrees = trajectory_params.get('arc_angle_degrees', 90.0)
             plane_angle_degrees = trajectory_params.get('plane_angle_degrees', 0.0)
             min_radius = trajectory_params.get('min_radius', 5000.0)
@@ -1273,7 +1273,7 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
             # 这里的 camera_height 在调用方（main）已经是当前遍历的特定高度了
             # 所以直接作为中间高度传入
             
-            camera_trans, current_frame = random_sphere_shell(
+            camera_trans, current_frame = rand_shell(
                 target_actor=target_actor,
                 num_frames=num_frames,
                 min_radius=min_radius,
@@ -1397,11 +1397,11 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
                 traj_params_copy['angle_degrees'] = plane_angle
                 traj_params_copy['trajectory_size'] = trajectory_size # 注入全局 trajectory_size
                 
-                # 对于 random_sphere_shell，我们也需要 min/max radius，
+                # 对于 rand_shell，我们也需要 min/max radius，
                 # 但它们可以从 camera_heights 中推断，或者在 config 中指定。
                 # 按照用户要求，我们将中间帧高度确定为当前的 camera_height
                 # min/max radius 可以作为边界。
-                if traj_type == 'random_sphere_shell':
+                if traj_type == 'rand_shell':
                      # 使用 camera_heights 的最小值和最大值作为球壳边界，
                      # 确保生成的点在合理范围内，而中间点正好是当前的 camera_height
                      traj_params_copy['min_radius'] = min(camera_heights)
