@@ -65,7 +65,7 @@ def process_occ_folder(occ_folder):
                 print(f"Error deleting {f}: {e}")
 
 def main():
-    base_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders_line+rot"
+    base_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders"
     
     # Datasets to process
     datasets = ['train_data', 'test_data']
@@ -88,7 +88,7 @@ def main():
             print(f"  Processing trajectory: {traj_type}")
             
             # Determine rule
-            if traj_type == 'rot_spiral':
+            if traj_type == 'rot_spiral' or traj_type == 'rand_shell':
                 rule = 'last'
             else:
                 rule = 'middle' # 'plane_grid' and everything else

@@ -3,7 +3,7 @@
 
 # 全局共用参数
 global:
-  trajectory_types: ['plane_grid',  'rand_shell']  # 要生成的轨迹类型列表，可以选择性启用
+  trajectory_types: ['fix_line','plane_grid', 'rot_spiral', 'rand_shell']  # 要生成的轨迹类型列表，可以选择性启用
   camera_heights: [5000.0, 6000.0, 7000.0, 8000.0, 10000.0, 12000.0] # 相机高度列表（UE单位：cm）
   # camera_heights: [5000.0, 8000.0, 12000.0]
   # 

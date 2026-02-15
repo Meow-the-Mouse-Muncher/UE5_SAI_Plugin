@@ -1006,7 +1006,7 @@ def catmull_rom_spline(P0, P1, P2, P3, num_points):
 def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degrees, mid_height, plane_angle_degrees=0.0, current_frame=0):
     """
     生成球层内的随机连续轨迹 (Random Sphere Shell Walk with Spline)
-    [Constraint] 中间帧(num_frames//2) 位于 (0, 0, mid_height)
+    [Update] 0~N-1帧为完全随机轨迹，第N帧为标准GT位姿 (正顶视/侧视)，用于Ground Truth
     """
     # 获取目标物位置
     target_location = target_actor.get_actor_location()
@@ -1015,10 +1015,7 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
     # --- 1. 确定控制点数量 (奇数) ---
     # 控制点数量：每 10 帧一个控制点，至少 5 个
     num_control_points = max(5, num_frames // 6)
-    if num_control_points % 2 == 0:
-        num_control_points += 1 # 强制为奇数，以便有确定的中间点
-        
-    mid_cp_idx = num_control_points // 2
+    # 因为不需要锚定中间点了，奇偶其实无所谓，但保持原逻辑也无妨
     
     control_points = []
     
@@ -1033,40 +1030,39 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
         phi = random.uniform(0, 2 * math.pi)
         
         sin_theta = math.sin(theta)
+        # 局部坐标 (相对于 Target)
         x = r * sin_theta * math.cos(phi)
         y = r * sin_theta * math.sin(phi)
         z = r * cos_theta # Z is up relative to target
         return np.array([x, y, z])
 
-    # --- 2. 生成控制点 (锚定中间点) ---
+    # --- 2. 生成完全随机的控制点 (不再锚定中间点) ---
     for i in range(num_control_points):
-        if i == mid_cp_idx:
-            # 中间点：强制在 Z 轴上，高度为指定的 mid_height
-            z = mid_height
-            # 确保 mid_height 在 min/max 范围内 (虽然由调用者保证，但防御性编程)
-            z = max(min_radius, min(max_radius, z))
-            control_points.append(np.array([0.0, 0.0, z]))
-        else:
-            control_points.append(sample_point())
+        control_points.append(sample_point())
             
     # --- 3. 分配帧数 ---
     num_segments_total = num_control_points - 1
-    num_segments_half = num_segments_total // 2
     
-    frames_first_half = num_frames // 2
-    frames_second_half = num_frames - frames_first_half
+    # [修复] 处理样条连接处的点重复问题
+    # catmull_rom_spline 生成 N 个点包含起点和终点
+    # 直接拼接会导致连接点重复 (Seg1 end == Seg2 start)
+    # 解决方法：除了最后一段，每段生成后丢弃最后一个点
+    # 因此，为了得到 num_frames 个有效不重复点，我们需要分配 num_frames + (segments - 1) 个点
     
+    total_points_needed = num_frames + (num_segments_total - 1)
+    
+    # 将总点数分配给各段
     def distribute_frames(total_f, n_segs):
         if n_segs == 0: return []
         base = total_f // n_segs
         rem = total_f % n_segs
         return [base + 1 if i < rem else base for i in range(n_segs)]
-        
-    frames_per_segment = distribute_frames(frames_first_half, num_segments_half) + \
-                         distribute_frames(frames_second_half, num_segments_half)
+    
+    frames_per_segment = distribute_frames(total_points_needed, num_segments_total)
 
     # --- 4. 生成样条曲线 ---
     full_path = []
+    # Catmull-Rom 需要 P0, P1, P2, P3，为了闭合或平滑，可以重复首尾点作为辅助
     cps = [control_points[0]] + control_points + [control_points[-1]]
     
     for i in range(num_segments_total):
@@ -1075,8 +1071,15 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
         p2 = cps[i+2]
         p3 = cps[i+3]
         n_points = frames_per_segment[i]
+        
         if n_points > 0:
             segment_points = catmull_rom_spline(p0, p1, p2, p3, n_points)
+            
+            # [修复] 去重逻辑
+            if i < num_segments_total - 1:
+                # 如果不是最后一段，去掉最后一个点（它将是下一段的起点）
+                segment_points = segment_points[:-1]
+                
             full_path.extend(segment_points)
     
     # --- 5. 应用 Plane Angle 旋转并生成相机关键帧 ---
@@ -1088,6 +1091,7 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
     cos_a = math.cos(rad_angle)
     sin_a = math.sin(rad_angle)
     
+    # 处理 0 ~ num_frames-1 的随机轨迹
     for i, pos_local in enumerate(full_path):
         # 旋转局部坐标
         # pos_local = [x, y, z]
@@ -1126,8 +1130,32 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
             )
         )
         
-    end_frame = current_frame + num_frames
-    return camera_trans, end_frame
+    # --- 6. [NEW] 添加最后一帧 GT (Ground Truth) ---
+    # GT 位置：目标物正上方 mid_height 处 (或者根据 plane_angle_degrees 偏移)
+    # 这里我们设定 Standard Pose: 
+    #   Location: (target_x, target_y, target_z + mid_height)
+    #   Rotation: Pitch=-90, Roll=0, Yaw=plane_angle_degrees
+    
+    gt_frame_index = current_frame + num_frames
+    
+    gt_x = target_x
+    gt_y = target_y
+    gt_z = target_z + mid_height
+    
+    gt_pitch = -90.0
+    gt_yaw = plane_angle_degrees # 也可以设为0，视需求而定
+    gt_roll = 0.0
+    
+    camera_trans.append(
+        SequenceKey(
+            frame=gt_frame_index,
+            location=(gt_x, gt_y, gt_z),
+            rotation=(gt_roll, gt_pitch, gt_yaw)
+        )
+    )
+
+    # 返回 total_frames = num_frames (random) + 1 (GT)
+    return camera_trans, gt_frame_index + 1
 
 def generate_single_trajectory(target_actor, map_name, trajectory_type, trajectory_params, camera_height, num_frames):
     """生成单个轨迹类型的序列

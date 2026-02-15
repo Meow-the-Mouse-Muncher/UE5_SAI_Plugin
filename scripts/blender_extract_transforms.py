@@ -376,7 +376,7 @@ def batch_process_by_category(scale=100):
         os.makedirs(output_base_dir)
     
     # Categories based on your sequence structure
-    categories = ["plane_grid", "rot_spiral"]
+    categories = ["plane_grid", "rot_spiral", "rand_shell"]
     
     total_processed = 0
     total_files = 0

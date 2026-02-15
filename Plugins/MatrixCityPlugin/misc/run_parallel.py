@@ -199,7 +199,7 @@ def main():
     colorama.init(autoreset=True)
     setup_logging()
     
-    config_file = Path(args.config).resolve()
+    config_file = Path(args.config).resolve() 
     if not config_file.exists():
         logging.error(f"配置文件不存在: {config_file}")
         sys.exit(1)
