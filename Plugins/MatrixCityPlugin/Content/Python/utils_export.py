@@ -102,6 +102,8 @@ def batch_export_sequences(map_name=None):
                 category = "plane_grid"
             elif "/rot_spiral/" in asset_path:
                 category = "rot_spiral"
+            elif "/rand_shell/" in asset_path:
+                category = "rand_shell"
         
         if category not in categories:
             categories[category] = []

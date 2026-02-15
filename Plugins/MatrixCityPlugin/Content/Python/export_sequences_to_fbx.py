@@ -112,6 +112,12 @@ def export_sequences_for_map(map_name: str, output_base_dir: str = None) -> int:
             category = "rot_arc"
         elif "/rot_line/" in asset_path:
             category = "rot_line"
+        elif "/plane_grid/" in asset_path:
+            category = "plane_grid"
+        elif "/rot_spiral/" in asset_path:
+            category = "rot_spiral"
+        elif "/rand_shell/" in asset_path:
+            category = "rand_shell"
         else:
             category = "other"
         
