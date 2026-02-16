@@ -30,6 +30,10 @@ def process_gt_folder(gt_folder, keep_index_method):
         if not files:
             continue
             
+        if len(files) == 1:
+            print(f"Skipping {folder_path}: Already processed (1 file).")
+            continue
+
         if keep_index_method == 'middle':
             target_index = len(files) // 2
         elif keep_index_method == 'last':
@@ -55,6 +59,10 @@ def process_occ_folder(occ_folder):
     # Simply delete all depth maps
     folder_path = os.path.join(occ_folder, 'depth')
     files = get_sorted_files(folder_path)
+
+    if not files:
+        print(f"Skipping {folder_path}: Already processed (empty).")
+        return
     
     if files:
         print(f"Processing {folder_path}: Deleting all {len(files)} files")
@@ -68,8 +76,8 @@ def main():
     base_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders"
     
     # Datasets to process
-    datasets = ['train_data', 'test_data']
-    
+    datasets = ['test_data']
+    #train_data',
     for dataset in datasets:
         dataset_path = os.path.join(base_dir, dataset)
         if not os.path.exists(dataset_path):

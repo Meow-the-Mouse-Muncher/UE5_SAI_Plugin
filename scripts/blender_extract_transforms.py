@@ -358,8 +358,8 @@ def batch_process_by_category(scale=100):
     config = load_config()
     
     # Base paths
-    project_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Content"
-    fbx_dir = os.path.join(project_dir,"Exported_FBX")
+    project_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/"
+    fbx_dir = os.path.join(project_dir,"Exported_FBX_test")
     
     # Use output path from config if available
     if 'Output_Path' in config:
@@ -376,7 +376,7 @@ def batch_process_by_category(scale=100):
         os.makedirs(output_base_dir)
     
     # Categories based on your sequence structure
-    categories = ["plane_grid", "rot_spiral", "rand_shell"]
+    categories = ["fix_line", "plane_grid", "rot_spiral", "rand_shell"]
     
     total_processed = 0
     total_files = 0
