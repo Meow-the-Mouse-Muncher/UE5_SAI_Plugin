@@ -108,21 +108,44 @@ def visualize_camera_poses(poses_data, save_path=None):
     """
     Visualize camera poses in 3D space with camera frustums
     """
+    # Set backend if no display
+    if not save_path and os.environ.get('DISPLAY', '') == '':
+        print("No DISPLAY environment variable. Using Agg backend.")
+        plt.switch_backend('Agg')
+
     frames = poses_data['frames']
     
     # Extract camera positions and orientations
     positions = []
-    orientations = []
     
+    # Check if we have valid frames
+    if not frames:
+        print("Warning: No frames found in pose data.")
+        return
+
     for frame in frames:
         matrix = np.array(frame['transform_matrix'])
         position = matrix[:3, 3]
-        rotation = matrix[:3, :3]
-        
         positions.append(position)
-        orientations.append(rotation)
     
     positions = np.array(positions)
+    mean_pos = np.mean(positions, axis=0) if len(positions) > 0 else np.array([0,0,0])
+
+    # Dynamic scaling for visualization
+    max_range = np.array([
+        positions[:, 0].max() - positions[:, 0].min(),
+        positions[:, 1].max() - positions[:, 1].min(),
+        positions[:, 2].max() - positions[:, 2].min()
+    ]).max() / 2.0
+    
+    frustum_scale = max(max_range * 0.1, 10.0)  # At least 10 units, or 10% of scale
+    
+    orientations = []
+
+    for frame in frames:
+        matrix = np.array(frame['transform_matrix'])
+        rotation = matrix[:3, :3]
+        orientations.append(rotation)
     
     # Create 3D plot
     fig = plt.figure(figsize=(15, 12))
@@ -134,9 +157,9 @@ def visualize_camera_poses(poses_data, save_path=None):
     
     # Draw camera frustums
     for i, (pos, rot) in enumerate(zip(positions, orientations)):
-        # Camera frustum parameters
-        frustum_size = 0.05
-        frustum_depth = 0.1
+        # Camera frustum parameters - now dynamic based on scene scale
+        frustum_size = frustum_scale * 0.5
+        frustum_depth = frustum_scale
         
         # Define frustum corners in camera coordinate system (-Z-axis forward)
         corners = np.array([
@@ -288,37 +311,96 @@ def visualize_camera_poses(poses_data, save_path=None):
     
     plt.show()
 
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python analyze_poses.py <transforms.json> [--save-plot output.png]")
-        print("Example: python analyze_poses.py Saved/MovieRenders/render_data/fix_line/scene_001_Target_001_height_030_GT/pose/transforms.json")
+if __name__ == "__main__":
+    import argparse
+    import glob
+
+    parser = argparse.ArgumentParser(description="Analyze and visualize camera poses from transforms.json")
+    parser.add_argument("path", nargs="?", help="Path to transforms.json file or directory containing it")
+    parser.add_argument("--save", "-s", action="store_true", help="Save visualization to file instead of showing")
+    parser.add_argument("--output", "-o", help="Specific output path for visualization")
+    
+    args = parser.parse_args()
+    
+    target_path = args.path
+    
+    # Auto-detect logic
+    if not target_path:
+        # Priority search paths
+        potential_base_paths = [
+            "Saved/MovieRenders/test_data",
+            "Saved/MovieRenders/train_data",
+            "Saved/MovieRenders",
+        ]
+        
+        found_files = []
+        for base in potential_base_paths:
+            if os.path.exists(base):
+                print(f"Searching in {base}...")
+                found_files.extend(glob.glob(os.path.join(base, "**", "transforms.json"), recursive=True))
+                # Stop if we found something reasonable to avoid scanning too much? 
+                # No, let's gather options.
+        
+        # Remove duplicates if any
+        found_files = list(set(found_files))
+        found_files.sort()
+
+        if not found_files:
+            print("No transforms.json found in standard directories.")
+            sys.exit(1)
+            
+        print(f"\nFound {len(found_files)} pose files:")
+        for i, f in enumerate(found_files):
+            print(f"  [{i}] {f}")
+        
+        try:
+            choice = input(f"\nSelect file [0-{len(found_files)-1}]: ")
+            idx = int(choice)
+            target_path = found_files[idx]
+        except (ValueError, IndexError):
+            print("Invalid selection.")
+            sys.exit(1)
+            
+    elif os.path.isdir(target_path):
+        # If directory provided, look for transforms.json inside
+        potential_path = os.path.join(target_path, "transforms.json")
+        # Direct check
+        if os.path.exists(potential_path):
+            target_path = potential_path
+        else:
+            # Recursive search in dir (find first)
+            print(f"Searching for transforms.json inside directory: {target_path}...")
+            found = glob.glob(os.path.join(target_path, "**", "transforms.json"), recursive=True)
+            if found:
+                target_path = found[0]
+                print(f"Found: {target_path}")
+            else:
+                print(f"No transforms.json found in {target_path}")
+                sys.exit(1)
+
+    if not os.path.exists(target_path):
+        print(f"File not found: {target_path}")
         sys.exit(1)
-    
-    transforms_file = sys.argv[1]
-    save_plot = None
-    
-    # Check for save plot option
-    if len(sys.argv) >= 4 and sys.argv[2] == '--save-plot':
-        save_plot = sys.argv[3]
-    
-    if not os.path.exists(transforms_file):
-        print(f"File not found: {transforms_file}")
-        sys.exit(1)
-    
+
     # Load transforms
-    with open(transforms_file, 'r') as f:
+    with open(target_path, 'r') as f:
         poses_data = json.load(f)
     
-    print(f"Analyzing poses from: {transforms_file}")
-    print(f"File: {os.path.basename(transforms_file)}")
-    
+    print(f"\nAnalyzing: {target_path}")
     analyze_pose_sequence(poses_data)
     
     print("\n" + "="*70)
     print("GENERATING 3D VISUALIZATION...")
-    print("="*70)
     
-    visualize_camera_poses(poses_data, save_plot)
+    # Logic for save vs show
+    save_path = args.output
+    if args.save and not save_path:
+        # Default save path: same dir as json, named trajectory_vis.png
+        save_path = os.path.join(os.path.dirname(target_path), "trajectory_vis.png")
+    
+    # If no display, force save
+    if not save_path and os.environ.get('DISPLAY', '') == '':
+         print("No DISPLAY available, forcing save to 'trajectory_vis.png'")
+         save_path = os.path.join(os.path.dirname(target_path), "trajectory_vis.png")
 
-if __name__ == "__main__":
-    main()
+    visualize_camera_poses(poses_data, save_path)

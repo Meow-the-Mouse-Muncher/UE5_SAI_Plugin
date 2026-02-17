@@ -683,15 +683,17 @@ def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_d
 def rot_spiral(target_actor, num_frames, num_turns, arc_angle_degrees, radius, start_angle, current_frame=0):
     """
     [Modified] Hemisphere Fibonacci Sampling (preserving function name 'rot_spiral')
-    Generates points on a hemisphere using Fibonacci lattice.
+    Generates points on a spherical cap (cone) using Fibonacci lattice.
     The last frame is FORCED to be strictly at the top (Zenith), looking down.
     
     Args:
         target_actor: Target Actor
         num_frames (int): Total number of frames
         num_turns (float): [Unused in Fibonacci]
-        arc_angle_degrees (float): [Unused/Ignored, defaults to full hemisphere]
-        radius (float): Radius of the hemisphere (UE units)
+        arc_angle_degrees (float): Cone angle (full angle). 
+                                   Example: 180 = full hemisphere (z from 0 to R).
+                                   90 = 45-degree cone (z from R*sin(45) to R).
+        radius (float): Radius of the sphere (UE units)
         start_angle (float): Starting azimuth offset (degrees)
         current_frame (int): Start frame index
     """
@@ -710,37 +712,32 @@ def rot_spiral(target_actor, num_frames, num_turns, arc_angle_degrees, radius, s
     
     num_spiral_points = num_frames - 1
     
+    # Calculate height range based on arc_angle_degrees
+    # arc_angle is total cone angle at the apex.
+    # 180 degrees -> Bottom is Equator (Elev=0)
+    # 90 degrees -> Bottom is Elev=45 (90 - 90/2)
+    # min_elevation = 90 - (arc / 2)
+    
+    half_angle = arc_angle_degrees / 2.0
+    min_elev_deg = max(0.0, 90.0 - half_angle)
+    
+    # z = R * sin(elev)
+    z_min = radius * math.sin(math.radians(min_elev_deg))
+    z_max = radius
+    z_range = z_max - z_min
+
     for i in range(num_spiral_points):
         # 0 <= i < num_spiral_points
-        # Distribute z from 0 (equator) up to near the top, but not exactly top?
-        # Standard Fibonacci hemisphere:
-        # y goes from 1 to 0 (top to bottom) or 0 to 1. 
-        # Let's go bottom (z=0) to top (z=R).
-        # z = i / (N-1) if we want inclusive.
         
-        # Let's map i=0 -> z=some_low_val, i=max -> z=near_top
-        # Sample index usually goes 0 to N-1. 
-        # y = 1 - (i / (Nfloat - 1)) * 1 ? 
-        
-        # For a hemisphere, we often just want even area.
-        # z_i = i / num_spiral_points ? 
-        # i=0 -> z=0 (equator). i=N-1 -> z differs.
-        
-        # Consistent approach:
-        # z = 1 - (2i+1)/2N for sphere.
-        # For hemisphere: z = i / N ? 
-        
-        # Let's use simple normalized index for height.
-        # We generally want to avoid z=R in the spiral part if we are forcing it at the end.
+        # Normalized linear index
         if num_spiral_points > 0:
-            lz = i / num_spiral_points  # 0.0 to (N-2)/(N-1) ~ 1.0
-            # To avoid bunching at top or matching the forced point too closely? 
-            # Actually, Fibonacci lattice handles packing well. 
-            # Let's just use z = i / num_spiral_points * radius.
+            lz = i / num_spiral_points  # 0.0 to ~1.0
             
-            z_offset = lz * radius
+            # Map lz to actual Height Z
+            # Distribute points from z_min upwards
+            z_offset = z_min + lz * z_range
         else:
-            z_offset = 0
+            z_offset = z_max # Fallback
 
         # Radius at this height
         # r^2 = z^2 + r_xy^2 => r_xy = sqrt(R^2 - z^2)

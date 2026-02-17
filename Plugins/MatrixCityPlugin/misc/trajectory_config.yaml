@@ -3,7 +3,7 @@
 
 # 全局共用参数
 global:
-  trajectory_types: ['fix_line', 'rand_shell']  # 要生成的轨迹类型列表，可以选择性启用
+  trajectory_types: ['fix_line', 'plane_grid', 'rot_arc', 'rot_spiral', 'rand_shell']  # 要生成的轨迹类型列表，可以选择性启用
   camera_heights: [5000.0, 6000.0, 7000.0, 8000.0, 10000.0, 12000.0] # 相机高度列表（UE单位：cm）
   # camera_heights: [5000.0, 8000.0, 12000.0]
   # 
@@ -28,7 +28,7 @@ rot_arc:
 
 # rot_spiral 轨迹参数（螺旋轨迹）
 rot_spiral:
-  num_turns: 2.0
+  num_turns: 3.0
   arc_angle_degrees: 90.0
 
 # rand_shell 轨迹参数（球层随机连续轨迹）

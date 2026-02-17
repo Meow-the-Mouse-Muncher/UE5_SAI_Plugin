@@ -47,7 +47,7 @@ def precompute_transforms(poses, center_pose, K):
     
     return shared_data, frame_transforms
 
-def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_data, device='cuda'):
+def refocus_image_gpu(src_img, center_depth, frame_transform, shared_data, device='cuda'):
     """GPU加速的逆向重聚焦图像处理，使用GT深度图和深度剔除"""
     R_c2s, T_c2s = frame_transform
     K, K_inv = shared_data
@@ -56,8 +56,6 @@ def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_
     device = torch.device(device if torch.cuda.is_available() else 'cpu')
     
     # Convert to tensors
-    src_tensor = torch.from_numpy(src_img).float().to(device)
-    # z_measured = torch.from_numpy(src_depth).float().to(device) / 100.0  # cm->m
     depth_m = -torch.from_numpy(center_depth).float().to(device) / 100.0  # cm->m, negative for -Z
     K_tensor = torch.from_numpy(K).float().to(device)
     K_inv_tensor = torch.from_numpy(K_inv).float().to(device)
@@ -195,14 +193,10 @@ def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, outpu
                         processed_count += 1
         elif os.path.exists(rgb_path):
             rgb_img = cv2.imread(rgb_path)
-            # Load corresponding source depth map
-            # [Modified] Allow missing source depth for refocus logic that doesn't strictly depend on it
-            src_depth_path = os.path.join(src_depth_dir, f"{i:04d}.exr")
-            src_depth = load_depth(src_depth_path)
             
             # Allow Refocus even if src_depth is None, assuming refocus_image_gpu can handle it
             if rgb_img is not None:
-                refocused_rgb = refocus_image_gpu(rgb_img, src_depth, center_depth, frame_transform, shared_data, device)
+                refocused_rgb = refocus_image_gpu(rgb_img, center_depth, frame_transform, shared_data, device)
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 if cv2.imwrite(output_path, refocused_rgb):
                     processed_count += 1
