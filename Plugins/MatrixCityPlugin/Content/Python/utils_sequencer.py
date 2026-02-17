@@ -652,20 +652,12 @@ def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_d
         camera_x = target_x + rel_x
         camera_y = target_y + rel_y
         
-        # 计算朝向 (复制 fix_line 逻辑)
-        look_vector_x = target_x - camera_x
-        look_vector_y = target_y - camera_y
-        look_vector_z = target_z - camera_z
+        # [Fix] Grid 模式下移除 LookAt 逻辑
+        # 强制相机垂直向下，使用 angle_degrees 作为 Yaw
+        # 这样相机的"上方"会始终跟随网格的旋转方向，保证画面与网格行/列对齐
         
-        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
         pitch = -90.0
-        
-        if horizontal_distance < 1e-6:
-            yaw = previous_yaw
-        else:
-            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
-            previous_yaw = yaw
-            
+        yaw = float(angle_degrees) # 跟随网格旋转角度
         roll = 0.0
         
         camera_trans.append(

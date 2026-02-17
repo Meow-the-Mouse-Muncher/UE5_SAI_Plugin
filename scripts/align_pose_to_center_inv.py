@@ -42,6 +42,10 @@ def precompute_transforms(poses, center_pose, K):
         # Calculate relative transform: Center -> Source (inverse direction)
         R_c2s = R_src.T @ R_center
         T_c2s = R_src.T @ (T_center - T_src)
+
+        # [FIX] 如果左右位移反了，说明 X 轴的相对移动算反了。
+        # 手动翻转 X 轴分量 (索引 0)
+        T_c2s[0] = -T_c2s[0] 
         
         frame_transforms.append((R_c2s, T_c2s))
     
@@ -54,7 +58,7 @@ def refocus_image_gpu(src_img, center_depth, frame_transform, shared_data, devic
     h, w = src_img.shape[:2]
     
     device = torch.device(device if torch.cuda.is_available() else 'cpu')
-    
+    src_tensor = torch.from_numpy(src_img).float().to(device)
     # Convert to tensors
     depth_m = -torch.from_numpy(center_depth).float().to(device) / 100.0  # cm->m, negative for -Z
     K_tensor = torch.from_numpy(K).float().to(device)
@@ -105,15 +109,6 @@ def refocus_image_gpu(src_img, center_depth, frame_transform, shared_data, devic
         padding_mode='zeros', 
         align_corners=True
     )
-    
-    # Depth culling: Z_proj < Z_measured means occlusion
-    if src_depth is not None:
-        # If source depth is available, enable pseudo occlusion culling if needed
-        # But based on current simple warp, we just return the result.
-        pass
-
-    # depth_mask = z_proj < z_measured  # Keep pixels where projected depth >= measured depth
-    
     # Apply depth mask
     result = sampled_color.squeeze(0).permute(1, 2, 0) * 255.0  # [H, W, 3]
     # result[depth_mask] = 0  # Set occluded pixels to black

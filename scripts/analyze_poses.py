@@ -401,6 +401,6 @@ if __name__ == "__main__":
     # If no display, force save
     if not save_path and os.environ.get('DISPLAY', '') == '':
          print("No DISPLAY available, forcing save to 'trajectory_vis.png'")
-         save_path = os.path.join(os.path.dirname(target_path), "trajectory_vis.png")
+         save_path = os.path.join( "trajectory_vis.png")
 
     visualize_camera_poses(poses_data, save_path)

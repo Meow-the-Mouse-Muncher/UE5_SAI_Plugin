@@ -43,7 +43,9 @@ def precompute_transforms(poses, center_pose, K):
         # Calculate relative transform: Center -> Source (inverse direction)
         R_c2s = R_src.T @ R_center
         T_c2s = R_src.T @ (T_center - T_src)
-        
+        # [FIX] 如果左右位移反了，说明 X 轴的相对移动算反了。
+        # 手动翻转 X 轴分量 (索引 0)
+        T_c2s[0] = -T_c2s[0] 
         frame_transforms.append((R_c2s, T_c2s))
     
     return shared_data, frame_transforms
