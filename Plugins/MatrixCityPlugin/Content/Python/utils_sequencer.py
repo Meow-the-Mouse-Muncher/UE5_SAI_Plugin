@@ -682,89 +682,121 @@ def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_d
 
 def rot_spiral(target_actor, num_frames, num_turns, arc_angle_degrees, radius, start_angle, current_frame=0):
     """
-    以目标物为中心生成螺旋上升轨迹 (Spiral on Spherical Cap)
-    从球冠边缘螺旋上升至顶点
+    [Modified] Hemisphere Fibonacci Sampling (preserving function name 'rot_spiral')
+    Generates points on a hemisphere using Fibonacci lattice.
+    The last frame is FORCED to be strictly at the top (Zenith), looking down.
     
     Args:
-        target_actor: 目标物Actor
-        num_frames (int): 图像张数（帧数）
-        num_turns (float): 螺旋圈数
-        arc_angle_degrees (float): 球冠开角（度），决定起始仰角 = 90 - arc/2
-        radius (float): 螺旋半径（半球面半径，UE单位：cm）
-        start_angle (float): 起始方位角偏移（度）
-        current_frame (int): 起始帧数
+        target_actor: Target Actor
+        num_frames (int): Total number of frames
+        num_turns (float): [Unused in Fibonacci]
+        arc_angle_degrees (float): [Unused/Ignored, defaults to full hemisphere]
+        radius (float): Radius of the hemisphere (UE units)
+        start_angle (float): Starting azimuth offset (degrees)
+        current_frame (int): Start frame index
     """
-    # 获取目标物位置
+    # Get target location
     target_location = target_actor.get_actor_location()
     target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
     
-    # 计算仰角范围
-    # 顶点为90度，球冠边缘为 90 - arc/2
-    elevation_max = 90.0
-    elevation_min = 90.0 - arc_angle_degrees / 2.0
-    
     camera_trans = []
-    previous_yaw = 0.0
     
-    for i in range(num_frames):
-        # 计算进度 t (0.0 到 1.0)
-        t = i / (num_frames - 1) if num_frames > 1 else 0.0
+    # Golden Angle
+    phi = math.pi * (3.0 - math.sqrt(5.0))  # ~2.3999 radians
+
+    # We need to generate num_frames points.
+    # The last point (index num_frames-1) is strictly top.
+    # So we generate num_frames-1 points on the spiral.
+    
+    num_spiral_points = num_frames - 1
+    
+    for i in range(num_spiral_points):
+        # 0 <= i < num_spiral_points
+        # Distribute z from 0 (equator) up to near the top, but not exactly top?
+        # Standard Fibonacci hemisphere:
+        # y goes from 1 to 0 (top to bottom) or 0 to 1. 
+        # Let's go bottom (z=0) to top (z=R).
+        # z = i / (N-1) if we want inclusive.
         
-        # 计算当前仰角 (线性插值)
-        current_elev_deg = elevation_min + t * (elevation_max - elevation_min)
-        current_elev_rad = math.radians(current_elev_deg)
+        # Let's map i=0 -> z=some_low_val, i=max -> z=near_top
+        # Sample index usually goes 0 to N-1. 
+        # y = 1 - (i / (Nfloat - 1)) * 1 ? 
         
-        # 计算当前方位角 (螺旋)
-        # 旋转总角度 = num_turns * 360
-        current_azimuth_deg = start_angle + t * num_turns * 360.0
-        current_azimuth_rad = math.radians(current_azimuth_deg)
+        # For a hemisphere, we often just want even area.
+        # z_i = i / num_spiral_points ? 
+        # i=0 -> z=0 (equator). i=N-1 -> z differs.
         
-        # 球坐标转笛卡尔坐标 (Z轴向上)
-        # z = r * sin(elev)
-        # r_xy = r * cos(elev)
-        # x = r_xy * cos(azimuth) + target_x
-        # y = r_xy * sin(azimuth) + target_y
+        # Consistent approach:
+        # z = 1 - (2i+1)/2N for sphere.
+        # For hemisphere: z = i / N ? 
         
-        local_z = radius * math.sin(current_elev_rad)
-        r_xy = radius * math.cos(current_elev_rad)
-        
-        # 计算相对于目标的偏移
-        offset_x = r_xy * math.cos(current_azimuth_rad)
-        offset_y = r_xy * math.sin(current_azimuth_rad)
-        
-        camera_x = target_x + offset_x
-        camera_y = target_y + offset_y
-        camera_z = target_z + local_z
-        
-        # 计算相机旋转 (LookAt Target)
-        # 计算从相机到目标物的向量
-        look_vector_x = target_x - camera_x
-        look_vector_y = target_y - camera_y
-        look_vector_z = target_z - camera_z
-        
-        # 计算俯仰角（pitch）
-        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
-        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
-        
-        # 计算偏航角（yaw）
-        if horizontal_distance < 1e-6:
-             # 极点处理：保持之前的 yaw
-             yaw = previous_yaw
-        else:
-            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
-            previous_yaw = yaw
+        # Let's use simple normalized index for height.
+        # We generally want to avoid z=R in the spiral part if we are forcing it at the end.
+        if num_spiral_points > 0:
+            lz = i / num_spiral_points  # 0.0 to (N-2)/(N-1) ~ 1.0
+            # To avoid bunching at top or matching the forced point too closely? 
+            # Actually, Fibonacci lattice handles packing well. 
+            # Let's just use z = i / num_spiral_points * radius.
             
+            z_offset = lz * radius
+        else:
+            z_offset = 0
+
+        # Radius at this height
+        # r^2 = z^2 + r_xy^2 => r_xy = sqrt(R^2 - z^2)
+        radius_xy = math.sqrt(max(0, radius**2 - z_offset**2))
+        
+        theta = phi * i + math.radians(start_angle)
+        
+        x_offset = radius_xy * math.cos(theta)
+        y_offset = radius_xy * math.sin(theta)
+        
+        cam_x = target_x + x_offset
+        cam_y = target_y + y_offset
+        cam_z = target_z + z_offset
+        
+        # Rotation: Look at target
+        # Vector from Cam to Target
+        vx = target_x - cam_x
+        vy = target_y - cam_y
+        vz = target_z - cam_z
+        
+        # Standard LookAt
+        xy_dist = math.sqrt(vx*vx + vy*vy)
+        pitch = math.degrees(math.atan2(vz, xy_dist)) # looking down is negative? 
+        # UE Camera: X is forward.
+        # If I am at (0,0,100) looking at (0,0,0):
+        # vector is (0,0,-100). z=-100, xy=0. atan2(-100, 0) = -90. Correct.
+        
+        yaw = math.degrees(math.atan2(vy, vx))
         roll = 0.0
         
         camera_trans.append(
             SequenceKey(
                 frame=current_frame + i,
-                location=(camera_x, camera_y, camera_z),
+                location=(cam_x, cam_y, cam_z),
                 rotation=(roll, pitch, yaw)
             )
         )
-        
-    end_frame = current_frame + num_frames
+
+    # --- Force Last Frame: Top Down ---
+    i_final = num_frames - 1
+    cam_x_final = target_x
+    cam_y_final = target_y
+    cam_z_final = target_z + radius
+    
+    # Strictly looking down
+    # Location: (0, 0, R) relative to target
+    # Rotation: Pitch = -90, Yaw = 0 (arbitrary), Roll = 0
+    camera_trans.append(
+        SequenceKey(
+            frame=current_frame + i_final,
+            location=(cam_x_final, cam_y_final, cam_z_final),
+            rotation=(0.0, -90.0, 0.0)
+        )
+    )
+
+    end_frame = current_frame + i_final
     return camera_trans, end_frame
 
 
@@ -1154,8 +1186,12 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
         )
     )
 
-    # 返回 total_frames = num_frames (random) + 1 (GT)
-    return camera_trans, gt_frame_index + 1
+    # 返回 total_frames 
+    # [Update] 修正帧数计算：
+    # 关键帧范围是 0 ~ gt_frame_index。
+    # 如果 Sequencer 播放范围设置为 gt_frame_index (例如32)，且渲染是 Inclusive 的 (0..32)，则正好生成 33 张图。
+    # 之前返回 +1 导致生成了 34 张 (0..33)，多了一张空帧。
+    return camera_trans, gt_frame_index
 
 def generate_single_trajectory(target_actor, map_name, trajectory_type, trajectory_params, camera_height, num_frames):
     """生成单个轨迹类型的序列

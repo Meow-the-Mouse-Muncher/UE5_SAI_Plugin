@@ -109,6 +109,10 @@ def refocus_image_gpu(src_img, src_depth, center_depth, frame_transform, shared_
     )
     
     # Depth culling: Z_proj < Z_measured means occlusion
+    if src_depth is not None:
+        # If source depth is available, enable pseudo occlusion culling if needed
+        # But based on current simple warp, we just return the result.
+        pass
 
     # depth_mask = z_proj < z_measured  # Keep pixels where projected depth >= measured depth
     
@@ -138,12 +142,35 @@ def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, outpu
     ])
     
     frames = pose_data['frames']
-    center_idx = len(frames) // 2
+    
+    # [Modify] Determine center_idx based on trajectory type available in context or heuristic
+    # We infer trajectory type from output_dir or pass it in.
+    # Logic: 
+    #   if rand_shell/rot_spiral -> target is LAST frame
+    #   else -> target is MIDDLE frame
+    
+    traj_type = os.path.basename(os.path.dirname(output_dir)) # e.g. 'rand_shell'
+    
+    if 'rand_shell' in traj_type or 'rot_spiral' in traj_type:
+        center_idx = len(frames) - 1
+    else:
+        center_idx = len(frames) // 2
+        
     center_pose = np.array(frames[center_idx]['transform_matrix'])
     poses = [np.array(frame['transform_matrix']) for frame in frames]
     
     # Load center depth map from GT depth directory
+    # After clean_renders, only the target depth map should exist in GT folder
+    # We try to load the specific one.
     center_depth_path = os.path.join(gt_depth_dir, f"{center_idx:04d}.exr")
+    if not os.path.exists(center_depth_path):
+        # Fallback: try finding any exr file if the specific index is missing but folder is not empty
+        # This handles cases where file numbering might be different or we want to be robust
+        potential_files = sorted([f for f in os.listdir(gt_depth_dir) if f.endswith('.exr')])
+        if potential_files:
+            center_depth_path = os.path.join(gt_depth_dir, potential_files[0])
+            print(f"Warning: Specific center depth {center_idx:04d}.exr not found, using {potential_files[0]} instead.")
+            
     center_depth = load_depth(center_depth_path)
     if center_depth is None:
         print(f"Failed to load center depth map: {center_depth_path}")
@@ -169,10 +196,12 @@ def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, outpu
         elif os.path.exists(rgb_path):
             rgb_img = cv2.imread(rgb_path)
             # Load corresponding source depth map
+            # [Modified] Allow missing source depth for refocus logic that doesn't strictly depend on it
             src_depth_path = os.path.join(src_depth_dir, f"{i:04d}.exr")
             src_depth = load_depth(src_depth_path)
             
-            if rgb_img is not None and src_depth is not None:
+            # Allow Refocus even if src_depth is None, assuming refocus_image_gpu can handle it
+            if rgb_img is not None:
                 refocused_rgb = refocus_image_gpu(rgb_img, src_depth, center_depth, frame_transform, shared_data, device)
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
                 if cv2.imwrite(output_path, refocused_rgb):
@@ -217,7 +246,8 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
             rgb_dir = os.path.join(sequence_dir, "rgb")
             gt_depth_dir = os.path.join(gt_sequence_dir, "depth")  # GT depth for center frame
             
-            if not all(os.path.exists(p) for p in [transforms_file, rgb_dir, gt_depth_dir, src_depth_dir]):
+            # [Modified] We don't require src_depth_dir to exist perfectly or contain all files
+            if not all(os.path.exists(p) for p in [transforms_file, rgb_dir, gt_depth_dir]):
                 continue
             
             output_dir = os.path.join(output_base, trajectory_type, sequence_name)
@@ -254,7 +284,7 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
 def main():
     # ==================== 配置参数 ====================
     # 输入数据路径
-    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/train_data"
+    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/test_data"
     
     # 输出路径
     OUTPUT_BASE = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/refocused_output"
