@@ -27,25 +27,39 @@ def load_depth(depth_path):
         return None
 
 def precompute_transforms(poses, center_pose, K):
-    """预计算所有帧的变换矩阵"""
+    """预计算所有帧的变换矩阵 (Standardized to OpenCV Coordinate System)"""
     K_inv = np.linalg.inv(K)
-    R_center = center_pose[:3, :3]
-    T_center = center_pose[:3, 3:4]
+
+    # 定义转换矩阵: Blender(GL) -> OpenCV
+    # Blender: X-Right, Y-Up,   Z-Back
+    # OpenCV:  X-Right, Y-Down, Z-Forward
+    # 需要翻转 Y 和 Z 轴
+    # 修正矩阵乘法： Pose_cv = Pose_gl @ diag(1, -1, -1, 1)
+    
+    c2w_blender_to_opencv = np.diag([1.0, -1.0, -1.0, 1.0])
+    
+    # 转换中心帧 Pose
+    # 注意: json 中的 transform_matrix 通常是 4x4 的 list-of-lists
+    center_pose_cv = center_pose @ c2w_blender_to_opencv
+    
+    R_center = center_pose_cv[:3, :3]
+    T_center = center_pose_cv[:3, 3:4]
     
     shared_data = (K, K_inv)
     frame_transforms = []
     
     for pose in poses:
-        R_src = pose[:3, :3]
-        T_src = pose[:3, 3:4]
+        # 转换当前帧 Pose
+        pose_cv = pose @ c2w_blender_to_opencv
+        
+        R_src = pose_cv[:3, :3]
+        T_src = pose_cv[:3, 3:4]
         
         # Calculate relative transform: Center -> Source (inverse direction)
+        # P_source = R_c2s @ P_center + T_c2s
+        # 这是标准的刚体变换，在统一后的坐标系内进行
         R_c2s = R_src.T @ R_center
         T_c2s = R_src.T @ (T_center - T_src)
-
-        # [FIX] 如果左右位移反了，说明 X 轴的相对移动算反了。
-        # 手动翻转 X 轴分量 (索引 0)
-        T_c2s[0] = -T_c2s[0] 
         
         frame_transforms.append((R_c2s, T_c2s))
     
@@ -60,7 +74,10 @@ def refocus_image_gpu(src_img, center_depth, frame_transform, shared_data, devic
     device = torch.device(device if torch.cuda.is_available() else 'cpu')
     src_tensor = torch.from_numpy(src_img).float().to(device)
     # Convert to tensors
-    depth_m = -torch.from_numpy(center_depth).float().to(device) / 100.0  # cm->m, negative for -Z
+    # [FIX] OpenCV Coordinate System: +Z is Forward. Depth values are positive.
+    # No negative sign needed.
+    depth_m = torch.from_numpy(center_depth).float().to(device) / 100.0
+    
     K_tensor = torch.from_numpy(K).float().to(device)
     K_inv_tensor = torch.from_numpy(K_inv).float().to(device)
     R_c2s_tensor = torch.from_numpy(R_c2s).float().to(device)

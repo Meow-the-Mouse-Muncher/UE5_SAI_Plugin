@@ -192,25 +192,27 @@ def visualize_camera_poses(poses_data, save_path=None):
                    [world_corners[j, 2], world_corners[next_j, 2]], 
                    color=color, alpha=0.6, linewidth=1)
         
-        # Draw camera coordinate axes (every 3rd camera for clarity)
-        if i % 3 == 0:
-            axis_scale = 0.3
-            
-            # Z-axis (blue) - camera viewing direction
-            z_end = pos + rot[:, 2] * axis_scale  
-            ax.plot([pos[0], z_end[0]], [pos[1], z_end[1]], [pos[2], z_end[2]], 
-                   'b-', alpha=0.8, linewidth=3)
-            
-            # X-axis (red)
-            x_end = pos + rot[:, 0] * axis_scale
-            ax.plot([pos[0], x_end[0]], [pos[1], x_end[1]], [pos[2], x_end[2]], 
-                   'r-', alpha=0.8, linewidth=2)
-            
-            # Y-axis (green)
-            y_end = pos + rot[:, 1] * axis_scale
-            ax.plot([pos[0], y_end[0]], [pos[1], y_end[1]], [pos[2], y_end[2]], 
-                   'g-', alpha=0.8, linewidth=2)
-    
+        # Draw camera coordinate axes (FOR EVERY CAMERA now, to debug orientation)
+        axis_scale = frustum_scale * 0.8  # Make axes visible based on scene scale
+        
+        # X-axis (Red) - Right
+        x_end = pos + rot[:, 0] * axis_scale
+        ax.plot([pos[0], x_end[0]], [pos[1], x_end[1]], [pos[2], x_end[2]], 
+               'r-', alpha=0.9, linewidth=1.5)
+        
+        # Y-axis (Green) - Down (in OpenCV) / Up (in OpenGL)??? 
+        # Let's just trust the matrix columns: Col 0=X, Col 1=Y, Col 2=Z
+        y_end = pos + rot[:, 1] * axis_scale
+        ax.plot([pos[0], y_end[0]], [pos[1], y_end[1]], [pos[2], y_end[2]], 
+               'g-', alpha=0.9, linewidth=1.5)
+        
+        # Z-axis (Blue) - Forward (in OpenCV usually +Z, or -Z?)
+        # Standard: Rot matrix columns are the world direction of camera axes.
+        # So rot[:, 2] is the camera's Z axis direction in world space.
+        z_end = pos + rot[:, 2] * axis_scale  
+        ax.plot([pos[0], z_end[0]], [pos[1], z_end[1]], [pos[2], z_end[2]], 
+               'b-', alpha=0.9, linewidth=1.5)
+
     # Mark start and end positions with larger frustums
     start_pos = positions[0]
     start_rot = orientations[0]
