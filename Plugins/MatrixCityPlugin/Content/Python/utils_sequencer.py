@@ -785,7 +785,7 @@ def rot_spiral(target_actor, num_frames, num_turns, arc_angle_degrees, radius, s
         )
     )
 
-    end_frame = current_frame + i_final
+    end_frame = current_frame + num_frames
     return camera_trans, end_frame
 
 
@@ -1034,8 +1034,11 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
     target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
     
     # --- 1. 确定控制点数量 (奇数) ---
+    # [Mod] 减少一帧留给 GT，以保证总帧数 = num_frames
+    num_random_frames = num_frames - 1
+    
     # 控制点数量：每 10 帧一个控制点，至少 5 个
-    num_control_points = max(5, num_frames // 6)
+    num_control_points = max(5, num_random_frames // 6)
     # 因为不需要锚定中间点了，奇偶其实无所谓，但保持原逻辑也无妨
     
     control_points = []
@@ -1070,7 +1073,7 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
     # 解决方法：除了最后一段，每段生成后丢弃最后一个点
     # 因此，为了得到 num_frames 个有效不重复点，我们需要分配 num_frames + (segments - 1) 个点
     
-    total_points_needed = num_frames + (num_segments_total - 1)
+    total_points_needed = num_random_frames + (num_segments_total - 1)
     
     # 将总点数分配给各段
     def distribute_frames(total_f, n_segs):
@@ -1157,7 +1160,7 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
     #   Location: (target_x, target_y, target_z + mid_height)
     #   Rotation: Pitch=-90, Roll=0, Yaw=plane_angle_degrees
     
-    gt_frame_index = current_frame + num_frames
+    gt_frame_index = current_frame + num_random_frames
     
     gt_x = target_x
     gt_y = target_y
