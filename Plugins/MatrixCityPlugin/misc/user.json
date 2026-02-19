@@ -2,7 +2,12 @@
   "ue_command": "/home/user1/Unreal_Engine_5.6/Engine/Binaries/Linux/UnrealEditor",
   "ue_project": "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/PCGBiomeForestPoplar.uproject",
   "maps": [
-    "scene_010"
+    "scene_007",
+    "scene_008",
+    "scene_009",
+    "scene_011",
+    "scene_012",
+    "scene_013"
   ], 
   "camera_name": "CineCameraActor1",
   "render_config": "misc/render_SAI_config.yaml",

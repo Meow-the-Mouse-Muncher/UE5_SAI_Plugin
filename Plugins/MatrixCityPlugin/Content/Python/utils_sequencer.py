@@ -1178,12 +1178,12 @@ def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degre
         )
     )
 
-    # 返回 total_frames 
-    # [Update] 修正帧数计算：
-    # 关键帧范围是 0 ~ gt_frame_index。
-    # 如果 Sequencer 播放范围设置为 gt_frame_index (例如32)，且渲染是 Inclusive 的 (0..32)，则正好生成 33 张图。
-    # 之前返回 +1 导致生成了 34 张 (0..33)，多了一张空帧。
-    return camera_trans, gt_frame_index
+    # 返回 end_frame（半开区间上界）
+    # UE5 set_playback_end(N) 渲染帧 [0, N)，即 0 ~ N-1
+    # GT 帧在 gt_frame_index，要被渲染到就需要 end_frame = gt_frame_index + 1
+    # 与 rot_spiral 保持一致：end_frame = current_frame + num_frames
+    end_frame = gt_frame_index + 1  # == current_frame + num_frames
+    return camera_trans, end_frame
 
 def generate_single_trajectory(target_actor, map_name, trajectory_type, trajectory_params, camera_height, num_frames):
     """生成单个轨迹类型的序列

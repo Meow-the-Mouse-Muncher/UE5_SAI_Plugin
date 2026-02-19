@@ -239,6 +239,7 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
     else:
         print(f"Base dir {base_dir} does not exist")
         return
+    trajectories = ['fix_line','plane_grid']
 
     for trajectory_type in trajectories:
         trajectory_dir = os.path.join(base_dir, trajectory_type)
@@ -311,9 +312,9 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
 
 def main():
     # ==================== 配置参数 ====================
-    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/test_data"
+    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/train_data"
     
-    OUTPUT_BASE = "/home_ssd/sjy/deocc_swin/test_data"
+    OUTPUT_BASE = "/home_ssd/sjy/deocc_swin/train_data"
     
     # 是否使用GPU加速
     USE_GPU = True
