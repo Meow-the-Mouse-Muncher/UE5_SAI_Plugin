@@ -593,73 +593,88 @@ def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_d
     # 获取目标物位置
     target_location = target_actor.get_actor_location()
     target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
-    
+
     # 计算相机高度
     camera_z = target_z + height_offset
-    
-    # 网格参数
-    side_count = math.ceil(math.sqrt(num_frames))
-    if side_count < 2: side_count = 2
-    
-    # 计算步长 (Step)
-    # 使用 trajectory_size 作为覆盖范围参考
-    step = trajectory_size / (side_count - 1) if side_count > 1 else 0
-    
-    # 旋转角度
+
+    if num_frames <= 0:
+        return [], current_frame
+
+    # 固定 33 帧阵列采样：32 个非中心点 + 1 个中心点
+    # 采用 7x5 奇数网格，保证几何中心是网格点
+    # 为了得到 32 个非中心点：从 34 个非中心网格点中对称移除一对对角角点
+    if num_frames != 33:
+        unreal.log_warning(f"plane_grid is designed for 33 frames, but got {num_frames}; output will still be generated.")
+
+    cols = 7
+    rows = 5
+    long_steps = max(cols - 1, rows - 1)
+    step = trajectory_size / long_steps if long_steps > 0 else 0.0
+    cx = (cols - 1) / 2.0
+    cy = (rows - 1) / 2.0
+
+    # 生成蛇形扫描路径（从上到下，行内往返），保证轨迹连续
+    # 坐标使用中心化局部坐标，后续统一旋转到世界坐标
+    non_center_points = []
+    for rr in range(rows):
+        r = rows - 1 - rr  # top -> bottom
+        if rr % 2 == 0:
+            col_iter = range(cols)
+        else:
+            col_iter = range(cols - 1, -1, -1)
+
+        for c in col_iter:
+            local_x = (c - cx) * step
+            local_y = (r - cy) * step
+            if abs(local_x) < 1e-9 and abs(local_y) < 1e-9:
+                continue
+            non_center_points.append((local_x, local_y))
+
+    # 7x5 去中心后共有 34 个点；对称移除一对角点，保留 32 个非中心点
+    corner_a = (-3.0 * step, 2.0 * step)
+    corner_b = (3.0 * step, -2.0 * step)
+    selected_points = [
+        p for p in non_center_points
+        if not ((abs(p[0] - corner_a[0]) < 1e-6 and abs(p[1] - corner_a[1]) < 1e-6) or
+                (abs(p[0] - corner_b[0]) < 1e-6 and abs(p[1] - corner_b[1]) < 1e-6))
+    ]
+
+    # 非 33 帧时按需求裁剪/补齐，中心帧仍锁定在中间索引
+    needed_non_center = max(0, num_frames - 1)
+    if len(selected_points) < needed_non_center:
+        selected_points.extend([(0.0, 0.0)] * (needed_non_center - len(selected_points)))
+    selected_points = selected_points[:needed_non_center]
+
+    mid_index = num_frames // 2
+    before_count = mid_index
+    after_count = num_frames - mid_index - 1
+
+    before_points = selected_points[:before_count]
+    after_points = selected_points[before_count:before_count + after_count]
+
+    # 中心帧强制锁定目标正上方
+    ordered_points = before_points + [(0.0, 0.0)] + after_points
+
     angle_radians = math.radians(angle_degrees)
     cos_a = math.cos(angle_radians)
     sin_a = math.sin(angle_radians)
-    
-    # --- 计算中间帧的偏移量 ---
-    mid_index = num_frames // 2
-    mid_row = mid_index // side_count
-    mid_col = mid_index % side_count
-    
-    # 中间帧的蛇形逻辑
-    if mid_row % 2 == 1:
-        mid_col = side_count - 1 - mid_col
-        
-    # 中间帧的未旋转局部坐标 (相对于 grid start (0,0))
-    # 注意：这里我们假设网格从(0,0)开始生长，然后减去中间帧坐标来实现居中
-    mid_local_x = mid_col * step
-    mid_local_y = mid_row * step
-    
+
+    pitch = -90.0
+    yaw = float(angle_degrees)
+    roll = 0.0
     camera_trans = []
-    previous_yaw = 0.0
-    
-    for i in range(num_frames):
-        row = i // side_count
-        col = i % side_count
-        
-        # 蛇形扫描 (Zigzag)
-        if row % 2 == 1:
-            col = side_count - 1 - col
-            
-        # 原始局部坐标 (相对于 grid start)
-        raw_local_x = col * step
-        raw_local_y = row * step
-        
-        # 居中修正后的局部坐标 (中间帧位于 0,0)
-        local_x = raw_local_x - mid_local_x
-        local_y = raw_local_y - mid_local_y
-        
+
+    for i, (local_x, local_y) in enumerate(ordered_points):
+        if i == mid_index:
+            local_x = 0.0
+            local_y = 0.0
+
         # 旋转并平移到世界坐标
-        # x' = x*cos - y*sin
-        # y' = x*sin + y*cos
         rel_x = local_x * cos_a - local_y * sin_a
         rel_y = local_x * sin_a + local_y * cos_a
-        
         camera_x = target_x + rel_x
         camera_y = target_y + rel_y
-        
-        # [Fix] Grid 模式下移除 LookAt 逻辑
-        # 强制相机垂直向下，使用 angle_degrees 作为 Yaw
-        # 这样相机的"上方"会始终跟随网格的旋转方向，保证画面与网格行/列对齐
-        
-        pitch = -90.0
-        yaw = float(angle_degrees) # 跟随网格旋转角度
-        roll = 0.0
-        
+
         camera_trans.append(
             SequenceKey(
                 frame=current_frame + i,
@@ -667,7 +682,7 @@ def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_d
                 rotation=(roll, pitch, yaw)
             )
         )
-        
+
     end_frame = current_frame + num_frames
     return camera_trans, end_frame
 

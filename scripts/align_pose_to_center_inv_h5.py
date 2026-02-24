@@ -239,7 +239,7 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
     else:
         print(f"Base dir {base_dir} does not exist")
         return
-    trajectories = ['fix_line','plane_grid']
+    trajectories = ['plane_grid','fix_line']
 
     for trajectory_type in trajectories:
         trajectory_dir = os.path.join(base_dir, trajectory_type)
