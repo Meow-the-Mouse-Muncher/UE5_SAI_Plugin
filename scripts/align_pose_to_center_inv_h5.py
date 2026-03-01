@@ -142,11 +142,14 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
     ])
     
     frames = pose_data['frames']
-    center_idx = len(frames) // 2
+    # Load center depth map from GT depth directory
+    if any(traj in h5_path for traj in ['rot_spiral', 'rand_shell']):
+        # 对于 rot_spiral 和 rand_shell，使用最后一张作为深度图
+        center_idx = len(frames) - 1
+    else:
+        center_idx = len(frames)//2 
     center_pose = np.array(frames[center_idx]['transform_matrix'])
     poses = [np.array(frame['transform_matrix']) for frame in frames]
-    
-    # Load center depth map from GT depth directory
     center_depth_path = os.path.join(gt_depth_dir, f"{center_idx:04d}.exr")
     center_depth = load_depth(center_depth_path)
     if center_depth is None:
@@ -162,6 +165,9 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
     # Load center RGB from GT directory (Ground Truth Target)
     center_gt_rgb_path = os.path.join(gt_rgb_dir, f"{center_idx:04d}.png")
     center_gt_rgb = cv2.imread(center_gt_rgb_path)
+    if center_gt_rgb is None:
+        print(f"Error: Could not load GT RGB image at {center_gt_rgb_path}")
+        return False
     center_gt_rgb = cv2.cvtColor(center_gt_rgb, cv2.COLOR_BGR2RGB)
 
     h, w = center_gt_rgb.shape[:2]
@@ -181,9 +187,10 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
             continue
 
         rgb_img = cv2.imread(rgb_path)
-        rgb_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB)
         if rgb_img is None:
+            print(f"Warning: Could not load RGB image at {rgb_path}, skipping frame {i}")
             continue
+        rgb_img = cv2.cvtColor(rgb_img, cv2.COLOR_BGR2RGB)
         
         if i == center_idx:
             # Copy center frame (identity transform)
@@ -239,7 +246,7 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
     else:
         print(f"Base dir {base_dir} does not exist")
         return
-    trajectories = ['plane_grid','fix_line']
+    trajectories = ['rot_arc'] # Only process these trajectories for now
 
     for trajectory_type in trajectories:
         trajectory_dir = os.path.join(base_dir, trajectory_type)
@@ -312,9 +319,9 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
 
 def main():
     # ==================== 配置参数 ====================
-    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/train_data"
+    BASE_DIR = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders_rot/test_data"
     
-    OUTPUT_BASE = "/home_ssd/sjy/deocc_swin/train_data"
+    OUTPUT_BASE = "/home_ssd/sjy/deocc_swin/test_data"
     
     # 是否使用GPU加速
     USE_GPU = True

@@ -76,7 +76,7 @@ def main():
     base_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders"
     
     # Datasets to process
-    datasets = ['test_data']
+    datasets = ['train_data']
     #train_data',
     for dataset in datasets:
         dataset_path = os.path.join(base_dir, dataset)
