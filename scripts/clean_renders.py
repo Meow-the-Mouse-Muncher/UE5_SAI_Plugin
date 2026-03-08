@@ -52,21 +52,35 @@ def process_gt_folder(gt_folder, keep_index_method):
                 except OSError as e:
                     print(f"Error deleting {f}: {e}")
 
-def process_occ_folder(occ_folder):
+def process_occ_folder(occ_folder, keep_index_method):
     """
-    Process Occ folder (only delete depth maps as requested).
+    Process OCC folder depth maps.
+    keep_index_method: 'middle' or 'last' (must match GT rule)
     """
-    # Simply delete all depth maps
     folder_path = os.path.join(occ_folder, 'depth')
     files = get_sorted_files(folder_path)
 
     if not files:
         print(f"Skipping {folder_path}: Already processed (empty).")
         return
-    
-    if files:
-        print(f"Processing {folder_path}: Deleting all {len(files)} files")
-        for f in files:
+
+    if len(files) == 1:
+        print(f"Skipping {folder_path}: Already processed (1 file).")
+        return
+
+    if keep_index_method == 'middle':
+        target_index = len(files) // 2
+    elif keep_index_method == 'last':
+        target_index = len(files) - 1
+    else:
+        print(f"Unknown method {keep_index_method}")
+        return
+
+    target_file = files[target_index]
+    print(f"Processing {folder_path}: Keeping {os.path.basename(target_file)} ({keep_index_method} of {len(files)})")
+
+    for i, f in enumerate(files):
+        if i != target_index:
             try:
                 os.remove(f)
             except OSError as e:
@@ -116,7 +130,7 @@ def main():
                 if seq_folder_name.endswith('_GT'):
                     process_gt_folder(seq_folder_path, rule)
                 elif seq_folder_name.endswith('_occ'):
-                    process_occ_folder(seq_folder_path)
+                    process_occ_folder(seq_folder_path, rule)
 
 if __name__ == "__main__":
     main()
