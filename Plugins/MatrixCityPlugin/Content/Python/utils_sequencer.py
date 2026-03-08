@@ -709,6 +709,8 @@ def rot_spiral(target_actor, num_frames, num_turns, arc_angle_degrees, radius, s
     target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
     
     camera_trans = []
+    # 顶部奇点时使用配置角度，确保 GT 朝向可控且跨轨迹一致
+    previous_yaw = float(start_angle)
     
     # Golden Angle
     phi = math.pi * (3.0 - math.sqrt(5.0))  # ~2.3999 radians
@@ -773,6 +775,7 @@ def rot_spiral(target_actor, num_frames, num_turns, arc_angle_degrees, radius, s
         # vector is (0,0,-100). z=-100, xy=0. atan2(-100, 0) = -90. Correct.
         
         yaw = math.degrees(math.atan2(vy, vx))
+        previous_yaw = yaw
         roll = 0.0
         
         camera_trans.append(
@@ -789,14 +792,12 @@ def rot_spiral(target_actor, num_frames, num_turns, arc_angle_degrees, radius, s
     cam_y_final = target_y
     cam_z_final = target_z + radius
     
-    # Strictly looking down
-    # Location: (0, 0, R) relative to target
-    # Rotation: Pitch = -90, Yaw = 0 (arbitrary), Roll = 0
+    # GT: 顶视，Yaw 使用 start_angle（由 plane_angles 注入）
     camera_trans.append(
         SequenceKey(
             frame=current_frame + i_final,
             location=(cam_x_final, cam_y_final, cam_z_final),
-            rotation=(0.0, -90.0, 0.0)
+            rotation=(0.0, -90.0, float(start_angle))
         )
     )
 
@@ -900,7 +901,7 @@ def rot_line(target_actor, num_frames, arc_angle_degrees, height, plane_angle_de
         
         # 计算偏航角（yaw）- 处理奇点情况
         if horizontal_distance < 1e-6:  # 相机在目标物正上方（奇点）
-            yaw = previous_yaw  # 使用前一帧的 yaw 角度
+            yaw = float(plane_angle_degrees)  # 使用配置角度，保证 GT 一致
         else:
             yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
             previous_yaw = yaw  # 更新前一帧的 yaw 角度
