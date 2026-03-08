@@ -7,6 +7,11 @@ Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/
 File_Name_Format: "{sequence_name}/{render_pass}/{frame_number}"
 Motion_Blur: false
 
+# 仅补 OCC 深度单帧（用于快速恢复缺失数据）
+Only_OCC: true
+Single_Frame_Only: true
+Single_Frame_Index: 16
+
 Anti_Alias:
     enable: true
     spatial_samples: 8
@@ -16,7 +21,7 @@ Anti_Alias:
 Render_Passes:
     -
         pass_name: 'rgb'
-        enable: true
+        enable: false
         ext: "png"
     -
         pass_name: 'depth'

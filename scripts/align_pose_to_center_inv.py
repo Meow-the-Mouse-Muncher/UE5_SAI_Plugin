@@ -186,6 +186,13 @@ def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, outpu
         print(f"Failed to load center depth map: {center_depth_path}")
         return 0, 0
     
+    # 1. 计算鲁棒的统计量
+    mindep = np.percentile(center_depth, 1)
+    maxdep = np.percentile(center_depth, 99)
+    
+    # 2. 直接裁剪深度图本身，将“深度巨大”或“深度极小”的噪点修正到合理区间
+    # 这样即便后续保存到 H5 或进行 3D 投影，也不会因为离群点导致数值崩溃
+    center_depth = np.clip(center_depth, mindep, maxdep)
     shared_data, frame_transforms = precompute_transforms(poses, center_pose, K)
     os.makedirs(os.path.join(output_dir, 'rgb'), exist_ok=True)
     
@@ -223,7 +230,14 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
     
     # Find all sequences (both OCC and GT)
     sequence_list = []
-    for trajectory_type in os.listdir(base_dir):
+    if os.path.exists(base_dir):
+        trajectories = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+    else:
+        print(f"Base dir {base_dir} does not exist")
+        return
+    trajectories = ['plane_grid'] # Only process these trajectories for now
+
+    for trajectory_type in trajectories:
         trajectory_dir = os.path.join(base_dir, trajectory_type)
         if not os.path.isdir(trajectory_dir):
             continue

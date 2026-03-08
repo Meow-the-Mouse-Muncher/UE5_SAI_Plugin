@@ -152,6 +152,13 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
     poses = [np.array(frame['transform_matrix']) for frame in frames]
     center_depth_path = os.path.join(gt_depth_dir, f"{center_idx:04d}.exr")
     center_depth = load_depth(center_depth_path)
+    # 1. 计算鲁棒的统计量
+    mindep = np.percentile(center_depth, 1)
+    maxdep = np.percentile(center_depth, 99)
+    
+    # 2. 直接裁剪深度图本身，将“深度巨大”或“深度极小”的噪点修正到合理区间
+    # 这样即便后续保存到 H5 或进行 3D 投影，也不会因为离群点导致数值崩溃
+    center_depth = np.clip(center_depth, mindep, maxdep)
     if center_depth is None:
         print(f"Failed to load center depth map: {center_depth_path}")
         return False

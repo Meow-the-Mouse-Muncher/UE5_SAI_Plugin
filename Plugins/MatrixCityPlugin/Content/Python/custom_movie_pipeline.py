@@ -111,6 +111,7 @@ class CustomMoviePipeline():
         resolution: list = [1920, 1080],
         file_name_format: Optional[str] = None,
         output_path: Optional[str] = None,
+        single_frame_index: Optional[int] = None,
     ) -> None:
         """Add output config to a movie preset.
 
@@ -144,6 +145,20 @@ class CustomMoviePipeline():
                     unreal.log(f"Created output directory: {output_path}")
             except Exception as e:
                 unreal.log_warning(f"Failed to create output directory {output_path}: {e}")
+
+        # 可选：仅渲染单帧（用于快速补数据）
+        if single_frame_index is not None:
+            try:
+                frame_idx = int(single_frame_index)
+                if hasattr(output_config, 'use_custom_playback_range'):
+                    output_config.use_custom_playback_range = True
+                if hasattr(output_config, 'custom_start_frame'):
+                    output_config.custom_start_frame = frame_idx
+                if hasattr(output_config, 'custom_end_frame'):
+                    output_config.custom_end_frame = frame_idx + 1
+                unreal.log(f"Enabled single-frame render at frame {frame_idx}")
+            except Exception as e:
+                unreal.log_warning(f"Failed to set single-frame range: {e}")
 
     @classmethod
     def add_console_command(
@@ -200,6 +215,7 @@ class CustomMoviePipeline():
         anti_alias: dict = {'enable': False,
                             'spatial_samples': 8, 'temporal_samples': 1},
         motion_blur: bool = False,
+        single_frame_index: Optional[int] = None,
     ) -> unreal.MoviePipelineMasterConfig:
         """Add settings to a movie preset.
 
@@ -218,7 +234,7 @@ class CustomMoviePipeline():
 
         cls.add_render_passes(movie_preset, render_passes)
         cls.add_output_config(movie_preset, resolution,
-                              file_name_format, output_path)
+                              file_name_format, output_path, single_frame_index)
         cls.add_anti_alias(movie_preset, anti_alias)
         cls.add_console_command(movie_preset, motion_blur)
 
@@ -236,6 +252,7 @@ class CustomMoviePipeline():
         anti_alias: dict = {'enable': False,
                             'spatial_samples': 8, 'temporal_samples': 1},
         motion_blur: bool = False,
+        single_frame_index: Optional[int] = None,
     ) -> unreal.MoviePipelineMasterConfig:
         """Create a movie preset from args.
 
@@ -255,7 +272,7 @@ class CustomMoviePipeline():
 
         cls.add_render_passes(movie_preset, render_passes)
         cls.add_output_config(movie_preset, resolution,
-                              file_name_format, output_path)
+                              file_name_format, output_path, single_frame_index)
         cls.add_anti_alias(movie_preset, anti_alias)
         cls.add_console_command(movie_preset, motion_blur)
 
@@ -349,6 +366,11 @@ class CustomMoviePipeline():
         newJob = cls.create_job(level, level_sequence)
         if render_config is None:
             render_config = cls.render_config
+
+        single_frame_index = None
+        if render_config.get('Single_Frame_Only', False):
+            single_frame_index = int(render_config.get('Single_Frame_Index', 0))
+
         movie_preset = cls.create_movie_preset(
             render_passes=render_config['Render_Passes'],
             resolution=render_config['Resolution'],
@@ -356,6 +378,7 @@ class CustomMoviePipeline():
             output_path=render_config['Output_Path'],
             anti_alias=render_config['Anti_Alias'],
             motion_blur=render_config['Motion_Blur'],
+            single_frame_index=single_frame_index,
         )
         newJob.set_configuration(movie_preset)
         unreal.log(f"Added new job ({newJob.job_name}) to queue.")
@@ -488,6 +511,7 @@ class CustomMoviePipeline():
         
         # 构建多轨迹多高度渲染序列
         builder = RenderSequenceBuilder()
+        only_occ = bool(render_config.get('Only_OCC', False))
         
         import batch_utils
         for key, (level, sequence_name) in trajectory_results.items():
@@ -523,14 +547,15 @@ class CustomMoviePipeline():
                 sequence_path=sequence_name
             )
             
-            # 添加GT渲染步骤
-            builder.add_gt_render(
-                step_id=f"{trajectory_type}_{height_str}_{angle_label}_gt_render",
-                scene_config=gt_scene_config,
-                render_config=render_config_gt,
-                level_path=level,
-                sequence_path=sequence_name
-            )
+            if not only_occ:
+                # 添加GT渲染步骤
+                builder.add_gt_render(
+                    step_id=f"{trajectory_type}_{height_str}_{angle_label}_gt_render",
+                    scene_config=gt_scene_config,
+                    render_config=render_config_gt,
+                    level_path=level,
+                    sequence_path=sequence_name
+                )
         
         # 设置完成回调
         def on_sequence_complete(context):
