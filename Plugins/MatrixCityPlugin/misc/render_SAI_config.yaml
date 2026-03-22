@@ -3,13 +3,13 @@ _BASE_: render_config.yaml
 
 # 基础渲染设置
 Resolution: [1024, 1024]
-Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/train_data"
+Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/test_data"
 File_Name_Format: "{sequence_name}/{render_pass}/{frame_number}"
 Motion_Blur: false
 
 # 仅补 OCC 深度单帧（用于快速恢复缺失数据）
-Only_OCC: true
-Single_Frame_Only: true
+Only_OCC: false
+Single_Frame_Only: false
 Single_Frame_Index: 16
 
 Anti_Alias:
@@ -21,7 +21,7 @@ Anti_Alias:
 Render_Passes:
     -
         pass_name: 'rgb'
-        enable: false
+        enable: true
         ext: "png"
     -
         pass_name: 'depth'

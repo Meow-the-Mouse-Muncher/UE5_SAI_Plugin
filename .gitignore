@@ -8,3 +8,5 @@
 !/Plugins/**
 !/pipeline_automation/
 !/pipeline_automation/**
+!README.md
+scripts/trajectory_figs
