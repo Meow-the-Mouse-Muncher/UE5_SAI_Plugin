@@ -15,24 +15,27 @@ unreal.log_warning("######################################################")
 @loader_func
 def main(render_config_path):
 
-    # 1. connect to socket
+    (cmdTokens, cmdSwitches, cmdParameters) = unreal.SystemLibrary.parse_command_line(
+        unreal.SystemLibrary.get_command_line()
+    )
+
+    # 1. connect to the worker-specific socket when one was supplied.
     host = '127.0.0.1'
-    port = 9999
+    try:
+        port = int(cmdParameters.get('socket_port', '9999'))
+    except (TypeError, ValueError):
+        unreal.log_warning("Invalid socket_port; falling back to 9999")
+        port = 9999
     PIEExecutor = unreal.MoviePipelinePIEExecutor()
     PIEExecutor.connect_socket(host, port)
     log_msg_with_socket(PIEExecutor, '[*] Unreal Engine Loaded!')
 
     # 2. 读取渲染配置
-    # if render_config_path is None:
     unreal.log_warning(f"Render Config Path: {render_config_path}")
-    render_config_path = str(PLUGIN_ROOT / 'misc/render_SAI_config.yaml')
-    
-
-    unreal.log_warning(f"PLUGIN_ROOT: {PLUGIN_ROOT}")
-    unreal.log_warning(f"Config path type: {type(render_config_path)}")
-    
-    # 确保路径是字符串
+    if not render_config_path:
+        render_config_path = PLUGIN_ROOT / 'misc/render_SAI_config.yaml'
     render_config_path = str(render_config_path)
+    unreal.log_warning(f"Using render config: {render_config_path}")
     
     try:
         render_config = CfgNode.load_yaml_with_base(render_config_path)
@@ -45,10 +48,6 @@ def main(render_config_path):
         render_config = CfgNode.load_yaml_with_base(render_config_path)
     
     # 3. 获取指定地图路径
-    (cmdTokens, cmdSwitches, cmdParameters) = unreal.SystemLibrary.parse_command_line(
-        unreal.SystemLibrary.get_command_line()
-    )
-    
     # 从命令行参数获取目标地图
     target_map = cmdParameters.get('target_map', '')
     if target_map:

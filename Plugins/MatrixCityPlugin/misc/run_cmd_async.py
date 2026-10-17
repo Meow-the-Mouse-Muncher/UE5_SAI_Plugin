@@ -180,6 +180,7 @@ def main(config_file: str='misc/user.json', gpu_id: Optional[int]=None, port: in
         f'"{ue_map}"' if ue_map else '',  # 加载指定地图
         f'-ExecCmds="py {script_path_str}"',
         f'-render_config_path="{render_config_path}"',
+        f'-socket_port={port}',
         f'-target_map="{ue_map}"' if ue_map else '',  # 传递地图路径参数
         
         f'-notexturestreaming',

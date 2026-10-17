@@ -15,6 +15,7 @@ import bpy
 import os
 import json
 import glob
+import struct
 import numpy as np
 import yaml
 
@@ -104,7 +105,66 @@ def clear_scene():
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
 
-def generate_3dgs_transforms_direct(out_data, output_dir, config, scale=100):
+def _frame_stems(directory, extension):
+    if not os.path.isdir(directory):
+        return set()
+    return {
+        os.path.splitext(name)[0]
+        for name in os.listdir(directory)
+        if name.lower().endswith(extension)
+    }
+
+
+def _png_size(path):
+    with open(path, "rb") as image_file:
+        header = image_file.read(24)
+    if header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
+        raise ValueError(f"Invalid PNG file: {path}")
+    return struct.unpack(">II", header[16:24])
+
+
+def validate_render_pair(parent_dir, fbx_name, pose_count):
+    """Return verified render-frame stems and their shared RGB resolution."""
+    render_dirs = {
+        "GT": os.path.join(parent_dir, f"{fbx_name}_GT"),
+        "occ": os.path.join(parent_dir, f"{fbx_name}_occ"),
+    }
+    frame_sets = {}
+    for label, render_dir in render_dirs.items():
+        rgb_dir = os.path.join(render_dir, "rgb")
+        depth_dir = os.path.join(render_dir, "depth")
+        rgb_stems = _frame_stems(rgb_dir, ".png")
+        depth_stems = _frame_stems(depth_dir, ".exr")
+        if not rgb_stems or not depth_stems:
+            raise ValueError(f"Missing RGB or depth frames in {render_dir}")
+        if rgb_stems != depth_stems:
+            raise ValueError(f"RGB/depth stem mismatch in {render_dir}")
+        frame_sets[label] = rgb_stems
+
+    if frame_sets["GT"] != frame_sets["occ"]:
+        raise ValueError(f"GT/OCC frame-stem mismatch for {fbx_name}")
+
+    frame_stems = sorted(frame_sets["GT"])
+    if len(frame_stems) != pose_count:
+        raise ValueError(
+            f"Render/pose frame count mismatch for {fbx_name}: "
+            f"renders={len(frame_stems)}, poses={pose_count}"
+        )
+
+    expected_size = None
+    for render_dir in render_dirs.values():
+        for frame_stem in frame_stems:
+            size = _png_size(os.path.join(render_dir, "rgb", f"{frame_stem}.png"))
+            if expected_size is None:
+                expected_size = size
+            elif size != expected_size:
+                raise ValueError(
+                    f"RGB resolution mismatch for {fbx_name}: {size} vs {expected_size}"
+                )
+    return frame_stems, expected_size
+
+
+def generate_3dgs_transforms_direct(out_data, output_dir, config, frame_stems, resolution, scale=100):
     """
     Convert raw transforms to 3DGS format directly from memory
     Generate JSON files for both GT and occ folders
@@ -112,21 +172,17 @@ def generate_3dgs_transforms_direct(out_data, output_dir, config, scale=100):
     all_frames = []
     frames = out_data.get('frames', [])
     
-    # Get resolution from config, fallback to default
-    resolution = config.get('Resolution', [1920, 1080])
     w = float(resolution[0])
     h = float(resolution[1])
-    
-    print(f"Using resolution from config: {int(w)}x{int(h)}")
+    print(f"Using verified render resolution: {int(w)}x{int(h)}")
 
-    for frame in frames:
-        # Generate image file path (assuming images will be in rgb subdirectory)
-        image_name = str(frame['frame_index']).zfill(4) + '.png'
+    for frame, frame_stem in zip(frames, frame_stems):
+        image_name = f"{frame_stem}.png"
         file_path = os.path.join("..", "rgb", image_name)
 
         c2w = np.array(frame['rot_mat'])
         
-        # Transformation logic from generate_transforms_3dgs.py
+        # Preserve the existing coordinate convention; its scale needs calibration.
         c2w[:3, :3] *= 100
         # c2w[:3, 3] /= scale
         
@@ -168,7 +224,7 @@ def generate_3dgs_transforms_direct(out_data, output_dir, config, scale=100):
     
     output_files = []
     
-    # 为 GT 和 occ 都创建目录和 JSON 文件
+    # Both render folders passed validation, so they receive the same verified poses.
     for suffix in ["_GT", "_occ"]:
         target_name = fbx_name + suffix
         target_dir = os.path.join(parent_dir, target_name)
@@ -324,6 +380,14 @@ def process_single_fbx(fbx_path, output_base_dir, config, scale=100):
         keyframes = [scene.frame_start]
     
     print(f"Processing {len(keyframes)} frames with pose changes")
+
+    try:
+        frame_stems, render_resolution = validate_render_pair(
+            os.path.dirname(output_dir), fbx_name, len(keyframes)
+        )
+    except ValueError as exc:
+        print(f"Skipping {fbx_name}: {exc}")
+        return False
     
     # Extract transforms for each keyframe
     for i, frame in enumerate(keyframes):
@@ -338,7 +402,9 @@ def process_single_fbx(fbx_path, output_base_dir, config, scale=100):
     
     try:
         # Generate 3DGS format transforms directly
-        final_transforms = generate_3dgs_transforms_direct(out_data, output_dir, config, scale)
+        final_transforms = generate_3dgs_transforms_direct(
+            out_data, output_dir, config, frame_stems, render_resolution, scale
+        )
         
         print(f"Successfully processed: {fbx_name}")
         print(f"  - Frames: {len(out_data['frames'])}")
@@ -352,7 +418,7 @@ def process_single_fbx(fbx_path, output_base_dir, config, scale=100):
 
 def batch_process_by_category(scale=100):
     """
-    Batch process FBX files organized by category (fix_line, rot_arc, rot_line)
+    Batch process every trajectory category present under Exported_FBX.
     """
     # Load configuration
     config = load_config()
@@ -375,8 +441,15 @@ def batch_process_by_category(scale=100):
     if not os.path.exists(output_base_dir):
         os.makedirs(output_base_dir)
     
-    # Categories based on your sequence structure
-    categories = ['plane_grid', 'rot_spiral', 'rand_shell']
+    categories = sorted(
+        entry
+        for entry in os.listdir(fbx_dir)
+        if os.path.isdir(os.path.join(fbx_dir, entry))
+        and glob.glob(os.path.join(fbx_dir, entry, "*.fbx"))
+    )
+    if not categories:
+        print(f"No FBX files found under: {fbx_dir}")
+        return
     
     total_processed = 0
     total_files = 0

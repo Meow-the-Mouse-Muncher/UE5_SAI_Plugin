@@ -2,8 +2,8 @@
 _BASE_: render_config.yaml
 
 # 基础渲染设置
-Resolution: [1024, 1024]
-Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders/test_data"
+Resolution: [512, 512]
+Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders_rot/test_data/"
 File_Name_Format: "{sequence_name}/{render_pass}/{frame_number}"
 Motion_Blur: false
 

@@ -50,13 +50,20 @@ def export_sequence_to_fbx(sequence_path: str, output_dir: str) -> bool:
     return success
 
 
-def export_sequences_for_map(map_name: str, output_base_dir: str = None) -> int:
+def export_sequences_for_map(
+    map_name: str,
+    output_base_dir: str = None,
+    sequence_paths: list[str] = None,
+) -> int:
     """
     Export all sequences for a specific map to FBX
     
     Args:
         map_name: Map name, e.g. "scene_010"
-        output_base_dir: Base output directory. If None, uses project's Exported_FBX folder
+        output_base_dir: Base output directory. If None, uses project's Exported_FBX folder.
+        sequence_paths: Exact current-run Level Sequence asset paths. When provided,
+            only these assets are exported. The map-name scan is retained solely for
+            standalone backward compatibility.
         
     Returns:
         int: Number of successfully exported sequences
@@ -75,36 +82,31 @@ def export_sequences_for_map(map_name: str, output_base_dir: str = None) -> int:
         os.makedirs(output_base_dir)
         unreal.log(f"Created output directory: {output_base_dir}")
     
-    # Get all sequence assets
-    asset_registry = unreal.AssetRegistryHelpers.get_asset_registry()
-    filter = unreal.ARFilter(
-        class_names=["LevelSequence"],
-        package_paths=[sequences_content_path],
-        recursive_paths=True
-    )
-    
-    sequence_assets = asset_registry.get_assets(filter)
-    
-    if not sequence_assets:
-        unreal.log_warning("No Level Sequences found in /Game/Sequences")
+    # Prefer the exact asset list returned by utils_sequencer for this run. This
+    # prevents newly rendered images from being paired with historical FBX files.
+    if sequence_paths is None:
+        unreal.log_warning("[FBX Export] No current-run sequence list; using legacy map-name scan")
+        asset_registry = unreal.AssetRegistryHelpers.get_asset_registry()
+        asset_filter = unreal.ARFilter(
+            class_names=["LevelSequence"],
+            package_paths=[sequences_content_path],
+            recursive_paths=True
+        )
+        asset_paths = [
+            str(asset_data.package_name)
+            for asset_data in asset_registry.get_assets(asset_filter)
+            if map_name in str(asset_data.asset_name)
+        ]
+    else:
+        asset_paths = sorted(set(str(path) for path in sequence_paths))
+
+    if not asset_paths:
+        unreal.log_warning(f"No current-run sequences to export for map: {map_name}")
         return 0
-    
-    unreal.log(f"Found {len(sequence_assets)} sequences total")
-    
-    # Filter sequences by map name and group by category
+
+    # Group selected sequence assets by category.
     categories = {}
-    filtered_count = 0
-    
-    for asset_data in sequence_assets:
-        asset_path = str(asset_data.package_name)
-        asset_name = str(asset_data.asset_name)
-        
-        # 只处理指定地图的轨迹
-        if map_name not in asset_name:
-            continue
-            
-        filtered_count += 1
-        
+    for asset_path in asset_paths:
         # Extract category from path
         if "/fix_line/" in asset_path:
             category = "fix_line"
@@ -125,11 +127,8 @@ def export_sequences_for_map(map_name: str, output_base_dir: str = None) -> int:
             categories[category] = []
         categories[category].append(asset_path)
     
-    unreal.log(f"Filtered to {filtered_count} sequences for map: {map_name}")
-    
-    if filtered_count == 0:
-        unreal.log_warning(f"No sequences found for map: {map_name}")
-        return 0
+    selected_count = sum(len(paths) for paths in categories.values())
+    unreal.log(f"Selected {selected_count} sequences for map: {map_name}")
     
     # Export each category
     total_exported = 0
@@ -146,7 +145,7 @@ def export_sequences_for_map(map_name: str, output_base_dir: str = None) -> int:
             if export_sequence_to_fbx(asset_path, category_output_dir):
                 total_exported += 1
     
-    unreal.log(f"[FBX Export] Completed: {total_exported}/{filtered_count} sequences exported for map: {map_name}")
+    unreal.log(f"[FBX Export] Completed: {total_exported}/{selected_count} sequences exported for map: {map_name}")
     return total_exported
 
 

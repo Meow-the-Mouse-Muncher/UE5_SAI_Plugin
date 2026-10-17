@@ -39,6 +39,7 @@ class CustomMoviePipeline():
     _current_target_index = 0  # 当前目标物索引
     _is_batch_target_rendering = False  # 是否在批量目标物渲染模式
     _current_map_context = None  # 当前地图上下文
+    _batch_sequence_paths = set()  # 当前批次实际创建的 Sequence 资产路径
 
     @classmethod
     def clear_queue(cls):
@@ -512,6 +513,9 @@ class CustomMoviePipeline():
         # 构建多轨迹多高度渲染序列
         builder = RenderSequenceBuilder()
         only_occ = bool(render_config.get('Only_OCC', False))
+        successful_sequence_paths = {
+            sequence_path for _, sequence_path in trajectory_results.values()
+        }
         
         import batch_utils
         for key, (level, sequence_name) in trajectory_results.items():
@@ -562,6 +566,7 @@ class CustomMoviePipeline():
             unreal.log("Multi-trajectory multi-height rendering completed successfully!")
             # 触发批量目标物渲染的下一个目标物
             if cls._is_batch_target_rendering:
+                cls._batch_sequence_paths.update(successful_sequence_paths)
                 cls._current_target_index += 1
                 cls._process_next_target()
         
@@ -599,6 +604,7 @@ class CustomMoviePipeline():
         # 设置批量目标物渲染状态
         cls._is_batch_target_rendering = True
         cls._current_target_index = 0
+        cls._batch_sequence_paths = set()
         
         # 保存上下文
         cls._current_map_context = {
@@ -653,6 +659,8 @@ class CustomMoviePipeline():
         
         if not trajectory_results:
             unreal.log_error("Failed to generate any trajectories")
+            cls._current_target_index += 1
+            cls._process_next_target()
             return
         
         log_msg_with_socket(executor, f'[*] Created {len(trajectory_results)} trajectory sequences')
@@ -689,8 +697,9 @@ class CustomMoviePipeline():
         # 渲染完成后自动导出FBX
         try:
             from export_sequences_to_fbx import export_sequences_for_map
-            unreal.log(f"[*] Starting FBX export for map: {map_name}")
-            export_sequences_for_map(map_name)
+            sequence_paths = sorted(cls._batch_sequence_paths)
+            unreal.log(f"[*] Starting FBX export for {len(sequence_paths)} current-run sequences in map: {map_name}")
+            export_sequences_for_map(map_name, sequence_paths=sequence_paths)
             unreal.log(f"[*] FBX export completed for map: {map_name}")
         except Exception as e:
             unreal.log_error(f"Failed to export FBX for map {map_name}: {e}")
@@ -700,6 +709,7 @@ class CustomMoviePipeline():
         cls._target_render_queue = []
         cls._current_target_index = 0
         cls._current_map_context = None
+        cls._batch_sequence_paths = set()
         
         # 发送完成信号并退出编辑器
         if executor:
