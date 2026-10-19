@@ -381,7 +381,7 @@ class RenderController:
         all_actors = actor_system.get_all_level_actors()
         
         for actor in all_actors:
-            if actor.get_actor_label() == actor_name:
+            if actor.get_name() == actor_name or actor.get_actor_label() == actor_name:
                 self._scene_actors_cache[actor_name] = actor
                 return actor
         

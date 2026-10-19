@@ -72,6 +72,14 @@ def get_occlusion_actors_by_prefix(prefix="SM_"):
     """获取当前场景中所有以指定前缀开头的遮挡物"""
     world = get_world()
     all_actors = unreal.GameplayStatics.get_all_actors_of_class(world, unreal.StaticMeshActor)
+    import render_worker
+    names = render_worker.get_worker_config().get('occlusion_actor_names')
+    if names is not None:
+        lookup = {actor.get_name(): actor for actor in all_actors}
+        missing = set(names) - set(lookup)
+        if missing:
+            raise RuntimeError('Final dataset tree actors are missing: ' + repr(sorted(missing)))
+        return [lookup[name] for name in names]
     
     occlusion_actors = []
     for actor in all_actors:
@@ -110,12 +118,12 @@ def load_map_if_different(map_package_path: str, current_map_name: str = None):
     """如果当前地图不是目标地图，则加载新地图"""
     if current_map_name is None:
         current_world = unreal.EditorLevelLibrary.get_editor_world()
-        current_map_name = current_world.get_name()
+        current_map_name = current_world.get_path_name().split('.')[0]
     
     # 从包路径中提取地图名
     target_map_name = map_package_path.split('/')[-1]
     
-    if current_map_name != target_map_name:
+    if current_map_name != map_package_path:
         unreal.log(f"Loading map: {map_package_path}")
         success = unreal.EditorLoadingAndSavingUtils.load_map(map_package_path)
         if not success:

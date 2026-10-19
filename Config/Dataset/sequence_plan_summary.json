@@ -1,0 +1,36 @@
+{
+  "success": true,
+  "owner": "ForestDataset",
+  "status": "final",
+  "validation_split": null,
+  "views_per_sequence": 25,
+  "splits": {
+    "train": {
+      "sequences": 17280,
+      "maps": 24,
+      "sequences_per_map": 720,
+      "source_scenes": [
+        "scene_007",
+        "scene_008",
+        "scene_009",
+        "scene_011",
+        "scene_012",
+        "scene_013"
+      ],
+      "csv_sha256": "be4f966845ac337d2b50fb34881afa047e241b7ce43a05dddfbfed0a7db8deff"
+    },
+    "test": {
+      "sequences": 1920,
+      "maps": 4,
+      "sequences_per_map": 480,
+      "source_scenes": [
+        "scene_010"
+      ],
+      "csv_sha256": "e68c4dccd1c4805bb75952ed66a758e54cf3d15a7633d9d25a2ede18aae5fd77"
+    }
+  },
+  "accepted_recipes_preserved": true,
+  "train_to_test_sequence_ratio": 9,
+  "manifest_sha256": "a128e0aca4ce3ea563803a747297c31d8befe1f122cdb201d941e84464872e46",
+  "asset_manifest_sha256": "645027c2265aee296e4976e22e926bde21bcb501a8a5715d164c16ced962cf2d"
+}

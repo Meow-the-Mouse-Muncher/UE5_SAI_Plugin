@@ -1,0 +1,4 @@
+/Game/Map/dataset/test/scene_010_edge
+/Game/Map/dataset/test/scene_010_grass
+/Game/Map/dataset/test/scene_010_litter
+/Game/Map/dataset/test/scene_010_road

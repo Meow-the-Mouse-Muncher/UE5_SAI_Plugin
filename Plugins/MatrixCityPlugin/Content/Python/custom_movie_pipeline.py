@@ -430,14 +430,14 @@ class CustomMoviePipeline():
         # 1. OCC渲染场景配置：当前目标物可见，遮挡物可见，其他目标物隐藏
         occ_scene_config = SceneConfig(
             target_actors_visibility={actor.get_actor_label(): False for actor in target_actors},
-            occlusion_actors_visibility={actor.get_actor_label(): True for actor in occlusion_actors}
+            occlusion_actors_visibility={actor.get_name(): True for actor in occlusion_actors}
         )
         occ_scene_config.target_actors_visibility[current_target_actor.get_actor_label()] = True
         
         # 2. GT渲染场景配置：当前目标物可见，遮挡物隐藏，其他目标物隐藏
         gt_scene_config = SceneConfig(
             target_actors_visibility={actor.get_actor_label(): False for actor in target_actors},
-            occlusion_actors_visibility={actor.get_actor_label(): False for actor in occlusion_actors}
+            occlusion_actors_visibility={actor.get_name(): False for actor in occlusion_actors}
         )
         gt_scene_config.target_actors_visibility[current_target_actor.get_actor_label()] = True
         
@@ -513,14 +513,14 @@ class CustomMoviePipeline():
         # OCC渲染场景配置：当前目标物可见，遮挡物可见，其他目标物隐藏
         occ_scene_config = SceneConfig(
             target_actors_visibility={actor.get_actor_label(): False for actor in target_actors},
-            occlusion_actors_visibility={actor.get_actor_label(): True for actor in occlusion_actors}
+            occlusion_actors_visibility={actor.get_name(): True for actor in occlusion_actors}
         )
         occ_scene_config.target_actors_visibility[current_target_actor.get_actor_label()] = True
         
         # GT渲染场景配置：当前目标物可见，遮挡物隐藏，其他目标物隐藏
         gt_scene_config = SceneConfig(
             target_actors_visibility={actor.get_actor_label(): False for actor in target_actors},
-            occlusion_actors_visibility={actor.get_actor_label(): False for actor in occlusion_actors}
+            occlusion_actors_visibility={actor.get_name(): False for actor in occlusion_actors}
         )
         gt_scene_config.target_actors_visibility[current_target_actor.get_actor_label()] = True
         

@@ -1,0 +1,2459 @@
+{
+  "owner": "ForestDataset",
+  "files": {
+    "Content/Cinematics/Sequences/Sequence/SequenceRoot.uasset": {
+      "size_bytes": 51577,
+      "sha256": "23cb6e8934fc05343a137aed3bf4ec68cb1ab338ea04d288ee3401ad74a2bb91"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basebody/MI_fe_skin_body_caucasian_01.uasset": {
+      "size_bytes": 122028,
+      "sha256": "d206120f0db72df036eff84300ca6159d306088bbd9d739e7e380f6a9c64dc22"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basebody/MI_fe_skin_body_caucasian_yellow.uasset": {
+      "size_bytes": 125084,
+      "sha256": "f3dca75cc7da2af2daa0f4cd879528c2310ef4bd31ca7e791dfabf7ea1931bc5"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basebody/MI_fe_skin_deep.uasset": {
+      "size_bytes": 123938,
+      "sha256": "6a328ae8125d2736bde75914fe6340bd8df490466ea1c949f60b78d22b5361a2"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basebody/MI_ma_head_02.uasset": {
+      "size_bytes": 124725,
+      "sha256": "5fc42a973b830f01fce2e4df6d1fc268954216b49c0572b5b3200e8a36c94c28"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basebody/MI_ma_head_04_dark.uasset": {
+      "size_bytes": 129825,
+      "sha256": "fa751ec08eab7bd8229952d319f734d3deb9a04cab7e473ddfa320b3a82a76a5"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basebody/MI_ma_skin_body_01_caucasian.uasset": {
+      "size_bytes": 125306,
+      "sha256": "30ad38f74353452defece27cd70e1baf090d5dcb38354e792631305e9143d5df"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basematerials/MI_eyeglass_opaque.uasset": {
+      "size_bytes": 96293,
+      "sha256": "49a990167ab0613ddc406f550b4cd7225cfd284bda3df279e76cf9c679935773"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basematerials/M_Base.uasset": {
+      "size_bytes": 167387,
+      "sha256": "26f13a0683d4fc64d5831efe12a03caaee83d226c68c5b99d6ef59efddaa04d8"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basematerials/M_BaseComplex.uasset": {
+      "size_bytes": 180884,
+      "sha256": "a24eee1e38e7f593f6bb285edb07470109f931d179d1e1e5a2eaa4f2819b9f1b"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basematerials/M_Base_Eyeglass.uasset": {
+      "size_bytes": 111656,
+      "sha256": "5a275a5e8a3ceb86c4ded90da5026c7ee7d83060dfdff91476f53c4d2eae2381"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basematerials/M_Base_GlobalTint.uasset": {
+      "size_bytes": 136174,
+      "sha256": "927c8e6c4055218aaa9193fba0d59d1ad5297152c614eedf7c426df4fd80adac"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basematerials/M_base_hair_simple.uasset": {
+      "size_bytes": 140331,
+      "sha256": "586da0bb6ff4d13c12b918e3dd9d8b60a8a35f984b8f6f8f3ec5de1252704bd9"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Basematerials/M_base_head.uasset": {
+      "size_bytes": 163433,
+      "sha256": "f4c4444d0a37e4dab42a684eb42e47022c06cab6d046a8dd1d5a95b8cd5e106e"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/Eye/MI_eye_gold.uasset": {
+      "size_bytes": 134181,
+      "sha256": "fbd263be2d366aa610f1a760b8b26fd261ff998101bb1192b25649a03cb9084a"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/Eye/M_EyeRefractive.uasset": {
+      "size_bytes": 156857,
+      "sha256": "328438a2bc5df7391c698b740031d101ba9c62b2cb046f91baa9960a59de34ea"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/MI_fe_eyelashes_dark.uasset": {
+      "size_bytes": 125182,
+      "sha256": "e0f7fed28e40b4760a6f3888e3115d8a9bfb76a8c43c07c34ffcaff335c137ea"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/MI_hair_02_blond.uasset": {
+      "size_bytes": 145128,
+      "sha256": "aa13a16bafdf75411efedbe736c96ba2b3e0f6518952729de863d00c8de36b7e"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/MI_hair_02_brown.uasset": {
+      "size_bytes": 148443,
+      "sha256": "2652195694ceb31b8b2b92ac07bcb1167793593293a60b4e29ed664ffdd2e817"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/MI_hair_02_dark.uasset": {
+      "size_bytes": 130318,
+      "sha256": "6483b84378599e83ec97fa4e887d6d7f32eb154655786cfb93ae9d13f62a78f7"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/MI_ma_beard_simple_01.uasset": {
+      "size_bytes": 126559,
+      "sha256": "a9655bbd4c70b9ada31db58dc95b4aa50fe567a25f4e9a797f4e11dd2d4092d9"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/MI_ma_hair_03_asian.uasset": {
+      "size_bytes": 130240,
+      "sha256": "aaad188c734a4c25d8ead87c50d4be56d3f4af220cff40168af9f26a95cee98e"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/M_beard_base.uasset": {
+      "size_bytes": 239803,
+      "sha256": "9bdeab0c2e1981b441e281b47c14146cb1056dc53f422227c4f80db693c0c713"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Eye_hair/M_eye_occlusion.uasset": {
+      "size_bytes": 119427,
+      "sha256": "210dbb61712d26fe8a96267552a7295f4100ea1f3aebc9f8ddebf09533cf86bc"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_apron_01_b_dark.uasset": {
+      "size_bytes": 105706,
+      "sha256": "f34f79ca5c59a6ad596811ffa2d947c3d62ebc27408f2ae9ca4b75304b63684a"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_apron_02_brown_stripes1.uasset": {
+      "size_bytes": 146714,
+      "sha256": "c3e51b651a59a7010d8831f4e704db8fefc654629cf877ce9a2d1e105a55face"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_casual_jacket_01.uasset": {
+      "size_bytes": 131117,
+      "sha256": "eca0fd00af9f4144d031b9838c66d4c33e07020e165d42a099078d2c28db969d"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_construction_worker_02_dirt_orange.uasset": {
+      "size_bytes": 151244,
+      "sha256": "7c22d704d87154d4b705bc10b7186b65df42f388482a874cb3d06bf2ebfe5687"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_fe_business_01_c.uasset": {
+      "size_bytes": 105825,
+      "sha256": "f044ce9864cdab322df865d73c999abfb9916f58fde685f123b2cd6bb237908f"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_fe_casual_01_yellow.uasset": {
+      "size_bytes": 167248,
+      "sha256": "50fe6a1dc51322e14878a466009940467967c5b9b6b3c6b79abdab43d1933cc3"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_fe_casual_04.uasset": {
+      "size_bytes": 158039,
+      "sha256": "68a295089d18862bbbc4dfec28a1b38347bca5a65975e9f832f7577b6a416e10"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_fe_eyelashes.uasset": {
+      "size_bytes": 110015,
+      "sha256": "8bb40a8e5df39fecd6c14ca380e456577b8a70acc9e23812bb1d0e1fc3e2e39a"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_fe_head_01_b.uasset": {
+      "size_bytes": 121064,
+      "sha256": "beb28f6c5a2f50ea29671c40868db9a19becb14d00859a133ebf66de3a5fe29c"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_fe_head_05_dark1.uasset": {
+      "size_bytes": 122886,
+      "sha256": "c303968e077991fd3a530732ff7ef28039009f9d2745abf750f428904a7eb3f6"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_fe_police_01.uasset": {
+      "size_bytes": 136284,
+      "sha256": "974262d6f7f5d939807da0f1397da2430bef9a3dd21f70304862cca891e2b6ca"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_fe_sport_02.uasset": {
+      "size_bytes": 140353,
+      "sha256": "b49e7dcb30450f58729708549aabe998fcd4fd770ebefbf05a96074f59130d02"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_glass_01.uasset": {
+      "size_bytes": 97623,
+      "sha256": "06330ffabbe1ca087ea3aba34cb490ba47b18d10709ff5f9856dcb6df3302544"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_glass_01_red.uasset": {
+      "size_bytes": 131350,
+      "sha256": "cee89a34f9c9633f126b17a517264437d34376dbfc9b05a79a62497809974d5b"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_glass_dark.uasset": {
+      "size_bytes": 127468,
+      "sha256": "784bef81597c4b8db4e59aac925b046e7a3aefe464265779e3120b1d794123e2"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_glove_worker_01.uasset": {
+      "size_bytes": 138109,
+      "sha256": "5b3b79e64e3edf441b8f416d3346b6061de12e3c834553bf5206ab32569fc174"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_hat_cap_01_brown.uasset": {
+      "size_bytes": 138887,
+      "sha256": "5d9dfd056fe92a9c5e75cac43cdd7fc6afc6bcc75461f6780b527605cd3da7a0"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_hat_construction_01.uasset": {
+      "size_bytes": 115808,
+      "sha256": "f8c5143a4fbebe7980c616eaaddc9c5349a9a01f1bb749f9bd661d77ae9b7b82"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_hat_construction_01_white.uasset": {
+      "size_bytes": 111872,
+      "sha256": "7b6748d8258767e2cc46c60a6e41d8cb7e40d58fb097b0f72994467be2af55f0"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_hat_flatcapl_01_yellow.uasset": {
+      "size_bytes": 112615,
+      "sha256": "31c72c1b8c8e9b94a2e47c330fd04c1cce617e176f1149229074c5ef7c0241f8"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_ma_physician_01_blue.uasset": {
+      "size_bytes": 137184,
+      "sha256": "a3583d5efc278d796d816288ca8388d5f72abf4af8c4e3d6a2ee56c87eac800e"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_security_vest_01.uasset": {
+      "size_bytes": 134900,
+      "sha256": "d4458045a8c722632ce0ed43c8b7683537cb25e718e30c31bd4c1b523ea3377b"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/MI_security_vest_01_orange.uasset": {
+      "size_bytes": 141252,
+      "sha256": "9ad6696c0afae3aad50d46e15966d3c4913f82964805a827010a149c4caff136"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Materialfunctions/MF_EyeRefraction.uasset": {
+      "size_bytes": 74507,
+      "sha256": "88b7a0796788732acb1f803d284447b0af0dce32b36cc4811c51422d0fa1331f"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Materialfunctions/MF_Logo.uasset": {
+      "size_bytes": 119941,
+      "sha256": "4c037a260ba69ad7c40e6e61c0b3f13fc67188c17260c7c26bc7bb783560e629"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Materialfunctions/MF_RGBA_LogoBlend.uasset": {
+      "size_bytes": 112709,
+      "sha256": "c10b217cbb6e709853ae7119b3811a586ad0a75dc0100799e29cf7d18188fd99"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Materialfunctions/MF_RGBA_Multiplier.uasset": {
+      "size_bytes": 53278,
+      "sha256": "b6351c7feb45d101fb40efe0911716466de8e8c56cbdbab9ba654c2eb37e2b06"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Materialfunctions/MF_RGBA_Tint.uasset": {
+      "size_bytes": 117935,
+      "sha256": "efb7c6002ebfb74d2dd02185925ec856f7e4a58640389ffc766f700db7f7d950"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Materialfunctions/MF_RGBYMCA_LogoBlend.uasset": {
+      "size_bytes": 125560,
+      "sha256": "a64d4d5fec49e06b40489000b8db41339b9e3358ab11b2d006927a96e5b02ad1"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Materialfunctions/MF_RGBYMCA_Multiplier.uasset": {
+      "size_bytes": 125153,
+      "sha256": "cc0a410894f1a514d27b169ff453e0b40ddf52a62671416f3dded9092653579c"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/Materialfunctions/MF_RGBYMCA_Tint.uasset": {
+      "size_bytes": 130113,
+      "sha256": "55759cc1f73a685c6c885fe0c990e9775282521694f69b770e1fc3d96e997143"
+    },
+    "Content/CitizenNPC/CharacterParts/Materials/SSP_caucasian.uasset": {
+      "size_bytes": 2759,
+      "sha256": "16e9d3110271c6973badb567df9eba6142625aeff4d1b954d476ea21996145e7"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Basebody/T_fe_base_body_01_D.uasset": {
+      "size_bytes": 4621017,
+      "sha256": "146926f41de65827632453a3057573293a48361cefbbabd43c3196931c4183a1"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Basebody/T_fe_base_body_01_ID.uasset": {
+      "size_bytes": 168564,
+      "sha256": "58470cec23ea252da9ca2a3d1c42f9f6ad2e856628c7efa5c735b2d1671d27fa"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Basebody/T_fe_base_body_01_N.uasset": {
+      "size_bytes": 7257047,
+      "sha256": "5189cbd6c24c51c1c3b9d88c8c1914885779ab167e3d0c5207562c3a407ccc22"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Basebody/T_fe_base_body_01_ORM.uasset": {
+      "size_bytes": 3847707,
+      "sha256": "d5b8cafae80ba57e478cc3e90390f93d655a08accbcbd986d42bfebfb0677555"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Basebody/T_fe_base_head_01_ID.uasset": {
+      "size_bytes": 543488,
+      "sha256": "0d9866215c66cb451d14c4427c4d98a71d8e9e24ac0c65ba8bd44d16425da0fe"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Basebody/T_ma_base_body_01_D.uasset": {
+      "size_bytes": 6279737,
+      "sha256": "a6a7e2f740b481feb1483132e132157f813d2b0a8cea32edc4218352b852cbd5"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Basebody/T_ma_base_body_01_ID.uasset": {
+      "size_bytes": 87562,
+      "sha256": "b81000c13d3a2fe0344769ba1a241707438f3f31c2062ef88ea22478a11e7b75"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Basebody/T_ma_base_body_01_N.uasset": {
+      "size_bytes": 7636154,
+      "sha256": "d76ac509d77bcf210b5365b0bea5e7daba1f3ac4376b84121d07b94516ce566a"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Basebody/T_ma_base_body_01_ORM.uasset": {
+      "size_bytes": 5361027,
+      "sha256": "f06a0605392778f85a282829ae8a1b7d2ec67e478a7cd261bfddc12fd8545ab8"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Hair/SSP_Eye.uasset": {
+      "size_bytes": 2331,
+      "sha256": "67c19e548fdf13a6ce532fe472ab0b590effae902bfb3f33db3806c3ecf02c36"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Hair/T_Hair_01_Depth.uasset": {
+      "size_bytes": 1518911,
+      "sha256": "ef54a23904e81cdca4dc593c63e9fd6ef089efc7633dfc1e4bcac93b1089cced"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Hair/T_hair_01_ALPHA.uasset": {
+      "size_bytes": 1153919,
+      "sha256": "292f9a4f9a48904b71ae0bfcd7379263a57c55eccfbcf6627a00cae950aca0d5"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Hair/T_hair_01_ID.uasset": {
+      "size_bytes": 1943401,
+      "sha256": "a023ad8cc2d90b74345b6471387743005ce6060d53a43c34927fae798d4be77c"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Hair/T_hair_01_ROOT.uasset": {
+      "size_bytes": 1309139,
+      "sha256": "94688c2b48cc9a13720c8412a54f02420cd94006c9db7c94440fccecad4b37c3"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Hair/T_hair_breakup.uasset": {
+      "size_bytes": 772241,
+      "sha256": "a5e4c053df4f65d723606662bf14fb027d21840979fe38ab05d5578986ca790c"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Hair/T_head_hair_01_D.uasset": {
+      "size_bytes": 1968745,
+      "sha256": "f65f3de27fdf2210d8a499cc3a5202fd148bbc89f56ed7e0b4f034f885493cb0"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/Logo/T_logo_dark_normals.uasset": {
+      "size_bytes": 86790,
+      "sha256": "41f48bde6f82f12e8652f54b3ae406f9312f7a24c06c432b7dc0fd4e4f10de57"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_RGBA_Mask_NoTint.uasset": {
+      "size_bytes": 3250,
+      "sha256": "df520b874653f436e07b8e33d58f11d9ade334dab6b85eadad8e0b78766ceb76"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_RGBA_Mask_TintR.uasset": {
+      "size_bytes": 3129,
+      "sha256": "8140e18f8fe43259e8483ae72eec751febfee8c2f0e4d3c3a2cf6b629e2da582"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_apron_02_N.uasset": {
+      "size_bytes": 2466916,
+      "sha256": "ff060485e4f060f9ad3a006c129a915192ea9a2ce70462ed617b30c053ac368e"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_apron_02_b_D.uasset": {
+      "size_bytes": 1079423,
+      "sha256": "a3f04976c3c7fd4614016befcec412e96c1e7adfc127b4e1301f1d3abb012e53"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_apron_02_b_ID.uasset": {
+      "size_bytes": 884968,
+      "sha256": "0d1a92221374abb60565a1bf91256715a237348d6c3e4d17763b529a87d2f28e"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_apron_02_b_ORM.uasset": {
+      "size_bytes": 1293754,
+      "sha256": "94d0d04fa24b176ac36186cb3ffb91776b8a9c6575f16aeb902d49194e655bf1"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_apron_waiter_01_b_D.uasset": {
+      "size_bytes": 7120764,
+      "sha256": "6d357e69c5ac019921a6c1551dcc1e30d3ac4c6a2ef7df0893779794fea38945"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_apron_waiter_01_b_N.uasset": {
+      "size_bytes": 8135786,
+      "sha256": "e13c3117155bd2dd449257afcee039e08f3813d63edab65390669e09a27fcb79"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_apron_waiter_01_b_ORM.uasset": {
+      "size_bytes": 4253962,
+      "sha256": "b84fd976b8c1e568a48ed6670bc153988cc66b55e954ff53965f2fef165be73c"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_construction_worker_gloves_01_D.uasset": {
+      "size_bytes": 5941306,
+      "sha256": "7a6ac76cf500a75a64f3412c1bd402c595596f77a0e395ee66d33bde04dc40f4"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_construction_worker_gloves_01_ID.uasset": {
+      "size_bytes": 508038,
+      "sha256": "fbab13fa8e4842b8408a74443477eb9f3d89456a9812c952302e0f0be9194865"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_construction_worker_gloves_01_N.uasset": {
+      "size_bytes": 8904672,
+      "sha256": "b28262fbd5faa016aa068d41e8d72e9150139cfde73d0423fdcaef1f18b43f4c"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_construction_worker_gloves_01_ORM.uasset": {
+      "size_bytes": 4298720,
+      "sha256": "2e4c6fd7a0a25c81c66baed345cb6c4bec23a789f8e4125c92654d475a3a0579"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_eye_D.uasset": {
+      "size_bytes": 498666,
+      "sha256": "a014e832b740f57505561aa75ce04b6ee5929d823bc9d1b3f51a22541f1a3a5c"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_eye_DISP.uasset": {
+      "size_bytes": 428646,
+      "sha256": "12af52705408f289e376a7d00e150347fcf1ffa3b64e5d6a490502d01e4fe605"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_eye_N.uasset": {
+      "size_bytes": 809417,
+      "sha256": "6ce11fd232d84dca3948774a2c1d50b6dd53e002240e9e3029dee4789fe8488d"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_eye_sclera.uasset": {
+      "size_bytes": 373876,
+      "sha256": "4bb5568f65ca72f8e848f1c75bfeac27a3a84dc160c27eb529d471127dabe704"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_business_01_c_D.uasset": {
+      "size_bytes": 6803597,
+      "sha256": "7cf0a7a6b8b6727e5e97649f5572caf0116e76cf456c6ba7bc6172db5a6f48e0"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_business_01_c_ID.uasset": {
+      "size_bytes": 109536,
+      "sha256": "b0eb7790c051b6a01346c20c925a37aefa5e979e1dfabee3033aaa7f0c3be16a"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_business_01_c_N.uasset": {
+      "size_bytes": 11153600,
+      "sha256": "0732faa8ccdc25dd090ec0f6ad50aede28618006e1adbbe04d4260d798909539"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_business_01_c_ORM.uasset": {
+      "size_bytes": 6336631,
+      "sha256": "abe211011e8c5c5fc3777c8bddef2e73430e55c59ff06dcd8f11cc661983fe1f"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_casual_01_D.uasset": {
+      "size_bytes": 8764486,
+      "sha256": "f61145bd08b4eaeeb8217d4a3d658903a2f6a83692c89929da84e94a09d2edba"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_casual_01_ID.uasset": {
+      "size_bytes": 115961,
+      "sha256": "1cd005dac06f67c70b290f5ce308275c121eaaa3db33bfa42079e62d35743c1b"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_casual_01_N.uasset": {
+      "size_bytes": 11404269,
+      "sha256": "eb3ed7f6ce57ca62a8fcc583a6f28b3af9e2251b55f2c47691e28e3af5963b46"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_casual_01_ORM.uasset": {
+      "size_bytes": 6362274,
+      "sha256": "bc4d2c2a7477aa8d2b5e14b977000d9b90c97c3d703921a416a4dc1cf69047e3"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_casual_04_D.uasset": {
+      "size_bytes": 8677851,
+      "sha256": "9eaa6368ef76b7fc352ef07084e9b1f1ecf7362da7eab09ca82b4a1d914df406"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_casual_04_ID.uasset": {
+      "size_bytes": 5398645,
+      "sha256": "1d8a60de7e4cdad4284872f368c0b1ac6e1a398d86a8805875e151c5461b1454"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_casual_04_N.uasset": {
+      "size_bytes": 11005368,
+      "sha256": "90ce5fd06edc0bef20520e1195bf64e3818596b67903408ff361b2e51321db4a"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_casual_04_ORM.uasset": {
+      "size_bytes": 6272481,
+      "sha256": "f271d30613037fa44f9ed77da8aa3c5739afae9f6c82c19784fb13bc41595321"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_head_01_b_D.uasset": {
+      "size_bytes": 6564460,
+      "sha256": "3b7287b25d37739e076719fa38c1b5f7a2469ec4a2e25013b7d8cfc3e3b14bab"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_head_01_b_ID.uasset": {
+      "size_bytes": 799103,
+      "sha256": "b21bd572da9213938ad0bffc8c832f032bbb50f2e98b0a57018db285c907db69"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_head_01_b_N.uasset": {
+      "size_bytes": 8219053,
+      "sha256": "155ba18f48c9fc91474a5525a32e37eb43004af2dc5a40a7fb2b45af2cc91ccb"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_head_01_b_ORM.uasset": {
+      "size_bytes": 4597837,
+      "sha256": "94015d81c6ef13b539141d77dafc6e103ab5d65679bd55fbaa5cde41810f67af"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_head_05_D.uasset": {
+      "size_bytes": 5559773,
+      "sha256": "264151c2c16e7ee1f0a4638d41aac8ee8b5212cba1b0cc4942b463db57ebb3db"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_head_05_N.uasset": {
+      "size_bytes": 7479961,
+      "sha256": "2377120bb9ff5a28d3b0a0d95670b92e61e5b5fd1f3f218cc0255fa729321633"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_head_05_ORM.uasset": {
+      "size_bytes": 5000997,
+      "sha256": "6b356b5ea0a0c12b9956d0a4fa9dbc661319ca96e5cb114d38eaea2af3cdb3ad"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_physician_01_D.uasset": {
+      "size_bytes": 6492878,
+      "sha256": "ef4406a80c14456474c296a49411aa463a45507d0a15689029ea97198cd1f3de"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_physician_01_ID.uasset": {
+      "size_bytes": 80034,
+      "sha256": "1408097024a19a04466c4a839f26181ba299ed322cd83fc93cc00ba7188cfdee"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_physician_01_N.uasset": {
+      "size_bytes": 9201638,
+      "sha256": "ee81fd3ae0f0bf50e2c4705166347a00e52173d8dd337dd509414ffc15e22429"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_physician_01_ORM.uasset": {
+      "size_bytes": 5784926,
+      "sha256": "271d2f6ffcae6e1d7f9ecee1a23735dc0a406742981779c78237749c43d6f669"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_sport_02_D.uasset": {
+      "size_bytes": 7205039,
+      "sha256": "6da03f66c533e2231a16efcfc8f04ae3eded5285a08d7d1a92ef462c821e0de7"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_sport_02_ID.uasset": {
+      "size_bytes": 249876,
+      "sha256": "7f231fd6b3c9caff101e7584458419bb45e7e2c7ded5b97b307273ba12002d28"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_sport_02_N.uasset": {
+      "size_bytes": 10729392,
+      "sha256": "99fc78fac2d9b6dcc2a2396d65cbaba925a53fdada669d06037d988d3a7c0129"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_fe_sport_02_ORM.uasset": {
+      "size_bytes": 7670260,
+      "sha256": "90852d6d698be2c59c30b9cd59908d11f00fc38503d3e085087da9e3c6c13d0f"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_glass_01_D.uasset": {
+      "size_bytes": 1170668,
+      "sha256": "7a164f6a9efad931218a0848c75e1f4c89f93ec1b7088f5b4dcaa86e822208ba"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_glass_01_ID.uasset": {
+      "size_bytes": 163563,
+      "sha256": "5dab904dd9490d25ccd7bbb50cbafcd7e8ac0d9eb394d409056af031913c4e79"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_glass_01_N.uasset": {
+      "size_bytes": 5681571,
+      "sha256": "200705a7a6e34da4a90cffb10a274ce96423fe344c49d6cf02e222bc8c0475c1"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_glass_01_ORM.uasset": {
+      "size_bytes": 1728900,
+      "sha256": "7e3159fb2574897a6cd9c85691bb00e87a7e01c3eff3ea1f0d3aa5983d7c0b27"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_cap_01_D.uasset": {
+      "size_bytes": 3004247,
+      "sha256": "de37ef386fb13b022a0f28a029b5ce92421aa7c66b9c32210d940da7ffc2bdde"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_cap_01_ID.uasset": {
+      "size_bytes": 269013,
+      "sha256": "0cdd1d5a08fe3700f63dfda790605365a6e5ac52e53711da59321c474fa0e1a4"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_cap_01_N.uasset": {
+      "size_bytes": 9207390,
+      "sha256": "8de6bd8cadc9c6c67c58b3832749d98fac02f12849523a5bd63f4da4025d88bb"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_cap_01_ORM.uasset": {
+      "size_bytes": 4273866,
+      "sha256": "5d9081252b7fc30064c6c99ad99c9215048d0c31348e00ee26923c129218d2e3"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_construction_01_D.uasset": {
+      "size_bytes": 2609841,
+      "sha256": "25bda5481f8fd149e28d58cb6e636b9a13987236dd53ee1a56b28aacc5b3053d"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_construction_01_ID.uasset": {
+      "size_bytes": 51620,
+      "sha256": "c6abfb96e3a821b1fa046952a46cae8cbbfc6965d28343b0d404fcc9525a2d70"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_construction_01_N.uasset": {
+      "size_bytes": 6511933,
+      "sha256": "f80280361230da43324d3f747aae0a4b1b5d2ec83da74119b2317b9deaa5ec61"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_construction_01_ORM.uasset": {
+      "size_bytes": 4357815,
+      "sha256": "1f559127e244c430f8e3ddf85cc7701bf198ef9a40c5fb90e30e9e712375e432"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_flatcap_01_D.uasset": {
+      "size_bytes": 4293122,
+      "sha256": "b94a0d0bbb23a26a10db7a41285dc1c8664445320d5fd75ee12c9787046d148d"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_flatcap_01_ID.uasset": {
+      "size_bytes": 4201590,
+      "sha256": "81f47cee46fd8582c84d011b52dc5e0690375b9b031f877ef1aab5626c080e9c"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_flatcap_01_N.uasset": {
+      "size_bytes": 4330907,
+      "sha256": "e3b2555820d945c5b258418881f0f4231a4175eb9c9fe3675627cf9ae03e7e68"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_hat_flatcap_01_ORM.uasset": {
+      "size_bytes": 882013,
+      "sha256": "7b69f8b479e227fb9317e5bcb7beed2c20e15516dbe12985a78d43c5c76855e7"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_casual_02_ID.uasset": {
+      "size_bytes": 127230,
+      "sha256": "1895619a4c3277be0f788bf136e215f463e3be7973e821774ca35363472d9bc7"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_casual_jacket_01_D.uasset": {
+      "size_bytes": 16864591,
+      "sha256": "2885ed9ddbcdb3278650b4c38420e357cd907233abe8dba0880638e5c3ace88f"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_casual_jacket_01_ID.uasset": {
+      "size_bytes": 16793351,
+      "sha256": "349af0b8aaca9568b8de6f67ad06d6f4ceff4d16b0bb8c7dd48ce865931af608"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_casual_jacket_01_N.uasset": {
+      "size_bytes": 16912276,
+      "sha256": "e6de065e7e6c95334f20b52568e5412346c1194cca827f68b7589b8e073d7ec1"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_casual_jacket_01_ORM.uasset": {
+      "size_bytes": 16876432,
+      "sha256": "a0537aafd08f51705a5455db412c1cd400b50e8a5a823c2a21cd7332433beddf"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_construction_worker_02_D.uasset": {
+      "size_bytes": 16884527,
+      "sha256": "e2deda475a4af407c9d8958fe2b269f3893e32cfa321698d0511422b28c5f06f"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_construction_worker_02_N.uasset": {
+      "size_bytes": 16923440,
+      "sha256": "2acfd77ad4c6a9e4cee9c8bbafc06ea5255f5916ce040f0473983fd156bd7125"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_construction_worker_02_ORM.uasset": {
+      "size_bytes": 16864218,
+      "sha256": "edb4b0042cc8bc40dbd89d35a6379e53e879981648754d8b0a8119f50b3472c7"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_01_D.uasset": {
+      "size_bytes": 6802603,
+      "sha256": "b515c83518ea6c0ff4cd1fd57d9fc1594163618476430119c02a8ffe83f8a900"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_01_N.uasset": {
+      "size_bytes": 9470306,
+      "sha256": "a54711d2078a29f3b2d6e38200a6fc169f68c7dc152eb56e1bb6a97e4b95560b"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_01_ORM.uasset": {
+      "size_bytes": 4323025,
+      "sha256": "d099686d6634f48168aaa8ba31c4f2b0b01f0c70f831f80be4e38f4bfb6c5c7d"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_02_D.uasset": {
+      "size_bytes": 6305042,
+      "sha256": "df38749033d11db9c3f16960791425051b21fe82851fe23338cecb24329f01a8"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_02_ID.uasset": {
+      "size_bytes": 1089387,
+      "sha256": "8ab9221c03160ebd373a3bc102795ae9eb64012fa0d298f46dda810513d95362"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_02_N.uasset": {
+      "size_bytes": 8726706,
+      "sha256": "76fbb87e0f27a747740d84ecfd6e5aca2aa3c11d63d9edd4e0fe05c928a6a7bf"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_02_ORM.uasset": {
+      "size_bytes": 4475744,
+      "sha256": "2202c9670ee5440f1583b60e47e82f26eb4f68a376183a816408c809cd91eaa4"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_04_D.uasset": {
+      "size_bytes": 5762115,
+      "sha256": "70ce15db928ffd61de6914c0057c5e1b0bf56e431a1d0dca1fe945d1660e454b"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_04_N.uasset": {
+      "size_bytes": 8037539,
+      "sha256": "cea2d1866f434c67dfc8695b405ce9372925f549601e55b23592aaf98c0a4344"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_head_04_ORM.uasset": {
+      "size_bytes": 4852156,
+      "sha256": "6823d3d4f85aed6f4691a0fa3061e60c6d979deb70bf2c77c5f409be52d743b6"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_physician_01_D.uasset": {
+      "size_bytes": 6467068,
+      "sha256": "d01ee0a5e81c969e8aadd7cf2578491f24a1b0fe3b41afa956342b6dc08e3426"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_physician_01_ID.uasset": {
+      "size_bytes": 115535,
+      "sha256": "0158bc7dda7e571a5a649ed9d48f21d1fc0fc7ce1d0a8bf22d28258667f8d32c"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_physician_01_N.uasset": {
+      "size_bytes": 9253153,
+      "sha256": "9d8f35666e240ce6b4a1e0e7db85a57c860e973cdc33195fc3dcb45f4cb96b57"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_physician_01_ORM.uasset": {
+      "size_bytes": 5846014,
+      "sha256": "9ccad453fc978c7206bab30d30b7f3672dd99cabcb1221e576d9621e6d62c26d"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_security_vest_01_D.uasset": {
+      "size_bytes": 4830177,
+      "sha256": "aa8bc4a5c3dc5bbdc69433aeb63391911f5377220732c8847414475138911cf6"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_security_vest_01_ID.uasset": {
+      "size_bytes": 133020,
+      "sha256": "90d80b412be5a8bf3a4e3640f48583e20441dd1be6d616344d16897155d818a1"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_security_vest_01_N.uasset": {
+      "size_bytes": 8109160,
+      "sha256": "d64c6826c802419de97f719f506039557674f3356c0f53fadb1f1a059fbf4f09"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_security_vest_01_ORM.uasset": {
+      "size_bytes": 4586859,
+      "sha256": "353f47d3e52fc261ba856ecfbaf1e3351fdfb7502544859d80e224b127360c4b"
+    },
+    "Content/CitizenNPC/CharacterParts/Textures/T_ma_surgeon_01_N.uasset": {
+      "size_bytes": 10030157,
+      "sha256": "e72dd7f2954f22cd9b83c65ea4ff735222cffa31d7e2e83c5a5e2448652b890c"
+    },
+    "Content/Defect/Blueprints/GlobalFoliageActor/MaterialParameterCollection/MPC_GlobalFoliageActor_Defect.uasset": {
+      "size_bytes": 6918,
+      "sha256": "599fbf3aafd50cd7cbc5cb192ad89a0f567e6a8fff6d1f2ebce8708409808308"
+    },
+    "Content/Defect/Foliage/Debris/Branches/MI_Branches_01.uasset": {
+      "size_bytes": 19325,
+      "sha256": "e2a12e16bf2aebee755fd408b69e68969d14077a75faac541328d72fc19aca56"
+    },
+    "Content/Defect/Foliage/Debris/Branches/SM_BranchBig_01.uasset": {
+      "size_bytes": 238383,
+      "sha256": "9d7d4c17e9a27899b1629f3c1de5a83ad675a9a6897ec03970e6e5fc00ebded5"
+    },
+    "Content/Defect/Foliage/Debris/Branches/SM_BranchBig_02.uasset": {
+      "size_bytes": 359717,
+      "sha256": "4827cc695d16a9bfb036828bc1e4bc4a2c4f6478c923304e05e5345fadb8d838"
+    },
+    "Content/Defect/Foliage/Debris/Branches/SM_BranchBig_03.uasset": {
+      "size_bytes": 192301,
+      "sha256": "9664ad8d24c5220a740028b6774f8983eac51d111b49828f12041ec3dcc25cac"
+    },
+    "Content/Defect/Foliage/Debris/Branches/SM_BranchBig_04.uasset": {
+      "size_bytes": 320048,
+      "sha256": "03975ea55bf17bcfb0b179d249e98d3517d997751e7361aadec547318617e388"
+    },
+    "Content/Defect/Foliage/Debris/Branches/T_DebrisBranches_01_BC.uasset": {
+      "size_bytes": 8001388,
+      "sha256": "7c9d31dd37f58a46327562ec5d6e6a076ec0cdcbcf8a433f9c3ab54c9a364492"
+    },
+    "Content/Defect/Foliage/Debris/Branches/T_DebrisBranches_01_N.uasset": {
+      "size_bytes": 10521936,
+      "sha256": "f13c1b9c640a727bd313b359108e771489f7bafacc270d909cbe95617057c946"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/MI_ForestPile_01.uasset": {
+      "size_bytes": 23334,
+      "sha256": "82458f3d6989bf26e90e37cc136bd3ef50329f3fbd7cccd065ebcf8bba78f633"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/SM_ForestPile_00.uasset": {
+      "size_bytes": 1098833,
+      "sha256": "536b98d8f412e9b82ad2d955ab365c9fe0703cf7925e3edb86c9298f3f339f61"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/SM_ForestPile_01.uasset": {
+      "size_bytes": 1104059,
+      "sha256": "ef83f73b63480c0a93654bcc22e1a6b13357529101731ecbbafffdbbdc49e2a3"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/SM_ForestPile_02.uasset": {
+      "size_bytes": 1107388,
+      "sha256": "2f3b379680a24abea14e5e735e72a549a51126a5fec99ccbb39d77a6fef7de8e"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/SM_ForestPile_03.uasset": {
+      "size_bytes": 1097681,
+      "sha256": "2a46343b6b9e964027e1c246ae4c516edc179b2652b89f7ab073f47707b2046b"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/SM_ForestPile_04.uasset": {
+      "size_bytes": 1017733,
+      "sha256": "82655a388f0f5f3137310064f51a22fe6e00645411b0fb6a58362e05f2bf0f41"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/SM_ForestPile_05.uasset": {
+      "size_bytes": 1014864,
+      "sha256": "1b412fa6f1dd5afdfb972b01106630b3c3de841925ad604008771fd9c7057a30"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/SM_ForestPile_06.uasset": {
+      "size_bytes": 1017900,
+      "sha256": "0d7912248df7390fa60e69fdb98ee636dcd2104910e87466d972a26666c21485"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/SM_ForestPile_07.uasset": {
+      "size_bytes": 1025442,
+      "sha256": "05048040269005826c50bcc62a86dee3ec9881eb565aa0caf6de6ead781b862d"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/T_ForestBunches_01_BaseColor.uasset": {
+      "size_bytes": 126444044,
+      "sha256": "5e5b53ad1da798f0a9fff4de27e24115122066c4abe7ff8a0b839eb2db88e774"
+    },
+    "Content/Defect/Foliage/Debris/ForestPiles/T_ForestBunches_01_Normal.uasset": {
+      "size_bytes": 99358495,
+      "sha256": "92788bf1a00a322dac4da6b6187b512b371ef3ba97cb8f658adf034181dcbc63"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/MI_LeavesPile_01.uasset": {
+      "size_bytes": 19829,
+      "sha256": "80a0278505a85a3709abaf18ffa92c529ef6bfff0b6b47fb204a05be32072ff3"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/MI_LeavesPile_02.uasset": {
+      "size_bytes": 19113,
+      "sha256": "9aa6ff39ddaef6a2ad2ff5acbf291dcac170f4ff4119c6e4564d54cce338997d"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/SM_LeavesPile_01_01.uasset": {
+      "size_bytes": 267626,
+      "sha256": "347aa5cc83777f682509fae530ed6bb37f6483e1a9f3060884a7d6d2e7ca0770"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/SM_LeavesPile_01_02.uasset": {
+      "size_bytes": 229362,
+      "sha256": "7a1f3412d22f1f61577a59ef0bcc727e1751fdaec3a5c904f7cecbdad3fbdd0d"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/SM_LeavesPile_01_03.uasset": {
+      "size_bytes": 227429,
+      "sha256": "f93438f44add160c0edc674800ae4fe5741df5b4f54479d07d04e125f4f56ded"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/SM_LeavesPile_01_04.uasset": {
+      "size_bytes": 194572,
+      "sha256": "1da2c1f4c5ca8fd524e9e23aded0500c106e3ac761951e0843141be33073818d"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/T_LeavesDry_05_BC.uasset": {
+      "size_bytes": 21894640,
+      "sha256": "25e396eb09da5a7323d02898e6bf2e55c464ac44514ca7d1530a2e1d4fe28156"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/T_LeavesDry_05_N.uasset": {
+      "size_bytes": 22481899,
+      "sha256": "93492691e5f5c27e026c865c1429cf817a285f0508a6a3a4153b249904de92c5"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/T_LeavesDry_05_SSS.uasset": {
+      "size_bytes": 31196462,
+      "sha256": "c2ace520cc597d20e1fb2975775d3d9c00746c0749cb7430ad44d0ef3aa5d5e6"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/T_LeavesPile_01_N.uasset": {
+      "size_bytes": 124757140,
+      "sha256": "9fc3bf21c483393cff93569806a32128005d0fd2035279daf3d3300aa5fb74c8"
+    },
+    "Content/Defect/Foliage/Debris/LeavesPiles/T_LeavesPile_01b_BC.uasset": {
+      "size_bytes": 121488178,
+      "sha256": "d8cb60bf0bae98c36c9296305190328f0e0625541fab110884097cbef729512e"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/MI_GrassCurly.uasset": {
+      "size_bytes": 34527,
+      "sha256": "56550d72803fd899adbff169e35ba2317bb1101c2a57b255cb71a5c9af4ac28a"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/MI_GrassCurly_Seeds.uasset": {
+      "size_bytes": 19463,
+      "sha256": "ad2e0db587c955d02cd67b7fd841a4994a8f9ba30872ecfac94dd20b1fbc051f"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/SM_GrassCurly_01_01.uasset": {
+      "size_bytes": 578629,
+      "sha256": "1dc350dd5681451f4e38971e663dce45742e23666417008e3c6b99736197ec1b"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/SM_GrassCurly_01_03.uasset": {
+      "size_bytes": 428651,
+      "sha256": "71f2e9c39d1ba86377949d5fc5b938f73ffd3bfa4025ab5e575ee0b45352eaa3"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/T_GrassCurly_01a_BC.uasset": {
+      "size_bytes": 4452436,
+      "sha256": "01ae0171cd7d7f8a604f6f9a04a4da571061bbbb9f0971545d85beca8c3e7290"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/T_GrassCurly_01a_N.uasset": {
+      "size_bytes": 3373680,
+      "sha256": "1a00a21d84de290b8b4db0fc54474f78ce1e7746583827bcedac35b1c37296e4"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/T_GrassCurly_01a_SSS.uasset": {
+      "size_bytes": 7073374,
+      "sha256": "d39bc2a51e991faff9d05a0ca390ed75e51c7d4df156af31ec0aec533e844f2a"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/T_GrassCurly_01b_BC.uasset": {
+      "size_bytes": 3006600,
+      "sha256": "db172892aecfaaf926196382a33aa928460f09a8aa564c39534f73aaa80d3343"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/T_GrassCurly_01b_N.uasset": {
+      "size_bytes": 4712219,
+      "sha256": "043f71433d0f5f635c8344695cf5071cc3084870617a3a5eb7ea74c4dc3b6c93"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/T_GrassCurly_01b_SSS.uasset": {
+      "size_bytes": 5365138,
+      "sha256": "1d6f1d18cfb7e1a34ac5449332605b572de0a3551b9cf1dcf399846f9dca3acf"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/T_SM_GrassCurly_01_fbx_RGB_PivotPos_A_ParentIndexInt_UV2.uasset": {
+      "size_bytes": 17989,
+      "sha256": "57616f87ceb48bb980dcde9f9ab1ac7ff8c05fb876d30d50df9076c22fb8fe86"
+    },
+    "Content/Defect/Foliage/Grass/GrassCurly/T_SM_GrassCurly_01_fbx_RGB_XVector_A_XExtentDividedbyRange_UV2.uasset": {
+      "size_bytes": 15833,
+      "sha256": "3751ed11c8fbdd435b4a5cd3bf7c55ddfe3708e00b714297cc5fedcd13b0a652"
+    },
+    "Content/Defect/Foliage/Grass/GrassField/T_GrassField_01_Normal.uasset": {
+      "size_bytes": 72182563,
+      "sha256": "f8fe637d2bc7e02c192236d0e35ceed46f788b31768eef9cb0bfd9755e0d5d28"
+    },
+    "Content/Defect/Foliage/Grass/GrassField/T_GrassField_01_SSS.uasset": {
+      "size_bytes": 95647584,
+      "sha256": "9ed5699a7671628c22408aab3b4b4619079a581bec9c36da41e6edbe6162452f"
+    },
+    "Content/Defect/Foliage/Grass/GrassField/T_GrassField_01a_BaseColor.uasset": {
+      "size_bytes": 113492978,
+      "sha256": "6901eb2baafde6a1cc1980cd3872cde83e1e2685f1d1505ec65b821cbb40ab5b"
+    },
+    "Content/Defect/Foliage/Grass/GrassFieldExtended/MI_GrassField.uasset": {
+      "size_bytes": 41805,
+      "sha256": "659209589688e2e544848ad8e4612d9e9f3d84d4e8f2446867034dbe56f1264c"
+    },
+    "Content/Defect/Foliage/Grass/GrassFieldExtended/T_GrassFieldExtended_RGB_PivotPos_A_ParentIndexInt_UV2.uasset": {
+      "size_bytes": 50890,
+      "sha256": "401426471f1d8c5428212760d5ab633945eaf4fcc34a3164409fe980db00d763"
+    },
+    "Content/Defect/Foliage/Grass/GrassFieldExtended/T_GrassFieldExtended_RGB_XVector_A_XExtentDividedbyRange_UV2.uasset": {
+      "size_bytes": 35959,
+      "sha256": "619a1488c1417e55ec28a8046164c493872cc8dade1e417ee6f07edc0710e995"
+    },
+    "Content/Defect/Foliage/Grass/Herbs/T_Herbs_01_BaseColor.uasset": {
+      "size_bytes": 79307924,
+      "sha256": "effd950e4af3a2bfaa4a6e3707d187fd047cb54990bd988fbfdec79c16294697"
+    },
+    "Content/Defect/Foliage/Grass/Herbs/T_Herbs_01_Normal.uasset": {
+      "size_bytes": 93284652,
+      "sha256": "cf6e0354c87d80ec63747fda90460294191b20e6a2ffdb2720a5b39f8b01a903"
+    },
+    "Content/Defect/Foliage/Grass/Herbs/T_Herbs_01_SSS.uasset": {
+      "size_bytes": 107257538,
+      "sha256": "925e23de09a9d46276f48ea164e7f936f5918560fe7b4bd209b4c4492829600e"
+    },
+    "Content/Defect/Foliage/Grass/HerbsExtended/MI_HerbsLong.uasset": {
+      "size_bytes": 37148,
+      "sha256": "623331d925de31f89c9b0eddedefecb1369374c2ebed2a23076df76cdd1fef11"
+    },
+    "Content/Defect/Foliage/Grass/HerbsExtended/SM_HerbsClusters_12.uasset": {
+      "size_bytes": 251544,
+      "sha256": "419a1bc69d57b10afea10be9808766d344a0619aea1aaee6916b9ea7419e65d5"
+    },
+    "Content/Defect/Foliage/Grass/HerbsExtended/SM_HerbsClusters_13.uasset": {
+      "size_bytes": 172697,
+      "sha256": "bdde096fb7f8a961bd29b328cbf2f40baf656b4e82ee0bba3914bd03995c0a56"
+    },
+    "Content/Defect/Foliage/Grass/HerbsExtended/SM_HerbsClusters_14.uasset": {
+      "size_bytes": 244957,
+      "sha256": "972b2435cf0c2d4c0f505ee0ba509b97037e01e5e278dceb83ab50c54cd81bf9"
+    },
+    "Content/Defect/Foliage/Grass/HerbsExtended/T_HerbsClusters_RGB_PivotPos_A_ParentIndexInt_UV2.uasset": {
+      "size_bytes": 17040,
+      "sha256": "ef8996c44de44bb2270aa92f24a1466831efc5a3aabc69feb9393cfdf690447c"
+    },
+    "Content/Defect/Foliage/Grass/HerbsExtended/T_HerbsClusters_RGB_XVector_A_XExtentDividedbyRange_UV2.uasset": {
+      "size_bytes": 13379,
+      "sha256": "664a7f5e4c10584451de85188046b69f67200a9674975a29bf4fecf19e5afa16"
+    },
+    "Content/Defect/Foliage/Plants/Nettle/Clusters/MI_Nettle_Master.uasset": {
+      "size_bytes": 37291,
+      "sha256": "c95e77ea5781c9ed493813304e7a6b84a03928df41c507593a438d838b03e891"
+    },
+    "Content/Defect/Foliage/Plants/Nettle/Clusters/SM_Nettle_01.uasset": {
+      "size_bytes": 514246,
+      "sha256": "e044a48375a11cc39203bceebbbb2138b2bf7928e2147fae63e7e0acfe5c2329"
+    },
+    "Content/Defect/Foliage/Plants/Nettle/Clusters/SM_Nettle_02.uasset": {
+      "size_bytes": 550494,
+      "sha256": "f3ae0467ebd3a6ff24f10e202f8e47a3a7701b6ebe3ff7df8f7946c75f438b01"
+    },
+    "Content/Defect/Foliage/Plants/Nettle/Clusters/SM_Nettle_03.uasset": {
+      "size_bytes": 446535,
+      "sha256": "4f36e67ca809bce508d1b36f48349e3b42c9425ea7dbae70323bb9d390d22263"
+    },
+    "Content/Defect/Foliage/Plants/Nettle/Clusters/T_Nettle_01_RGB_PivotPos_A_ParentIndexInt_UV2.uasset": {
+      "size_bytes": 16189,
+      "sha256": "e659e977864854e6733873d804a4579b926d7df120af5b30899890db07e5ac6f"
+    },
+    "Content/Defect/Foliage/Plants/Nettle/Clusters/T_Nettle_01_RGB_XVector_A_XExtentDividedbyRange_UV2.uasset": {
+      "size_bytes": 15081,
+      "sha256": "6ee48e809cef0397a82b306079a62310b0425f9a407a7e93bcc8c822fd701f02"
+    },
+    "Content/Defect/Foliage/Plants/Nettle/T_Nettle_01_BaseColor.uasset": {
+      "size_bytes": 5155893,
+      "sha256": "758bb11d2b58331f8a3d470961a06bb145a4b7adb677e2bee889b11ce4ed7953"
+    },
+    "Content/Defect/Foliage/Plants/Nettle/T_Nettle_01_Normal.uasset": {
+      "size_bytes": 4266604,
+      "sha256": "c929c203d77ad8a96c9efcfa4d3e0813f37e80145cca20c94b1bffe1953372a4"
+    },
+    "Content/Defect/Foliage/Plants/Nettle/T_Nettle_01_SSS.uasset": {
+      "size_bytes": 5409765,
+      "sha256": "2bf03680cc87fd56d8f10f504b835956586f0369752f6d6b2e233c6a23771b59"
+    },
+    "Content/Defect/Foliage/Trees/Common/T_Moss_01_BC.uasset": {
+      "size_bytes": 14798352,
+      "sha256": "756fd8d4f03ac62629d8d0508632a8be91720ca39f6a0a3958be20877f3e6537"
+    },
+    "Content/Defect/Foliage/Trees/Common/T_Moss_01_N.uasset": {
+      "size_bytes": 13867444,
+      "sha256": "25ec59e8dcf299cae1eff7677cbcbf0a8c8df933e03a010d7963610a406a7ca8"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/MI_Poplar_Master.uasset": {
+      "size_bytes": 46538,
+      "sha256": "c4b1a0dc3581033b2e3a02f8a9021e2bc335ebaba87c47cfaace869423d946c9"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/MI_Poplar_01_Field_Branches.uasset": {
+      "size_bytes": 20119,
+      "sha256": "33e210bb332a4d7e103a50e4f07a53eff1110c3a1df9a92073186c107cc69d49"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/MI_Poplar_01_Field_Leaves_01.uasset": {
+      "size_bytes": 21054,
+      "sha256": "ee9a4baa9bcb197250c8921d3f6cb1733e6d0b833053db063df51d656f644660"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/MI_Poplar_01_Field_Master.uasset": {
+      "size_bytes": 13473,
+      "sha256": "5fd22e7df2338a514074ae09755b74a943ba10f976dd88edb662968888f81b9b"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/MI_Poplar_01_Field_Trunk.uasset": {
+      "size_bytes": 18897,
+      "sha256": "f5a3e95ae575204d89bdc96ea773d923d7588d37c39c0d931827ee5940f97e1b"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/SM_Poplar_01_Field_Branch.uasset": {
+      "size_bytes": 37637569,
+      "sha256": "bf46c7fc547a25b2c77eeed13de1c97595c54222e3874de1347d518617458686"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/SM_Poplar_01_Field_Leaves_01.uasset": {
+      "size_bytes": 3642992,
+      "sha256": "e095c1ae894586b1ae7dfc2313e8aba168dc371f293f9b4cc5e9c0e655aa7344"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/SM_Poplar_01_Field_Leaves_02.uasset": {
+      "size_bytes": 3641898,
+      "sha256": "5e4f2d579a03c2135435d714e961e1e2c7e871803deb2600e90c3a87f82a06cf"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/SM_Poplar_01_Field_Leaves_03.uasset": {
+      "size_bytes": 3668818,
+      "sha256": "d51a7c74065487d619895eb584b44f7e7688544d2b060ab5df3779af7264476d"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/SM_Poplar_01_Field_Trunk.uasset": {
+      "size_bytes": 42931747,
+      "sha256": "76d315efecec08883a49c84fc33388f64e65078444b639591b2fc98f259ccb77"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/T_Poplar_01_Field_Leaves_01_RGB_PivotPos_A_ParentIndexInt_UV2.uasset": {
+      "size_bytes": 658689,
+      "sha256": "7db18b6c3b405db3dc8f6d52e664d1dea6e8177471f444f302bc99facd6b6f14"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_01_Filed/T_Poplar_01_Field_Leaves_01_RGB_XVector_A_XExtentDividedbyRange_UV2.uasset": {
+      "size_bytes": 528396,
+      "sha256": "b85b5505a7fa386efde6c2e536437e22f7a5cc174abf2c959993bf85534a24ab"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/MI_Poplar_02_Field_Branches.uasset": {
+      "size_bytes": 20104,
+      "sha256": "11855c49f5701ad82aa1c1a117769343742eec11ce75791713984aba85394d2b"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/MI_Poplar_02_Field_Leaves_01.uasset": {
+      "size_bytes": 18476,
+      "sha256": "4dc7436e99705a6a4f1c569224b39d71d13d2fe843729ff8d963aa6a12e1b8a0"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/MI_Poplar_02_Field_Master.uasset": {
+      "size_bytes": 20596,
+      "sha256": "b98a09e5419d99056c0f5dac8b036bd1eaa4c329fb3ff2d4fd46da2756ef813d"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/MI_Poplar_02_Field_Trunk.uasset": {
+      "size_bytes": 18983,
+      "sha256": "032825e3dfd78a1db07ea2204a6141cb4527884519f8693e723692cdebaa58d0"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/SM_Poplar_02_Field_Branch.uasset": {
+      "size_bytes": 30689956,
+      "sha256": "ce67edd9c402213d7fe6a002e18f38b81279f6b83df069ab33df198413e1cfc3"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/SM_Poplar_02_Field_Leaves_01.uasset": {
+      "size_bytes": 3647405,
+      "sha256": "b95fe8f8174eff7ddb973b8288d88e7e00dedfc2821865a1703521c15cd3db5e"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/SM_Poplar_02_Field_Leaves_02.uasset": {
+      "size_bytes": 3634583,
+      "sha256": "b900562cfa83baa25ff4eb1538f9fb0ed2dd6a968a58ee879e697bbace6885a3"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/SM_Poplar_02_Field_Trunk.uasset": {
+      "size_bytes": 33997882,
+      "sha256": "364a7408e035ef6d0caa9ca37f68ef6dee863f91342ad4ae017b21c348dce955"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/T_Poplar_02_Field_Leaves_01_RGB_PivotPos_A_ParentIndexInt_UV2.uasset": {
+      "size_bytes": 658960,
+      "sha256": "0c19082e1065481550e3c696e08e32f50cb37a79d97fac56be82ed610be6b28d"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_02_Filed/T_Poplar_02_Field_Leaves_01_RGB_XVector_A_XExtentDividedbyRange_UV2.uasset": {
+      "size_bytes": 532459,
+      "sha256": "fc3d6e08a807ff2930be43586b9f2cea93dfb1bad897b9dfb667eea215e1b51b"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/MI_Poplar_03_Field_Branches.uasset": {
+      "size_bytes": 20104,
+      "sha256": "624d3c6c4287756da15acaaaf0ea61fe6d863ff8a77fa5eb8c13ba0335897497"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/MI_Poplar_03_Field_Leaves_01.uasset": {
+      "size_bytes": 18476,
+      "sha256": "fb071630bec6682dd3ea790125fceb9a3c3deb94f0098d605453a9724ea9f1ff"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/MI_Poplar_03_Field_Master.uasset": {
+      "size_bytes": 22493,
+      "sha256": "6a3b6bf3016880a7ac15b93d6d096f1f5d81c2f692ac10b6d26616bbd4fdf343"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/MI_Poplar_03_Field_Trunk.uasset": {
+      "size_bytes": 21626,
+      "sha256": "f25371f60c3dec1277c54b6780121422b7d6e57772bfb0dffaca5500c3f28f20"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/SM_Poplar_03_Field_Branch.uasset": {
+      "size_bytes": 17306608,
+      "sha256": "be2025fed04389bbc063f71178c3320bf12795057732ee9991f8d4b31731204c"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/SM_Poplar_03_Field_Leaves_01.uasset": {
+      "size_bytes": 3683801,
+      "sha256": "caf3bd443d6485776d9fce9001f0c1c119bfa12a2f6a707a9fc3383681fe50e1"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/SM_Poplar_03_Field_Leaves_02.uasset": {
+      "size_bytes": 3671856,
+      "sha256": "9a31a0d4e0cfe57f3f9a64f61deed1c490798ea16c48433b357a1ad4f3583f05"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/SM_Poplar_03_Field_Leaves_03.uasset": {
+      "size_bytes": 3664083,
+      "sha256": "362da8e73206836699077d1d3f27ebaceb362151d888f481b1a5137b23b2953f"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/SM_Poplar_03_Field_Trunk.uasset": {
+      "size_bytes": 40818692,
+      "sha256": "b41bc05d00782348b484a451ff65aa2066f9a45d4edfb11515d8d50fe1d03140"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/T_Poplar_03_Field_Leaves_01_RGB_PivotPos_A_ParentIndexInt_UV2.uasset": {
+      "size_bytes": 665316,
+      "sha256": "4df89c0462c5b6eb3bbb0f57c3efb6316c8141c9f29c1445b77a50a751d53a22"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_03_Filed/T_Poplar_03_Field_Leaves_01_RGB_XVector_A_XExtentDividedbyRange_UV2.uasset": {
+      "size_bytes": 527229,
+      "sha256": "568f95e2a89091b3692a8dcc5faf3cc6439a1d895ba1510d88f9f4dd1679104f"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_15/MI_Poplar_15_Branches.uasset": {
+      "size_bytes": 19182,
+      "sha256": "b3b63983bc3077a0caac5b30198e430b145c9998c868f552a64048d81f5e50b9"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_15/MI_Poplar_15_Leaves_01.uasset": {
+      "size_bytes": 18685,
+      "sha256": "5ffc6fdd015bb019985fceea6bf4d2a9fde3da7a2eef97338b4434fa1759b5a5"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_15/MI_Poplar_15_Master.uasset": {
+      "size_bytes": 12413,
+      "sha256": "37e2a6fa77b26d512b3cfe75f22fdcf944b0ad48186c30c98f2459de04706b98"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_15/MI_Poplar_15_Trunk.uasset": {
+      "size_bytes": 18847,
+      "sha256": "ae266335fb6917aa8b66cfd0cc52e93f76981ecfc07e9af089f6f3b67a8fefa2"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_15/SM_Poplar_15_Branch.uasset": {
+      "size_bytes": 834828,
+      "sha256": "1c7e08eef5675dc41b58c783e8480459a3f521c3004af9e55fe29faa5013af98"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_15/SM_Poplar_15_Leaves_01.uasset": {
+      "size_bytes": 152258,
+      "sha256": "4789a7578933ebcf22c1171d5e232dc6674ec1585798dd71b221a67a6fbc5075"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_15/SM_Poplar_15_Trunk.uasset": {
+      "size_bytes": 693285,
+      "sha256": "97eb1ae6bb99aa70cb9c6c3ef7220df4340ef9552a240a0d9edc8792e7cc56b9"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_15/T_Poplar_15_Leaves_01_RGB_PivotPos_A_ParentIndexInt_UV2.uasset": {
+      "size_bytes": 16319,
+      "sha256": "7bf50c37a343da9f8f74b1bc1458f29598fdfeac65af40892c8c9363eec768db"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/Poplar_15/T_Poplar_15_Leaves_01_RGB_XVector_A_XExtentDividedbyRange_UV2.uasset": {
+      "size_bytes": 14818,
+      "sha256": "de5f8adc37d0965d434f0769eae49721fc3d43d2525829e7838335348a1aead5"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/T_PoplarBark_01_Albedo.uasset": {
+      "size_bytes": 188752740,
+      "sha256": "fc5f736bb57fcb8bec6eef39aa030846152339869ae1e9c39775a7f3549c6d5d"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/T_PoplarBark_01_Normal.uasset": {
+      "size_bytes": 168496726,
+      "sha256": "545c14345febeb49049e57053b1d17041ad6a8ca74240dfc3b249450e0bf9470"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/T_PoplarLeaves_01_BC.uasset": {
+      "size_bytes": 4505400,
+      "sha256": "b787ea9bdb07fe66a1f89b8045ec0d3296a7f75ffb7d338813d51fb4eb151815"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/T_PoplarLeaves_01_N.uasset": {
+      "size_bytes": 6021086,
+      "sha256": "802165760179acbfda5807a415a6597010780bce6edb344d8ffc752933d9077c"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/T_PoplarLeaves_01_SSS.uasset": {
+      "size_bytes": 9355083,
+      "sha256": "e86c35c2d69f2285b429bbb905736b3ebf322d71264701f8860faf73b8578cce"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/T_PoplarPatches_Albedo.uasset": {
+      "size_bytes": 45154219,
+      "sha256": "89fd70495a6a4e266cfd96a487b6d6f65d704d2fc8fd17dfb1b4b893673b91c1"
+    },
+    "Content/Defect/Foliage/Trees/Poplar/T_PoplarPatches_Normal.uasset": {
+      "size_bytes": 42359923,
+      "sha256": "3f9d043e101ca5602190fb589c5b8f2ab2788060f8f2609bb2f10e862529cf15"
+    },
+    "Content/Defect/Materials/Master/M_Patch.uasset": {
+      "size_bytes": 42681,
+      "sha256": "a0ac2c88fbfb41c58142f57a2a1de3709158dcbc6c3241f3928994442b32edfe"
+    },
+    "Content/Defect/Materials/Master/M_PivotPainter_Foliage_Update.uasset": {
+      "size_bytes": 196002,
+      "sha256": "5cb7618089eeb2cd4d204e6cd15dc0c9223eb4846614da23108ae7347bae3acc"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/Lerp_Multiple_Float2.uasset": {
+      "size_bytes": 85807,
+      "sha256": "155ed5b6f57263504427f36a6c92df16e0e9111f9087d8f419515ea258234fb8"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/MF_HeightLerp_Defect.uasset": {
+      "size_bytes": 88360,
+      "sha256": "d9283e66c0c58b3e1f2db94abd0c675a213b223f8d3f65a8bea4b7d16d0be686"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_1Level.uasset": {
+      "size_bytes": 28888,
+      "sha256": "370c95b16816c8f42758ca9f52756129caf55df8386737b424044af5fc1dc244"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_1Level_Basic.uasset": {
+      "size_bytes": 17119,
+      "sha256": "53b03e85b28cd3450ec93dc2787e85136cf764f7d2b92b951e5a037613b86f56"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_1Level_Shadow.uasset": {
+      "size_bytes": 17127,
+      "sha256": "0bbcce3913b8ecb0da3d2de8045d2e7103f20392b45887145d5b031d7158cdc3"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_1Level_WaterPlant.uasset": {
+      "size_bytes": 23936,
+      "sha256": "7102fc65ea90092f7df5d56d62e9631c57285e145d9c2ad34c6bf395220f2641"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_2Levels.uasset": {
+      "size_bytes": 67889,
+      "sha256": "d457c89af2f50ef8881e5e84b8316b051feb57698cef609a74ceffc5a370debf"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_3Levels.uasset": {
+      "size_bytes": 99406,
+      "sha256": "895622a53b9a0cf7f3697ff313acaaec7f3259a78395b61a0846d77a870547d4"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_4Levels.uasset": {
+      "size_bytes": 130967,
+      "sha256": "76f1d02857ab2536fe83a818f4e971ae719dbf94c8131d3b5ec5e43ee320e263"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_5Levels.uasset": {
+      "size_bytes": 154526,
+      "sha256": "dda3d8e4cd460785d7e78d8c66f377f2d340bce616318559e1f633385883f25e"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_InteractionCheap.uasset": {
+      "size_bytes": 86489,
+      "sha256": "b22d542c9f5af65c50d6d7f3b83e20b837f3b3c38d869f33fb4f085aca1ea2d2"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_InteractionFern.uasset": {
+      "size_bytes": 76104,
+      "sha256": "dfba4d3ea27f63f3087e0bb26ba4f9f9cc43383273d6ceac9b4b08d3d16e1464"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_Overlay.uasset": {
+      "size_bytes": 26750,
+      "sha256": "7ec0e1a531eb0b212f4091910fa5c27d53bc93860aa38f9e72cc4705ef8c5a0a"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_WindLevel.uasset": {
+      "size_bytes": 124077,
+      "sha256": "28072131e515b35743c51c09e0e7ef121e8a9525ef73afd9bb6362fb350aa80e"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_WindLevelBasic.uasset": {
+      "size_bytes": 94253,
+      "sha256": "27453367dd6a0a5329907781f9299e222e4d6e69d7d4404c28dbfcf3fe08e59c"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_WindLevelGrass.uasset": {
+      "size_bytes": 110213,
+      "sha256": "0b0de73a74496959d02c341028b828d8f93bd5b62b8ffc030ba017dbea29f28e"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_WindLevelLeaves.uasset": {
+      "size_bytes": 54029,
+      "sha256": "73f84472723378109f04b4ffdedefdf77d611e00cfde6e75bda0ef7886b11d2d"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/WindMaterialFunctions/MF_WindLevelShadow.uasset": {
+      "size_bytes": 67048,
+      "sha256": "0e87631bd6e7bde44e2acc787e0aee8eb593ce3260b2fb821c304a64f84f7932"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/ms_PivotPainter2_DecodeAxisVector_Defect.uasset": {
+      "size_bytes": 10707,
+      "sha256": "56b40902cd5c7bc1d13840e7785f074bf71447a6c441e9cc82f97fe4c412722e"
+    },
+    "Content/Defect/Materials/Master/MaterialFunctions/ms_PivotPainter2_ReturnParentTextureInfo.uasset": {
+      "size_bytes": 89573,
+      "sha256": "9626eefe6dfb896a093ea0003bb523346cfdf0611280c314272a23ffb0772d43"
+    },
+    "Content/Defect/Textures/Default/T_Default_BaseColor.uasset": {
+      "size_bytes": 4978,
+      "sha256": "5ed2f17da01429fe860a23e62bbb0f0db7c99fc3a9e537166a5b3662c9da4ec6"
+    },
+    "Content/Defect/Textures/Default/T_Default_Normal.uasset": {
+      "size_bytes": 5400,
+      "sha256": "c52614a52640a3c3ae5605cf041bcccb6c38a5a1a9a822575d744de4cb9d4c54"
+    },
+    "Content/Defect/Textures/Default/T_Default_RGB_PivotPos_A_ParentIndexInt_UV2.uasset": {
+      "size_bytes": 4363,
+      "sha256": "20bbb88b02a66f452c3b860dfc9be81bdd2f551b0a79f964815d0dce984be41d"
+    },
+    "Content/Defect/Textures/Default/T_Default_RGB_XVector_A_XExtentDividedbyRange_UV2.uasset": {
+      "size_bytes": 4399,
+      "sha256": "3ca5836e5594a06897c3965d3a258d3a160452e086441bb2feae61f0b0bc3239"
+    },
+    "Content/Defect/Textures/Default/T_Wind.uasset": {
+      "size_bytes": 18797027,
+      "sha256": "5b84a9884efe56b837751aaea39ac7f12ab13484ad0bbb55683ab4dd97dbaa27"
+    },
+    "Content/Defect/Textures/Default/T_Wind_Normalized.uasset": {
+      "size_bytes": 36828482,
+      "sha256": "1d0fbfed6658ff7adc499e59466e18482a0692d8ae7f9af9333267d8ddd36695"
+    },
+    "Content/Defect/Textures/Default/VT/T_Default_BaseColor.uasset": {
+      "size_bytes": 5250,
+      "sha256": "e3540c98ecd763ce5063196e34cc2008527a6852cce2130dee7de23608fb36c4"
+    },
+    "Content/Defect/Textures/Default/VT/T_Default_Masks.uasset": {
+      "size_bytes": 5530,
+      "sha256": "0443bf89b4701ad9f119c8c231c3ae56a0f9dbf6a246e7258691863cde889294"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_branch_355677cf6a.uasset": {
+      "size_bytes": 5219,
+      "sha256": "271d4b14ba0b7d662c3a8e687fb760d6f86fd40caa9228acc4b10401d12b5a2a"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_branch_46bef4c61e.uasset": {
+      "size_bytes": 5253,
+      "sha256": "3b181a632c127a591565a52093f21d42de71a11efc670004890500ed0cb648f6"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_branch_679eb17a62.uasset": {
+      "size_bytes": 5207,
+      "sha256": "5f53d69562413697c3702b898e870306582afeb0d8c041e76b17c56d0a77118a"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_branch_706758ff91.uasset": {
+      "size_bytes": 5126,
+      "sha256": "aea594f61c12bc246b64b200093cf2dde7f3707ab6249886e68c62c3acd8ca23"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_curly_grass_39e76365d3.uasset": {
+      "size_bytes": 6414,
+      "sha256": "2a29c5cec88d50985772d49c76cde2263b0f9a571697f49a12d990649245413b"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_curly_grass_48c2406e43.uasset": {
+      "size_bytes": 6301,
+      "sha256": "525b0a148134153512dd8093ab64cabcf7ab0af468bdd340be9daf7e36cf88a1"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_field_grass_0a97b09c24.uasset": {
+      "size_bytes": 6714,
+      "sha256": "a0b150b2724a373c47515f3b060e0893c71fa37debef1d00ea3cd92dfc5d8a54"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_field_grass_3c649b20eb.uasset": {
+      "size_bytes": 6458,
+      "sha256": "7a55e6ac05ac1dec969e5c329cc55b0d47dad8df89878ace4a5097f4caeb1bc9"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_field_grass_bc6a75388e.uasset": {
+      "size_bytes": 6574,
+      "sha256": "7528e217afec25e10628750c05a411ba1e809ccc034cbeb73a02adca114bf7eb"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_forest_pile_0be8b74b6d.uasset": {
+      "size_bytes": 5965,
+      "sha256": "447254222af5f6673a96b250f650909ff71976e89bf5713ac15271bebb14356e"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_forest_pile_169ae1bb92.uasset": {
+      "size_bytes": 5752,
+      "sha256": "1ec1cab47977536de8bb0b16c4fbefa30491d6da870a89b38c506967648db15b"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_forest_pile_340527f6ea.uasset": {
+      "size_bytes": 5683,
+      "sha256": "d4cae2625599b784dd8d534f1a609dd0781b34198ce4c580a3c6fd23fd609107"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_forest_pile_6805973a1d.uasset": {
+      "size_bytes": 5848,
+      "sha256": "3f7e379dee897ce70b9617b3df78bf51cbe01df5ee9fb7752baf1a422318d621"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_forest_pile_9871f8a968.uasset": {
+      "size_bytes": 5848,
+      "sha256": "21ded6b9f253276346985cd86f48a3096e15b993f8e046a7cb93a80cdbf52935"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_forest_pile_a0efba681c.uasset": {
+      "size_bytes": 5820,
+      "sha256": "b1cedfe45e686fc42fac2a5e7c0ea9c0e6fab376cfd359e404e442247742d09f"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_forest_pile_cdd4e8bcdc.uasset": {
+      "size_bytes": 5845,
+      "sha256": "183962406b07e6fc94c29ee454a48d4713cb2002aad67f1c945b8f25ab823074"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_forest_pile_f608c48b0d.uasset": {
+      "size_bytes": 5898,
+      "sha256": "da75fda3d13bfc97fe5ce38d50b76225e7df604fb577283bc2673df1804c019b"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_gravel_dacf4d5956.uasset": {
+      "size_bytes": 6043,
+      "sha256": "3f3bc6ea6ac55ab5ad78ab6e05df8d193e13ac1124166bbcad077143c4c40d51"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_leaf_pile_55b2a5ba41.uasset": {
+      "size_bytes": 5181,
+      "sha256": "00ff9887e4a2934ea192185d76e29179f6e31e46cdc4184083f1661091abfb82"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_leaf_pile_6476104acb.uasset": {
+      "size_bytes": 5228,
+      "sha256": "66bdf302d65597cc3656a4ce01607a9dbbf06f04e7c8725d230606484bce463e"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_leaf_pile_981b02b00a.uasset": {
+      "size_bytes": 5286,
+      "sha256": "14a6b19217cc21611471e3bef77e70277037c2d5ad3ab2f2264684726f18460b"
+    },
+    "Content/ForestDataset/Detail/Foliage/FT_leaf_pile_aca4b9c0d3.uasset": {
+      "size_bytes": 5209,
+      "sha256": "6c80f4fd4384c1661d97f38baa030a9220d1708623dca1375eacd580aa593125"
+    },
+    "Content/ForestDataset/Detail/Groundcover/SM_FieldGrassClean_02.uasset": {
+      "size_bytes": 309552,
+      "sha256": "5f8262562e26d8c80525436d59e5f1663160fd1ae76552e9b114d027ef99bc21"
+    },
+    "Content/ForestDataset/Detail/Groundcover/SM_FieldGrassClean_05.uasset": {
+      "size_bytes": 243507,
+      "sha256": "b2d452a4987a2378b1788c936f25f8c72b5e07fcd6190ff46b0d04b076c972ed"
+    },
+    "Content/ForestDataset/Detail/Groundcover/SM_FieldGrassClean_07.uasset": {
+      "size_bytes": 273033,
+      "sha256": "0e17b94567e9cb3ea77cc22e28f634aaaa0402834946f083b1974aeec9703f9f"
+    },
+    "Content/ForestDataset/Detail/Groundcover/SM_GravelStone_512.uasset": {
+      "size_bytes": 67267,
+      "sha256": "c08e1b3ec858be2a7b59e7413ad3d4a74e937a2a2353025d79483602e420162b"
+    },
+    "Content/ForestDataset/Detail/Meshes/SM_Ground_scene_009_edge.uasset": {
+      "size_bytes": 6235384,
+      "sha256": "6fb0559f6a84ff3349d6ff9619a4e2a90db0398a2ad9dfba5ac3f74c94c7c99c"
+    },
+    "Content/ForestDataset/Detail/Meshes/SM_Ground_scene_009_grass.uasset": {
+      "size_bytes": 6319189,
+      "sha256": "a0cc3d55f27eb06d181a974507fc46e7c1b0d17938a660b1612071c54b32df5a"
+    },
+    "Content/ForestDataset/Detail/Meshes/SM_Ground_scene_009_litter.uasset": {
+      "size_bytes": 6281629,
+      "sha256": "153249539350cf58b4ef70b68d474548c4836de37812e373da7a0e95921ebdc6"
+    },
+    "Content/ForestDataset/Detail/Meshes/SM_Ground_scene_009_road.uasset": {
+      "size_bytes": 6094613,
+      "sha256": "ccfeea732fe95a284d3e9f05070424d388becf81e272e5600f696b7dac22b639"
+    },
+    "Content/ForestDataset/Materials/MI_scene_007_edge.uasset": {
+      "size_bytes": 34691,
+      "sha256": "e09ef5ae8029219751ba69801c36e644ad6f9e18c36be85e5bbd7dabad306086"
+    },
+    "Content/ForestDataset/Materials/MI_scene_007_grass.uasset": {
+      "size_bytes": 34761,
+      "sha256": "d53a12366ad00155dac9527a481193016f1387ac67333f831c558b4f1fb6fe91"
+    },
+    "Content/ForestDataset/Materials/MI_scene_007_litter.uasset": {
+      "size_bytes": 35035,
+      "sha256": "ac272f2727c43a92cd00b9758ad27e730a1dd53c141bee73062d58120df112f6"
+    },
+    "Content/ForestDataset/Materials/MI_scene_007_road.uasset": {
+      "size_bytes": 34702,
+      "sha256": "b16e0559d4cb60f7511dfe987a02d25349775aaa11286c13259069a7e8a6f059"
+    },
+    "Content/ForestDataset/Materials/MI_scene_008_edge.uasset": {
+      "size_bytes": 35134,
+      "sha256": "5060af9da007a89263fc590e0ed27965bbbac5559945f016b64bc85a7da67285"
+    },
+    "Content/ForestDataset/Materials/MI_scene_008_grass.uasset": {
+      "size_bytes": 34955,
+      "sha256": "5b3b831f83d02445282c20951e4cc320676e153e6c5e29d48195a79d588fea87"
+    },
+    "Content/ForestDataset/Materials/MI_scene_008_litter.uasset": {
+      "size_bytes": 34783,
+      "sha256": "c06b34659612795412baef965ab8658c25d637ea7f83e5bed8e36bdfefd1bf92"
+    },
+    "Content/ForestDataset/Materials/MI_scene_008_road.uasset": {
+      "size_bytes": 34940,
+      "sha256": "d7994603a83ac04c74696cde91931fb1cb76c22d7d840dcd07eac464a3a842fe"
+    },
+    "Content/ForestDataset/Materials/MI_scene_009_edge.uasset": {
+      "size_bytes": 34687,
+      "sha256": "f0fa9c289f28cf3cef75aeb54c94996314fce2ef3fc35405ba7f709ac9669da4"
+    },
+    "Content/ForestDataset/Materials/MI_scene_009_grass.uasset": {
+      "size_bytes": 34761,
+      "sha256": "3d849a114e8160f0642e0899855b45fe6bbf49f382940e44d5392d943f15f075"
+    },
+    "Content/ForestDataset/Materials/MI_scene_009_litter.uasset": {
+      "size_bytes": 34564,
+      "sha256": "6256258d4895f67a6519d59fda95c6d0a864ccf6c83b7c7f0bcb2538b216b936"
+    },
+    "Content/ForestDataset/Materials/MI_scene_009_road.uasset": {
+      "size_bytes": 35091,
+      "sha256": "02ff4076e85b763fead94b3873e911bcd002bb81c9dc1c9e4d2ac673887d1c54"
+    },
+    "Content/ForestDataset/Materials/MI_scene_010_edge.uasset": {
+      "size_bytes": 34705,
+      "sha256": "1b825e63eb139b66367e02e87ce81a745d681fe6a52feee509c1c4f6a7435833"
+    },
+    "Content/ForestDataset/Materials/MI_scene_010_grass.uasset": {
+      "size_bytes": 34761,
+      "sha256": "58be98835bc1e47c03792d3738bda7f441c3634777a82c5138a57a6209abb532"
+    },
+    "Content/ForestDataset/Materials/MI_scene_010_litter.uasset": {
+      "size_bytes": 34971,
+      "sha256": "8292a45365d27b5cca84177f10f0f5b726b9413a79053f8fa46ead415e381d9f"
+    },
+    "Content/ForestDataset/Materials/MI_scene_010_road.uasset": {
+      "size_bytes": 34707,
+      "sha256": "d8fb74ccaf4ada62271527aef2c21e184edde03cac0d2ccf3a274aa4a215538b"
+    },
+    "Content/ForestDataset/Materials/MI_scene_011_edge.uasset": {
+      "size_bytes": 34299,
+      "sha256": "3417536b4276f59d3824534ce5a245d8b7eb52eae0c7c708b617f4db8c889098"
+    },
+    "Content/ForestDataset/Materials/MI_scene_011_grass.uasset": {
+      "size_bytes": 34313,
+      "sha256": "335bafeaf88b8e5cb98443ac4fa9c98f62132023f2af2fcc7522a0ba42da518a"
+    },
+    "Content/ForestDataset/Materials/MI_scene_011_litter.uasset": {
+      "size_bytes": 33997,
+      "sha256": "1330c0d628545f6a06c3983738252a8e688ce77e7013762c18c2e6a98c24f538"
+    },
+    "Content/ForestDataset/Materials/MI_scene_011_road.uasset": {
+      "size_bytes": 34308,
+      "sha256": "ef8ac71b363cb4dec2a99950911983f6b40656d38b1932db20f82d814ac66fb1"
+    },
+    "Content/ForestDataset/Materials/MI_scene_012_edge.uasset": {
+      "size_bytes": 34480,
+      "sha256": "762f3bd4baf351bdc7c5791c355495abb59463728a4a8515584d4f384a91a2c3"
+    },
+    "Content/ForestDataset/Materials/MI_scene_012_grass.uasset": {
+      "size_bytes": 35204,
+      "sha256": "fef7ee13055d052266fdeb8d0acb6dbaca8dc6142c129fcc913db0ca758f1129"
+    },
+    "Content/ForestDataset/Materials/MI_scene_012_litter.uasset": {
+      "size_bytes": 35074,
+      "sha256": "883954e4a39a38db3f510b169eb1c33f04eed6001057356595a94002548862ef"
+    },
+    "Content/ForestDataset/Materials/MI_scene_012_road.uasset": {
+      "size_bytes": 35197,
+      "sha256": "dd9a38d6dc0b6573e48822ef00856b734843aa20092d44d14915df0600288ed9"
+    },
+    "Content/ForestDataset/Materials/MI_scene_013_edge.uasset": {
+      "size_bytes": 35182,
+      "sha256": "0597f3d2171f8892ef574af60f5d5c7685b57ec53f2daef86749aeda8a20aed0"
+    },
+    "Content/ForestDataset/Materials/MI_scene_013_grass.uasset": {
+      "size_bytes": 35231,
+      "sha256": "9f0cf0846be939df542b02f46c3bce82095efa442953607f6c30c13b864c457b"
+    },
+    "Content/ForestDataset/Materials/MI_scene_013_litter.uasset": {
+      "size_bytes": 35070,
+      "sha256": "7616f08824156a62b7ec237da96f25b4869b0b496c652c16a5a8623648c06972"
+    },
+    "Content/ForestDataset/Materials/MI_scene_013_road.uasset": {
+      "size_bytes": 35235,
+      "sha256": "da2750c391f243d5dea8710b5fb5090582acc7d5638e7dd2d0e58ab03c79f815"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_007_edge.uasset": {
+      "size_bytes": 6281932,
+      "sha256": "88d21792f1d21293b3d7bf8422deab7e7debc114cf647232d9834bbf61260157"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_007_grass.uasset": {
+      "size_bytes": 6341268,
+      "sha256": "371159788b3083e1da2c610a0afd38e2342044dc826f5a6ff0e36c0b3ef06998"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_007_litter.uasset": {
+      "size_bytes": 6334076,
+      "sha256": "1454067ac23f2572259af39b4cb335ad32b00bba56bbbbc5ee084211b3a6b240"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_007_road.uasset": {
+      "size_bytes": 6072046,
+      "sha256": "b553f1c5b5612af8bfd51b4d75e7306c909c9b812cb0a5b607bec429c5cf2d3b"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_008_edge.uasset": {
+      "size_bytes": 6245957,
+      "sha256": "16f2db5bc1ec1e69080b313ac24f5536cfe95e134a2ddd601f085aaa09a38643"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_008_grass.uasset": {
+      "size_bytes": 6283610,
+      "sha256": "766584f84ff97d7fa2948cd824c263520087ab3268d5148e6de2a9d415f9fabb"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_008_litter.uasset": {
+      "size_bytes": 6324744,
+      "sha256": "a1a1d88d287aa9543cab7892a380c4e0fd5864fae0df8dfb59a69bfcd1842b62"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_008_road.uasset": {
+      "size_bytes": 6074850,
+      "sha256": "e559f131e13380d3a5d199d5cbddf3d1e0d16ab7c7e133a062182485a859761e"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_010_edge.uasset": {
+      "size_bytes": 6331762,
+      "sha256": "d913b55c69431c1436fe093dd13ca3320af40eebb8926d7d73fc8dd9f84f7435"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_010_grass.uasset": {
+      "size_bytes": 6412094,
+      "sha256": "1c3d235ea0f98ff237141c80f73898c796e9511b83ba51bebdc9697449d0139c"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_010_litter.uasset": {
+      "size_bytes": 6345651,
+      "sha256": "a1169686350d520f3d61e2257822126cc65e74242edac3c255f14f1d8eaea3e0"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_010_road.uasset": {
+      "size_bytes": 6062161,
+      "sha256": "d0274896769ab1dca5b6203195350cd7bf8ac94051ddba9efa115c10bb8b0478"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_011_edge.uasset": {
+      "size_bytes": 6181913,
+      "sha256": "ca12744a9de26870b2f104c5dbf0920e399f58db8614c83762d6d1063fa6381b"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_011_grass.uasset": {
+      "size_bytes": 6345821,
+      "sha256": "2a08a19413fb2802c154521e67f1628e326f784a509bd2f1ab0bebf94306a870"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_011_litter.uasset": {
+      "size_bytes": 6346892,
+      "sha256": "491f59f5b1a47a5886bdd486ca8ca51f1dede67dee8a7e71c3a98c3f94e6891a"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_011_road.uasset": {
+      "size_bytes": 6089882,
+      "sha256": "0f0e55b37426ceba016615a49d465b1a87ffb79b9983a2d944758065a53833af"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_012_edge.uasset": {
+      "size_bytes": 6269291,
+      "sha256": "a3209a9b611487276795482712379dc43dfb76172db5977b7fee86b24e25ba92"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_012_grass.uasset": {
+      "size_bytes": 6397784,
+      "sha256": "e1e11968c1591e6fe8821d4ad1549227f5eb763aaa45539a96340966e60e527f"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_012_litter.uasset": {
+      "size_bytes": 6313302,
+      "sha256": "3599ef8446749c1b408b10295d8fbdbe3398b408665fcf40ef31afd626664d0c"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_012_road.uasset": {
+      "size_bytes": 6069713,
+      "sha256": "3691c8a004a3a150cc0937f006325192f708c1d4588ee2854cf3f632b9ad6321"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_013_edge.uasset": {
+      "size_bytes": 6198489,
+      "sha256": "224a5ff95b96254bc57e6a69313eda6885de5315b4c5d63b129e58bd437a6f13"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_013_grass.uasset": {
+      "size_bytes": 6332140,
+      "sha256": "75088e43e3f47e8c2c674158ff97865202d47eef9cf89b337705694321bce00d"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_013_litter.uasset": {
+      "size_bytes": 6418324,
+      "sha256": "85bf4e6aedef9ab8fdc05a2c246c1af76589238a36087c4b79a9fc82d7ffec18"
+    },
+    "Content/ForestDataset/Meshes/SM_Ground_scene_013_road.uasset": {
+      "size_bytes": 6056998,
+      "sha256": "ef24dfe25a69d70c68f2c854f044c26e757501ccad7559a720f786d37fcd5e63"
+    },
+    "Content/Map/dataset/test/scene_010_edge.umap": {
+      "size_bytes": 4371889,
+      "sha256": "a22451ddae0f8c2d4817bf8cc5b676e17f425b847be12ce6d0e33ec4d7f3f23b"
+    },
+    "Content/Map/dataset/test/scene_010_grass.umap": {
+      "size_bytes": 6103033,
+      "sha256": "cf039f81e98dad1d1529fe2935f3b643e5bf35d4554e9c5d81478a615af4bc34"
+    },
+    "Content/Map/dataset/test/scene_010_litter.umap": {
+      "size_bytes": 4764369,
+      "sha256": "43bc991c7227b4bada3eb17ac999c55dd36434e77190d4c1a5caada7e5523e75"
+    },
+    "Content/Map/dataset/test/scene_010_road.umap": {
+      "size_bytes": 7804459,
+      "sha256": "008fbde8b4793b56297b0823903cdab4559016b93fa612b31b6b76dcc1d90dfe"
+    },
+    "Content/Map/dataset/train/scene_007_edge.umap": {
+      "size_bytes": 4949782,
+      "sha256": "d15af2f041256e646d2433f26a7cff008f701e01dba9f45d90a872d7109d88a2"
+    },
+    "Content/Map/dataset/train/scene_007_grass.umap": {
+      "size_bytes": 7218576,
+      "sha256": "2a0360c55714811935f429b2503b10c144f1b255045d56e9672830250a1be372"
+    },
+    "Content/Map/dataset/train/scene_007_litter.umap": {
+      "size_bytes": 4643944,
+      "sha256": "a49e2bc7bb76fce48a7b763217f3ef93e789f66996dabd804869c148e8356c98"
+    },
+    "Content/Map/dataset/train/scene_007_road.umap": {
+      "size_bytes": 7601575,
+      "sha256": "c6c176ea7ff09619626b750cd219625ac9fc60df5d9a73c022f2efdb87848bce"
+    },
+    "Content/Map/dataset/train/scene_008_edge.umap": {
+      "size_bytes": 4622862,
+      "sha256": "75e0717fbdad61cd0419a61587f36f8329687f36992af8589b6d9620199fb7ff"
+    },
+    "Content/Map/dataset/train/scene_008_grass.umap": {
+      "size_bytes": 6878563,
+      "sha256": "62842e5a5981a09211019eac0b4824ce7517b5b80e8c108a68d26917058a7929"
+    },
+    "Content/Map/dataset/train/scene_008_litter.umap": {
+      "size_bytes": 4363972,
+      "sha256": "d6bc77322deb3c308b6c8ba2b9db53ca0c258920cf5b6190d4ec91e50975d573"
+    },
+    "Content/Map/dataset/train/scene_008_road.umap": {
+      "size_bytes": 8225848,
+      "sha256": "3acf6d003859cc3af941af0494d3c52712979278e6b1eacec7fc1fdace2df049"
+    },
+    "Content/Map/dataset/train/scene_009_edge.umap": {
+      "size_bytes": 5378367,
+      "sha256": "90c6db07b5ffed2bd562ee540e5f0f5c2910d37979ddfba55ddb59b3139f5f23"
+    },
+    "Content/Map/dataset/train/scene_009_grass.umap": {
+      "size_bytes": 7729491,
+      "sha256": "93f122a64a7185c2d7a76ac583b9ad03a93d0fab6a430cac4b233ec050bb5bf6"
+    },
+    "Content/Map/dataset/train/scene_009_litter.umap": {
+      "size_bytes": 5056323,
+      "sha256": "9341638a98ec68a4ab50b756a10ceadbb35ce7c797d0a944aab4a2c423179b1b"
+    },
+    "Content/Map/dataset/train/scene_009_road.umap": {
+      "size_bytes": 7772458,
+      "sha256": "ccd010c203406ac6d166081d7d8ba58d19ef8beef8b60e3c3844fec64b441e20"
+    },
+    "Content/Map/dataset/train/scene_011_edge.umap": {
+      "size_bytes": 4694480,
+      "sha256": "2279c30606eada85f01ffd40d6704d3848c2fc5f37b4ec67e5f92e6229b0e1d1"
+    },
+    "Content/Map/dataset/train/scene_011_grass.umap": {
+      "size_bytes": 6779700,
+      "sha256": "27acdeeaf2d0a150491a2ddd8e236b282fe61838bb2a6e69f877a1e5fbb25410"
+    },
+    "Content/Map/dataset/train/scene_011_litter.umap": {
+      "size_bytes": 4319357,
+      "sha256": "40f8475b4148dd96188503942558c8f8ec1c0b1af1f681b5fd1465e30feaa36e"
+    },
+    "Content/Map/dataset/train/scene_011_road.umap": {
+      "size_bytes": 7517867,
+      "sha256": "f78cf8e351bc29578e3ff44d8cb003b4264407f76c10bbf3da070bfd57ba1a9b"
+    },
+    "Content/Map/dataset/train/scene_012_edge.umap": {
+      "size_bytes": 5383934,
+      "sha256": "cb0b4723caf34c8b7e9180028b480017afc6bcb026ae2347fbc5f05ccd533239"
+    },
+    "Content/Map/dataset/train/scene_012_grass.umap": {
+      "size_bytes": 7521335,
+      "sha256": "0a09306b44dd245c0cc468814f7ae7b68c001e09f77b8b00dca60a258bcb4b9a"
+    },
+    "Content/Map/dataset/train/scene_012_litter.umap": {
+      "size_bytes": 5141334,
+      "sha256": "14eb4afe2d528151b585a9f85c2a5074901eb96855c93981b1e921f20a517983"
+    },
+    "Content/Map/dataset/train/scene_012_road.umap": {
+      "size_bytes": 7875664,
+      "sha256": "28928ecbca846ae3d9cd70aafce0800ac8f9d94f8b1ce66a32e8b2a93acd91ad"
+    },
+    "Content/Map/dataset/train/scene_013_edge.umap": {
+      "size_bytes": 4831347,
+      "sha256": "d4c3128c7ad2dec15ad097d28219847a8b6b8784331bd65fde3cc3dffde5471b"
+    },
+    "Content/Map/dataset/train/scene_013_grass.umap": {
+      "size_bytes": 7221230,
+      "sha256": "b31131fc3ff6986214307eb086871dd3dbdf7670eb4e7cf72d5ccd9da2c19078"
+    },
+    "Content/Map/dataset/train/scene_013_litter.umap": {
+      "size_bytes": 4637002,
+      "sha256": "ee5969080cdb4db9a49cec5be196c7431e5c720df4386b9210ad823781f44163"
+    },
+    "Content/Map/dataset/train/scene_013_road.umap": {
+      "size_bytes": 7381567,
+      "sha256": "0435f4fa7af19e6cca6d3ad1f99f5a62a02ca54a03a47166873f5e35fde5e39b"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Grass_SMRSSC_2.uasset": {
+      "size_bytes": 55549,
+      "sha256": "a346cab62ef44352dc4e1e3384cf05ba29afbec794b9eb7b305bc18760614ec3"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Grill.uasset": {
+      "size_bytes": 23574,
+      "sha256": "5c3882ea928a4394696b0e1ed1fb9dd484dc984b585fb4d969004f4e29685bda"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Lights.uasset": {
+      "size_bytes": 46521,
+      "sha256": "2c77f0e1fddbbd12053fe3fd04a7f27295d38cf48bee6a6c4fb642b484ba810a"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Lights02.uasset": {
+      "size_bytes": 48233,
+      "sha256": "f8c0242ced696b86d355ba807b6f4e832da54cc4578accc521718ff26980c2e6"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_SUV_Body.uasset": {
+      "size_bytes": 174357,
+      "sha256": "b392f71c21f3f3fe00f6744093c88ba95759f03608ac768ba118e58939d77778"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Sedan_Body.uasset": {
+      "size_bytes": 35025,
+      "sha256": "bf3ade7ad0ed9186298513bd396e74459c9483088ff949fbffa7ad6c211743da"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Sedan_Glass.uasset": {
+      "size_bytes": 20414,
+      "sha256": "c872fe73cf42c06546e7618296ecf251be76aacbb454d82cc050e8d8c0400b1c"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Sedan_Glass_01.uasset": {
+      "size_bytes": 19250,
+      "sha256": "79048b30ac2af848588a2be3559ec9241cd2c89eea52896c839905ebc2247727"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Sedan_Interior.uasset": {
+      "size_bytes": 14858,
+      "sha256": "cbc58c0dd213281c701754a55a34025ef8da62637ce799b86616d335ac06755c"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Sedan_Interior_01.uasset": {
+      "size_bytes": 12506,
+      "sha256": "5e44c42bb288558142cd23e57f7939f4c3d513e9719ff6fba8283b3d0976afdd"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Sedan_Seats.uasset": {
+      "size_bytes": 11944,
+      "sha256": "a6ac7ceab2e1ee39515ae7073d99499c7fe6355086e35322163b782ba3ad1cd9"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Sedan_Seats_01.uasset": {
+      "size_bytes": 10859,
+      "sha256": "d754d6e581c3b42c62df8a3ad0cfb6a4ae8dcf6a977e5e677c38c8b2095298e4"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_Simple_Asset_ORM.uasset": {
+      "size_bytes": 39216,
+      "sha256": "2ffee038df9c3ec1ceca631513448df1ee33fb8ef3201079e130ff7925d694f2"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_WheelSet.uasset": {
+      "size_bytes": 20976,
+      "sha256": "adf1dae4eabd624a6136bdb4bf80cbe57f6f81f25fc5b301cf547e7ff2903f14"
+    },
+    "Content/PostApocalypticCity/Materials/MasterMaterial/MM_WheelSet_01.uasset": {
+      "size_bytes": 19742,
+      "sha256": "055059a187757ca5e97b26092b92aff6e19240200aa1af69eddd332be3d81890"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialFunction/MF_WPO.uasset": {
+      "size_bytes": 75123,
+      "sha256": "7250f2cf93833e88181e54b8692bbb987600e26a0d48091b66cf6424025adca1"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Barriers.uasset": {
+      "size_bytes": 15261,
+      "sha256": "6c72de1dae1c76e29beac9c80251d02b4e212ac948a398e2870abe56e9ea4641"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Bush1.uasset": {
+      "size_bytes": 14635,
+      "sha256": "4c7a7962c263887bee64c538d0eb4e9b3c7f6116e95838a5d4d00ea9a38fb938"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Glass_Inst.uasset": {
+      "size_bytes": 13259,
+      "sha256": "07fe5c832895a69977866532ced9a5b8e2f4e945e8794fa6ba732a0fec6be659"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Grill01_Inst.uasset": {
+      "size_bytes": 15404,
+      "sha256": "f35f6137afbbcde7c25fc029437eaeaf3b211a4af21d23488928793f55593b29"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Lights_02.uasset": {
+      "size_bytes": 20191,
+      "sha256": "c169ac96a7d8108ce90c6be0b65bffba7bbc270331f623632778a3cea84aa949"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Lights_Inst.uasset": {
+      "size_bytes": 16626,
+      "sha256": "1c839290fc429946df4ace2cd672947ae7b2a7869afbc23a392da5e419ebf905"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_LocustTree.uasset": {
+      "size_bytes": 20489,
+      "sha256": "0c4295003796775ca327f443362f2bc8cd24a22a19b82e8906253cd4d85ab9b4"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_SUV02_Body.uasset": {
+      "size_bytes": 27908,
+      "sha256": "550c9399c9eef62c0001f641a43c65422c8d228fc940148988e05cbb3821672a"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_SUV02_Glass_Inst.uasset": {
+      "size_bytes": 12766,
+      "sha256": "b1f6379f31be2e21def2b2b6853651ec883282d3f56c794baf89dd7cf9719084"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_SUV02_Interior_Inst.uasset": {
+      "size_bytes": 11182,
+      "sha256": "debb63fe85745935649c5c72e58ee85f8ea37da29a63df9b1dcb0008e1d0497e"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_SUV02_Seats_Inst.uasset": {
+      "size_bytes": 9830,
+      "sha256": "43f952eea795cbf36443b2430fd3567a29b0ccd878f58609659c17485c78d002"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_SUV04_Body.uasset": {
+      "size_bytes": 24301,
+      "sha256": "e9eafaa33aa0a44a394b7a36d31ade1b95403a2416ef187f084c8e00199ec04f"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_SUV04_Glass_Inst.uasset": {
+      "size_bytes": 11587,
+      "sha256": "e673918ec386a24470d89a7c2e87ce087ab4bb7232e0f67883fe603dcdcddeee"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_SUV04_Interior_Inst.uasset": {
+      "size_bytes": 13361,
+      "sha256": "68ee8a5cda7bd5031cb6238540134f083980c1506b9ba5e0d531725e929f25cd"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_SUV04_Seats_Inst.uasset": {
+      "size_bytes": 10909,
+      "sha256": "aa50b090630f2b203ce0c2972778df936952b3f730d2799dae4fc9a0027c8754"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan01_Body_Inst.uasset": {
+      "size_bytes": 18240,
+      "sha256": "298ab34b167f66d860a0f7492e7bc65047f755e2cd532805795488e4d547c412"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan01_Interior_Inst.uasset": {
+      "size_bytes": 12538,
+      "sha256": "6758c9c638f2f1926a38e538ffc57008965d86c4f28dd9e8593f49ef2d9c2bd0"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan01_Seats_Inst.uasset": {
+      "size_bytes": 93917,
+      "sha256": "e01000a89db46228109bc283a70821d6d79c1b634081b632476de4c85d2a0b17"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan02_Body_Inst.uasset": {
+      "size_bytes": 19236,
+      "sha256": "5a5bd154c8ad61c896ce1cf29ca9fb5be9ffd1558e78bf22990ef2c299aee6c9"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan02_Interior_Inst.uasset": {
+      "size_bytes": 12148,
+      "sha256": "b9263fbb7b7f3ae078817981285503dc4f9fdda744f9d1804f94a174cf725635"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan02_Seats_Inst.uasset": {
+      "size_bytes": 11178,
+      "sha256": "499604870e9ad794136c3bc4b18372050568acd2a991f3c4b320ee6e9665dafb"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan03_Body_Inst.uasset": {
+      "size_bytes": 17643,
+      "sha256": "ac11575b05b366ab3b6c3e694871f3282ea51d6f8f64eb39c36daca913feb193"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan03_Interior_Inst.uasset": {
+      "size_bytes": 12453,
+      "sha256": "931703ee79d4e8cc9a55f6245cc585a861fe542f4067000222b22152724a4a8b"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan03_Seats_Inst.uasset": {
+      "size_bytes": 11868,
+      "sha256": "d5b6cb2f5c55c5bbf0186a82c9b20d301a0d9499a6979c793e689cf028277685"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan04_Body_Inst.uasset": {
+      "size_bytes": 18048,
+      "sha256": "50675d22982cfb6a4ee123c01449f2bf1c2b57a41fa71a8b1baa612da3828cf2"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan04_Interior_Inst.uasset": {
+      "size_bytes": 14883,
+      "sha256": "e6dcec2fe1e4f30b69bf09ea6f71c5d7df446bb42336fc996635e0bffcd887e5"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Sedan04_Seats_Inst.uasset": {
+      "size_bytes": 12125,
+      "sha256": "212894a8f93691dc31dba777f4c2addd37785cc0b178d0af42598374f6e32164"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_Shop_01_Posters.uasset": {
+      "size_bytes": 19845,
+      "sha256": "db770505cc6064eecc8ae4ffc4a423c1c498a360baef3f671b6af65361c69e99"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_WheelSet_01_Inst.uasset": {
+      "size_bytes": 17961,
+      "sha256": "7f05defb3e393f341c9eda7dfef52455dc5eb45574768a788e41014c6bebfd99"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_WheelSet_02_Inst.uasset": {
+      "size_bytes": 18742,
+      "sha256": "60bf432cb10daa71b12038b00360e295cb35acfacf280cd38647d6c658fe3287"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_WheelSet_03_A.uasset": {
+      "size_bytes": 17837,
+      "sha256": "4c5826dd6eed51d2d5eea3ae281df7ab78616ce5bc9ad7fb5ff849f5070c6814"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_WheelSet_04_Inst.uasset": {
+      "size_bytes": 14735,
+      "sha256": "131ee75269cb97e06ffdd29b9a7c3ddf1cb21f9ebc4a7ffedfb872ab7540a57d"
+    },
+    "Content/PostApocalypticCity/Materials/MaterialInstance/MI_WheelSet_05_Inst.uasset": {
+      "size_bytes": 12627,
+      "sha256": "7ccc4f68c793fedb942d4b4c8732ca4b0c6fa064ae2e198cd6a7213afa363b95"
+    },
+    "Content/PostApocalypticCity/Meshes/SM_Barrier01.uasset": {
+      "size_bytes": 35410,
+      "sha256": "37d46b28d6a8ea9e1dbcd8c59fda13d2e6953e2368c11f890cd921620a715308"
+    },
+    "Content/PostApocalypticCity/Meshes/SM_Bush_01.uasset": {
+      "size_bytes": 455132,
+      "sha256": "50eb07e15afd13f3f8034cbfc726c1742d84ac2487dd18349ac378699ed35653"
+    },
+    "Content/PostApocalypticCity/Meshes/SM_Bush_02.uasset": {
+      "size_bytes": 515878,
+      "sha256": "13c8ab41e61da1217cf7cb2c1910c732e82222a5e80375b1e4a022cd5c82c293"
+    },
+    "Content/PostApocalypticCity/Meshes/SM_Bush_03.uasset": {
+      "size_bytes": 456808,
+      "sha256": "74eabcc09d9934ab338849c3be502aee85d549daaa6fd7a63697b084bb140c07"
+    },
+    "Content/PostApocalypticCity/Meshes/SM_Bush_04.uasset": {
+      "size_bytes": 470853,
+      "sha256": "51968422413aed0d9c7389604c7e6e7f7f2349d84c8be77d9b918029cf061943"
+    },
+    "Content/PostApocalypticCity/Meshes/SM_Poster_A_1.uasset": {
+      "size_bytes": 18441,
+      "sha256": "b58e72ff379ebdd42d90c9465830d8c06eeca84f3ec7f22170ef4d0b2bd0c149"
+    },
+    "Content/PostApocalypticCity/Meshes/Vehicles/Skeletal/Sedan02/Target_redcar.uasset": {
+      "size_bytes": 1876097,
+      "sha256": "a7fa2b1074430502c5309b02f5da71d108a2ecfe54fb5a1fa3e16359ad4e0c32"
+    },
+    "Content/PostApocalypticCity/Meshes/Vehicles/Skeletal/Sedan03/PA_Sedan03Rigged_PhysicsAsset_61FDDCFE.uasset": {
+      "size_bytes": 1940920,
+      "sha256": "fb0093d9de1be00de414cdf0c4f45f55991762628a8edc8955a061ef73a57209"
+    },
+    "Content/PostApocalypticCity/Meshes/Vehicles/Skeletal/Sedan04/Target_bluecar.uasset": {
+      "size_bytes": 1847230,
+      "sha256": "a28ea44f261e0320489d7256a5f486f95863de27a9f3c3410f4c90684db00958"
+    },
+    "Content/PostApocalypticCity/Meshes/Vehicles/Static/target.uasset": {
+      "size_bytes": 2205558,
+      "sha256": "afd81893d6018ce500a571a208b383707c6cd4c8b886449dd72f08569c8f5a8a"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_DirtMap_B.uasset": {
+      "size_bytes": 527444,
+      "sha256": "d51a104e8b486afa048ab597fc05a4628b99d46fad213e573195398230ec6978"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Grill01_B.uasset": {
+      "size_bytes": 25195,
+      "sha256": "3cfc51a68891d54ea6e79c6b2618aa76e6678069e779c321d1ad1720bf799399"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Grill01_N.uasset": {
+      "size_bytes": 47072,
+      "sha256": "d1bd90b8d32a0d57db95b17fd5fd291ae4ab0ad81e77972cd4e4418d21ec5c6a"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Lights_Masks.uasset": {
+      "size_bytes": 1024592,
+      "sha256": "2ad5088ece199209431c678b38262d673bacb7c7d4607f90688d8ea9fadbfe62"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Lights_N.uasset": {
+      "size_bytes": 1357421,
+      "sha256": "38115847c78732b56e97b31397cc548be6104c1b3f20abc223c585c9c1e7f451"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan01_Body.uasset": {
+      "size_bytes": 4111515,
+      "sha256": "82d1892ec7dfd2854d37d54ae90eb9363fe81e66410c61e826755eb5fce3b923"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan01_Body_Masks.uasset": {
+      "size_bytes": 3052600,
+      "sha256": "f87b75ac057522dbf09f084a839793fa935436297fcebb3de948d213f26ff491"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan01_DirtMasks.uasset": {
+      "size_bytes": 27445594,
+      "sha256": "3091af85a60bf745905593883199e4aac888203459bd99d4fff9f6cfffd7f1cb"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan01_Interior_B.uasset": {
+      "size_bytes": 21642857,
+      "sha256": "804ed7a6f56d559e051e7bc932ad8db2aa056aa10d6a181de2f8c466606da893"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan01_Interior_Masks.uasset": {
+      "size_bytes": 14918175,
+      "sha256": "4590d806af7222adccb1ed50cc38d5f325f13c24241f081c112344859345742e"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan01_Interior_N.uasset": {
+      "size_bytes": 2849637,
+      "sha256": "4e1cd6cd55208108e2e72ff9b66e8ce505a702802df856c59053742e83d9382e"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan01_Seats_B.uasset": {
+      "size_bytes": 9590915,
+      "sha256": "4f553cdc947e8130d4ccace07d1a0a29dae4617a6f26752e7497021fc58cc8c2"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan01_Seats_N.uasset": {
+      "size_bytes": 2005910,
+      "sha256": "dd5c3404c480590fdc25b3186e48e0c8b85ec8c2b06564eed210c3eb6c1130e8"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan02_Body_B.uasset": {
+      "size_bytes": 716905,
+      "sha256": "596599a7a3eb95af49a9f2f5b30a656a36a91194d8a8c91c6507ec22ec87ce27"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan02_Body_Masks.uasset": {
+      "size_bytes": 893151,
+      "sha256": "e712ab211f172bc2a12f87eb858da2e1f4d2eaf33863db217175ac9b9188a14a"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan02_DirtMasks.uasset": {
+      "size_bytes": 25399436,
+      "sha256": "5194d7cae0f99f59f481d2d7782a9fb740c3c29acf7c777cdb6218791146eae2"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan02_Interior.uasset": {
+      "size_bytes": 18775196,
+      "sha256": "8a56b4ec047ff5d9d48eb8bfc83a1f6f0b749dbb0591572cd0070bc6d9b39c4b"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan02_Interior_Masks.uasset": {
+      "size_bytes": 14303360,
+      "sha256": "4bbe0541b69cf9afb9563ec147b3771ff7ddbf82bc9cb987c13955c672c30950"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan02_Interior_N.uasset": {
+      "size_bytes": 3018793,
+      "sha256": "777abb6982923e4b5b07551f91a2c3f79048008030b1bf2245fd982bfe6a6c1a"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan02_Seats.uasset": {
+      "size_bytes": 8511907,
+      "sha256": "c6863b6e91df2a4df118e894d4c311ac45713d2988f589e3212887cb95b931a3"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan02_Seats_N.uasset": {
+      "size_bytes": 3699316,
+      "sha256": "d97f2504af90cfacc8c87b0aad76d7db565e7a928cb6d7054c3a5aa25e813c03"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan03_Body_B.uasset": {
+      "size_bytes": 1044445,
+      "sha256": "a3eae5a709662242bd202314d14e52a75a605a2818f480f16d733a1b42d55396"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan03_Body_Masks.uasset": {
+      "size_bytes": 1101160,
+      "sha256": "498693952d55325e6787ec2c076899a43966ec877a9a198f34b3f5989c224f09"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan03_DirtMasks.uasset": {
+      "size_bytes": 29234683,
+      "sha256": "4433e5f537137cd6073e405555943e1c45b2d66419d38c76c117988593f52e58"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan03_Interior_B.uasset": {
+      "size_bytes": 20442279,
+      "sha256": "aedff4d1596658274498d9d835c0d511117e0236f16b78b5be3199734745abc5"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan03_Interior_Masks.uasset": {
+      "size_bytes": 14691870,
+      "sha256": "37a4e9801bb7034d9a1c686a2ff8890ce2ffb9d3504007953136237ab9513034"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan03_Interior_N.uasset": {
+      "size_bytes": 2891281,
+      "sha256": "e05da88c655d473d903b65ca541c529ed04415f5b01953d68e5c10b5eb278761"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan03_Seats_B.uasset": {
+      "size_bytes": 10813008,
+      "sha256": "dc23890d03025e2bab29167c4abb4085e5d08d643044058f8fa0abef6259fd1a"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan03_Seats_N.uasset": {
+      "size_bytes": 2708871,
+      "sha256": "35e2e40500317a75ee9be97cc6c18a988c6a61a64cfff43e7970456856443949"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan04_Body.uasset": {
+      "size_bytes": 1147598,
+      "sha256": "2c6bb4eb7f95264ac8ad6f9bddc0de29ef25998441c02361f1aa980d5c739c49"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan04_Body_Masks.uasset": {
+      "size_bytes": 809910,
+      "sha256": "92116a450dbe2538788318936a30342451c10fac7019881ce97b6a41257abf57"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan04_DirtMasks.uasset": {
+      "size_bytes": 27778124,
+      "sha256": "2528ae089428cad1bc217ea2853d8eb9084386a1e3746a750656b3891d9a733e"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan04_Interior.uasset": {
+      "size_bytes": 18761486,
+      "sha256": "6fe7ef1dd9f821b64a78195ff09f91a5af8713afa69c849b089e96dce2c312c7"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan04_Interior_Masks.uasset": {
+      "size_bytes": 14442888,
+      "sha256": "126cc26b1e3688e417e4b42ca59bde2cf755ff0d00e1dce508af7e23a2cad691"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan04_Interior_N.uasset": {
+      "size_bytes": 3167463,
+      "sha256": "ceef1a7e8a24a124b72c2f7b78b08f2e9bf1139af8df17a657e5112aca10eb40"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan04_SeatS_B.uasset": {
+      "size_bytes": 10476683,
+      "sha256": "6f15a4e2cd6dc58529b2a569f98e6de15e04377050d56f63e05c2a296a7e9538"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Sedan04_Seats_N.uasset": {
+      "size_bytes": 3961638,
+      "sha256": "6e7967494a407d62b3306140158fa3d9228dac3e2305a73511f3cccf3fce60d6"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_WheelSet_01_B.uasset": {
+      "size_bytes": 1901883,
+      "sha256": "ec79ee50ea11216f34d6c657b11c2e83a9a5f2f58c18daed6f02286b29d2d586"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_WheelSet_01_Masks.uasset": {
+      "size_bytes": 3216780,
+      "sha256": "173627443d3fe7281701888d71ac4f486f7084651ec80c4abf221938aa73ad94"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_WheelSet_01_N.uasset": {
+      "size_bytes": 1669800,
+      "sha256": "153e46f6d98203b7649029e818b793034f5df7b9bad500af0625644d427abaa3"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_WheelSet_02_1_B.uasset": {
+      "size_bytes": 1724919,
+      "sha256": "c391f547c247ca1d050fbe715ea7ad0de3a268c26dfdbb494d706320371ae60e"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_WheelSet_02_B.uasset": {
+      "size_bytes": 1814793,
+      "sha256": "2cb843d7cfe8f6d661a9ef01a35de1ffd360bcd806b191b38d2d7c0626ace551"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_WheelSet_02_Masks.uasset": {
+      "size_bytes": 2866447,
+      "sha256": "5211f8352127f1edd17b03d29eb5592b1225f7d2adef895679c239747ca1bde8"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_WheelSet_02_N.uasset": {
+      "size_bytes": 1352992,
+      "sha256": "df6594b92b20d8606254f7783960360f578a2b89a0c5b98e7c5170eccf8d141b"
+    },
+    "Content/PostApocalypticCity/Textures/SedanVehicles/T_Windows_Masks.uasset": {
+      "size_bytes": 3035029,
+      "sha256": "e27968460c5ef63137303878dcf903d10b017ba5bcec722d6c4af4c9575e76cc"
+    },
+    "Content/PostApocalypticCity/Textures/T_Barriers_B.uasset": {
+      "size_bytes": 35407333,
+      "sha256": "d9ded031eb077dc085d1550b3e8b03653d856073ab9a6988bb37ff25ed8033df"
+    },
+    "Content/PostApocalypticCity/Textures/T_Barriers_OG_N.uasset": {
+      "size_bytes": 39431340,
+      "sha256": "698fb3418a935db0e8c37cd83e8a29c92acc1ea68d3404f6c6bc97c8160d333c"
+    },
+    "Content/PostApocalypticCity/Textures/T_Barriers_ORM.uasset": {
+      "size_bytes": 22728465,
+      "sha256": "50efff41bbbb077cffb80c511aed9c25ee788d57f82ccc6985deb0c42609b247"
+    },
+    "Content/PostApocalypticCity/Textures/T_Base_BC.uasset": {
+      "size_bytes": 4209,
+      "sha256": "f314ea2ee2108c8e4f418e59ebbe8c2f85c51dceab5ce54b5e0ad6c1296db43d"
+    },
+    "Content/PostApocalypticCity/Textures/T_Base_N.uasset": {
+      "size_bytes": 29494,
+      "sha256": "cd64867adb4da0f55a94093e81d97887d2a2d665b1903f0f290f5007c7157361"
+    },
+    "Content/PostApocalypticCity/Textures/T_Base_SMRA.uasset": {
+      "size_bytes": 4458,
+      "sha256": "4714b28fa580f67b874f4a866ac0b301e215331fba858aa28ae64292b447f70c"
+    },
+    "Content/PostApocalypticCity/Textures/T_DirtMap1.uasset": {
+      "size_bytes": 528337,
+      "sha256": "9bf07bbfdb56a1a261b30c0f5d938ef163575eb086e9f120eb02a3646a5e2b4b"
+    },
+    "Content/PostApocalypticCity/Textures/T_Fill_Base.uasset": {
+      "size_bytes": 5499,
+      "sha256": "3117326cc0ec610244a38bea594529c6a08433d523e162d5d025f88a0f8d7115"
+    },
+    "Content/PostApocalypticCity/Textures/T_Grunge08_B.uasset": {
+      "size_bytes": 5740213,
+      "sha256": "676e900be3a64b21cf2d41f92d3af4a547300159c6f6e5153023c3c101310200"
+    },
+    "Content/PostApocalypticCity/Textures/T_Lights_Masks.uasset": {
+      "size_bytes": 1024578,
+      "sha256": "cbf1c5ac3d793fa7d812ad0825f579cb61a11505c745dc4ced9f84c7c6714748"
+    },
+    "Content/PostApocalypticCity/Textures/T_Lights_N.uasset": {
+      "size_bytes": 1357407,
+      "sha256": "2a1afd84fd6e96978222b22f3809fc98597817fbbe05e7919260587e821e9f4f"
+    },
+    "Content/PostApocalypticCity/Textures/T_LocusTree_N.uasset": {
+      "size_bytes": 23292735,
+      "sha256": "5b9236bce196a1af824783114bf3d2a80e7b3c681348b942522f7a8fc161e65e"
+    },
+    "Content/PostApocalypticCity/Textures/T_Locust_B.uasset": {
+      "size_bytes": 17912551,
+      "sha256": "0eeebd47ebcc5c2deb74aae0bc33227949ae77d6bf56c1c53c3f599b36708a4b"
+    },
+    "Content/PostApocalypticCity/Textures/T_Locust_S.uasset": {
+      "size_bytes": 11143262,
+      "sha256": "dd6e14fd2cdb435ece556f5c12f764bd05fffabdc28b6118d00fc8cc265e5b10"
+    },
+    "Content/PostApocalypticCity/Textures/T_Locust_SSC.uasset": {
+      "size_bytes": 959826,
+      "sha256": "6f869a7cebf45dae625e50cf7c61e2e5ea0b7d919b557bf0dc459ac4a0a390c7"
+    },
+    "Content/PostApocalypticCity/Textures/T_Noise_Cloud_01.uasset": {
+      "size_bytes": 485820,
+      "sha256": "4ce8e731933485e5a0603d1ca44fcefe84fd0d18f17530dafd33c07abf24f2b5"
+    },
+    "Content/PostApocalypticCity/Textures/T_PostApoc_Posters_01_BA.uasset": {
+      "size_bytes": 36960049,
+      "sha256": "7013814d43dd5eeda676a9dfd740c4246e81596107f24b527272748446092fa5"
+    },
+    "Content/PostApocalypticCity/Textures/T_PostApoc_Posters_01_N.uasset": {
+      "size_bytes": 32241705,
+      "sha256": "7cd105f678d08c0acd6f01807c70ea3af9c812d76c372401f834668bf16ed38f"
+    },
+    "Content/PostApocalypticCity/Textures/T_PostApoc_Posters_01_ORM.uasset": {
+      "size_bytes": 18595489,
+      "sha256": "7c5544531969015c599d01ec841f63a670443538a91e98683616c143848150bd"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV01_Body.uasset": {
+      "size_bytes": 601708,
+      "sha256": "1401fc1669b2b96e11029ea5ae363583d0824bfe93c5c317939bbb254d3d3133"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV01_Body_Masks.uasset": {
+      "size_bytes": 1326156,
+      "sha256": "93b48e5e280dfa80660069a0937661f591d93693d5d885b07dcd99c2027ca243"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV01_DirtMasks.uasset": {
+      "size_bytes": 30831346,
+      "sha256": "9f4591e475ca1754963d647f7872e08eb134b7b81fdac7cfe01bf0013a683111"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV02_Body_BaseColour.uasset": {
+      "size_bytes": 3807433,
+      "sha256": "33f4ca663daf3e50ba8bb82f0a8226217dea876891519a831d18dda94232727d"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV02_Body_Masks.uasset": {
+      "size_bytes": 5162994,
+      "sha256": "6fbe1a31af319fdfdacc642aaaee9b63d0fd32fba6d0f3f0ddbc63a68e89f938"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV02_DirtMasks.uasset": {
+      "size_bytes": 30242927,
+      "sha256": "6dfd95706d9420bbfd1aae14c401ba19570cbb404fff55535bc204e904d5d112"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV02_Glass.uasset": {
+      "size_bytes": 2361271,
+      "sha256": "cc1e171e7d2634a18051e5fbce97f2fc69c7bd8cd1a2230ae6ba14cb8ff3e8bc"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV02_Interior_BaseColour.uasset": {
+      "size_bytes": 15373736,
+      "sha256": "6b60e0d9477f7103fa8150bd531277f2e1dac41ef77afd7cd1aeee4b3e8fe047"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV02_Interior_Masks.uasset": {
+      "size_bytes": 18052643,
+      "sha256": "9d30aaad699c5d11c0c23bbec1c6994c6abf2763c2e2d88231c2e9844befee0a"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV02_Interior_N.uasset": {
+      "size_bytes": 55082380,
+      "sha256": "17dac02246ee1dce693f161559caca12f8b1955bccb6620cedc0a9aec94d9c0e"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV02_Seats_BaseColour.uasset": {
+      "size_bytes": 5952449,
+      "sha256": "36def92b0d85389f4c7f0643cc3ab17caca5e85596c12d31e03b87d6ea6894a6"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV02_Seats_N.uasset": {
+      "size_bytes": 16496837,
+      "sha256": "20ecf302e1771373fb2f21fdc94894626fdf941f0b802a9bd228348529a77d5c"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV04_Body_BaseColour.uasset": {
+      "size_bytes": 3098652,
+      "sha256": "2e1c9c85b3e6c420eadb8e21807e030470fcfe57b1ceb48702e3b46aea384d68"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV04_Body_Masks.uasset": {
+      "size_bytes": 5216640,
+      "sha256": "0f993ea7cefd96464b54243d5719a75888c7b90d3d610a3e2db7b3189c979687"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV04_DirtMasks.uasset": {
+      "size_bytes": 30368403,
+      "sha256": "025fa321a8f109c5a826ea49b5001ce9a9d424e1d900c0802df875d08f2f2664"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV04_Glass.uasset": {
+      "size_bytes": 2184465,
+      "sha256": "933428f6b2f0c679c7195f5fb090d126ec2b0764f672d23571925f3d25ec342f"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV04_Interior_BaseColour.uasset": {
+      "size_bytes": 16130541,
+      "sha256": "98df4c88fd169ce6fbd4ad0c0273a228afb948564546b2be57cac8fe7a606590"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV04_Interior_Masks.uasset": {
+      "size_bytes": 15673299,
+      "sha256": "556b44d31c438c98705d261cf1142a61e423ee9eaa73f288ad12403366547512"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV04_Interior_N.uasset": {
+      "size_bytes": 15911399,
+      "sha256": "34315d61d866a002e7039c0bd7e9584c8292cd29c2dff6ec3212d22b33f06220"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV04_Seats_BaseColour.uasset": {
+      "size_bytes": 6585582,
+      "sha256": "718bda91a02687fe6f0e132b672c2a8b66dcbac2858d30b7ed5ad449f21a61f7"
+    },
+    "Content/PostApocalypticCity/Textures/T_SUV04_Seats_N.uasset": {
+      "size_bytes": 5876957,
+      "sha256": "b74a7692d057d5c9314d7ac4511399298632054ae88c5f82510c25a8009253a9"
+    },
+    "Content/PostApocalypticCity/Textures/T_Sedan01_Interior.uasset": {
+      "size_bytes": 21642835,
+      "sha256": "44ec2c3444eb22744c96bbf5ae13fe7c8ea286eaef1645a02566816879d2f806"
+    },
+    "Content/PostApocalypticCity/Textures/T_Sedan01_Interior_Masks.uasset": {
+      "size_bytes": 14918161,
+      "sha256": "4e7fbec8bf677e2d5a85b6cb846a35b594e31dbb0c962095947868e20cc50732"
+    },
+    "Content/PostApocalypticCity/Textures/T_Sedan01_Interior_N.uasset": {
+      "size_bytes": 2849623,
+      "sha256": "50d4ad629a65a16404b297f7a776724d9b3dac68d1d6ecd5fd575107a63355e1"
+    },
+    "Content/PostApocalypticCity/Textures/T_Sedan01_Seats.uasset": {
+      "size_bytes": 9590893,
+      "sha256": "41d3a26c6960dfbd510d823cf9cbeecbe2d275068ef33dd7627a2d4b226a5d08"
+    },
+    "Content/PostApocalypticCity/Textures/T_Sedan01_Seats_N.uasset": {
+      "size_bytes": 2005896,
+      "sha256": "2af0b38920d139f4262e5c0c7fab3a8abc50321b7a1a30b12767344b1cd326d6"
+    },
+    "Content/PostApocalypticCity/Textures/T_TreeMask.uasset": {
+      "size_bytes": 18578512,
+      "sha256": "98555c2eb9d7ba4fd318c50b6a3253e79e9b701c1d12fdf62e56cfc8ac592e06"
+    },
+    "Content/PostApocalypticCity/Textures/T_WheelSet_01.uasset": {
+      "size_bytes": 1901861,
+      "sha256": "2ed6db150b1e07072b06848b711f7c854c6373dc42156acbd2dc1068fc51c941"
+    },
+    "Content/PostApocalypticCity/Textures/T_WheelSet_01_N.uasset": {
+      "size_bytes": 1669786,
+      "sha256": "f94e5a3d839aa2303221ae954a807859729baa6f660a9a55c221699b00a99ca5"
+    },
+    "Content/PostApocalypticCity/Textures/T_WheelSet_02_Masks.uasset": {
+      "size_bytes": 2866433,
+      "sha256": "c646c5ea336ddb6301cc356aa2cbd68c9f9ed82aa539960d91adb1736d2503d2"
+    },
+    "Content/PostApocalypticCity/Textures/T_WheelSet_04.uasset": {
+      "size_bytes": 1366036,
+      "sha256": "83387d608c82b13cc26915b4c5626118c1b569af5c5113bb31b0a9fe6eef98de"
+    },
+    "Content/PostApocalypticCity/Textures/T_WheelSet_04_Mask.uasset": {
+      "size_bytes": 3507502,
+      "sha256": "1c0c45ecb2309c5d91964c182ea83d78542d18f5aa54ba9a76d063b2441ddd49"
+    },
+    "Content/PostApocalypticCity/Textures/T_WheelSet_04_N.uasset": {
+      "size_bytes": 2610232,
+      "sha256": "53b0ad355f22a61f1243efe4bf28d07e133445be80d3ce4dfead25b6e7dcf813"
+    },
+    "Content/PostApocalypticCity/Textures/T_WheelSet_05.uasset": {
+      "size_bytes": 2732862,
+      "sha256": "941fb28ccfc33e08eec8a8065e4f0e8a3c8a7b30c31c8c593ede6a70fcce0678"
+    },
+    "Content/PostApocalypticCity/Textures/T_WheelSet_05_Masks.uasset": {
+      "size_bytes": 4010625,
+      "sha256": "28e3642bcc4251f6660aa5412dbb950951116b3edb2350a6c6fe62f1b4c02d1d"
+    },
+    "Content/PostApocalypticCity/Textures/T_WheelSet_05_N.uasset": {
+      "size_bytes": 10580629,
+      "sha256": "becc8ae8f60aa80b8cc1e958c61d85933b08281e133bd63553a1e90a637d9674"
+    },
+    "Content/PostApocalypticCity/Textures/T_Windows_Masks.uasset": {
+      "size_bytes": 3035015,
+      "sha256": "c112eb41ebcbc620744e900dfe29573c1634766f3abb4c987fd7b3e68cf1e395"
+    },
+    "Content/RealismLab/Distinct/Materials/MI_DistinctGreen_MI_Bush1_bush.uasset": {
+      "size_bytes": 11216,
+      "sha256": "0f488fb6ecd38883d5caf071c08d8d8edd73520ef45430473b5dcb75ade0acb3"
+    },
+    "Content/RealismLab/Distinct/Materials/MI_DistinctGreen_MI_HerbsLong_herb.uasset": {
+      "size_bytes": 20333,
+      "sha256": "f1cada4d9061ac063805866e9d641ed9057e5ad33b19dc58d26c241e24ec0a10"
+    },
+    "Content/RealismLab/Distinct/Materials/MI_DistinctGreen_MI_Nettle_Master_nettle.uasset": {
+      "size_bytes": 26122,
+      "sha256": "d1ad68e6cfca3c87ac11d26e797aa6889fe891d21f025fab97e69ca4dda020d0"
+    },
+    "Content/RealismLab/Distinct/Materials/M_Boulder01.uasset": {
+      "size_bytes": 6294,
+      "sha256": "65845467cb1794026d9bab5fc346dffa0d0de65e257b58a340424da3ae78ef44"
+    },
+    "Content/RealismLab/Distinct/Materials/M_DistinctForestSurfaces.uasset": {
+      "size_bytes": 137823,
+      "sha256": "0490ffaf51ac6e681b60b1d51bfb85b1c64f1e3c300092313f7fc4b365514cc3"
+    },
+    "Content/RealismLab/Distinct/Meshes/SM_Boulder01.uasset": {
+      "size_bytes": 6493834,
+      "sha256": "9652e8a9a1be79f547938b0a5d156996d994674d5623bf84523a622677f735ea"
+    },
+    "Content/RealismLab/Distinct/Textures/Grass001_diff_2k_srgb8.uasset": {
+      "size_bytes": 9677224,
+      "sha256": "c1b5c78c7fa9bbd1cffaa6ff56f1439da49d6362fdf8ba6aeacc93973f82ea95"
+    },
+    "Content/RealismLab/Distinct/Textures/Grass001_nor_dx_2k.uasset": {
+      "size_bytes": 25669236,
+      "sha256": "2d9a6f4b2b52956e80c8e21b1d6908c746290c94bb0db3dfc4abd2998796d0ec"
+    },
+    "Content/RealismLab/Distinct/Textures/Grass001_rough_2k.uasset": {
+      "size_bytes": 3488969,
+      "sha256": "cc728165cf47507f684e56e8b6acc4d362c46ba080158dc308aeed8d9023a37b"
+    },
+    "Content/RealismLab/Distinct/Textures/boulder_01_diff_2k_srgb8.uasset": {
+      "size_bytes": 8427992,
+      "sha256": "4a0990b29a64a27679880da2553ae615cc02ff16aea0ca8352a88e0a96d4e0f3"
+    },
+    "Content/RealismLab/Distinct/Textures/boulder_01_nor_dx_2k.uasset": {
+      "size_bytes": 22706912,
+      "sha256": "1e3be700c5d25a4c0a759d0977cca7e5fc6da1cd2ccbac47bca1729f8d0b5f00"
+    },
+    "Content/RealismLab/Distinct/Textures/boulder_01_rough_2k.uasset": {
+      "size_bytes": 5776007,
+      "sha256": "5a090fb4c4944ff16f77dce2200762ffe5d5df08c23dca227a93657d8a6955c3"
+    },
+    "Content/RealismLab/Distinct/Textures/dry_decay_leaves_diff_2k_srgb8.uasset": {
+      "size_bytes": 7050205,
+      "sha256": "f7448aad29554b966c17bf03322d12a77c9fa89c0cf7fcdf2e301381efda1c12"
+    },
+    "Content/RealismLab/Distinct/Textures/dry_decay_leaves_nor_dx_2k.uasset": {
+      "size_bytes": 24831041,
+      "sha256": "0aeab1187ce549a532a085715e4e26562addd11cf8a2a92b5b2e2e45f3233cf9"
+    },
+    "Content/RealismLab/Distinct/Textures/dry_decay_leaves_rough_2k.uasset": {
+      "size_bytes": 7160688,
+      "sha256": "652dadfd96dfac27576fc9ffc6abb2e4600407bd6dd8753b40ba8b8c4fc7a82f"
+    },
+    "Content/RealismLab/Distinct/Textures/gravel_floor_02_diff_2k_srgb8.uasset": {
+      "size_bytes": 9575535,
+      "sha256": "87ab7ffa96add3401432643949e881c6e4d9cd8fc0a6f0b404441a96ccd3b2f5"
+    },
+    "Content/RealismLab/Distinct/Textures/gravel_floor_02_nor_dx_2k.uasset": {
+      "size_bytes": 25617847,
+      "sha256": "9d93cd6433d8800e67ad446edb82264f019af3ae4e5504e94150591b67c42cb8"
+    },
+    "Content/RealismLab/Distinct/Textures/gravel_floor_02_rough_2k.uasset": {
+      "size_bytes": 12168798,
+      "sha256": "22fa8b8aed6ca9fb5e5d20052ba240b592879e87ba92a12e5c02501c570f381a"
+    },
+    "Content/RealismLab/Textures/stony_dirt_path_diff_2k_srgb8.uasset": {
+      "size_bytes": 9471111,
+      "sha256": "8ae60f6b22627f5af0eef07ae1f6dd08875933481188dbdb83dffbd761bd905a"
+    },
+    "Content/RealismLab/Textures/stony_dirt_path_nor_dx_2k.uasset": {
+      "size_bytes": 25954254,
+      "sha256": "91c01a3d7a22c40b18b4b27c2c03c5f3a5a31f95405bb5fafcc11f435dfc2dbc"
+    },
+    "Content/RealismLab/Textures/stony_dirt_path_rough_2k.uasset": {
+      "size_bytes": 9462290,
+      "sha256": "75eaef385347b73444e3b67aeac33e491fcfa85e808f279f35b3fe39a2442b1e"
+    },
+    "Content/Target/c006.uasset": {
+      "size_bytes": 2863409,
+      "sha256": "544864e385a223386437358523fafc87be2da2cadfd5b20f9b7a66f70f5199d8"
+    },
+    "Content/Target/c007.uasset": {
+      "size_bytes": 3827072,
+      "sha256": "47dee17d1fe774307b45630cf34153a9e41f31c1316dd68303946ae2d7c72462"
+    },
+    "Content/Target/r001.uasset": {
+      "size_bytes": 1128298,
+      "sha256": "21ca3eb2ce3b262fe4e116d9ab3ceb7fef1e3121add46588dcc09943a011d745"
+    },
+    "Content/Target/r002.uasset": {
+      "size_bytes": 1129426,
+      "sha256": "ba222ca5aa63e0e470bbbb066f0935a5346feca21048c1801291c2ad589c6a36"
+    },
+    "Content/Target/r003.uasset": {
+      "size_bytes": 696205,
+      "sha256": "1eadc27a8c75ad7b2f0a37af9df95e6ea50883b82c15abd03cbdb6355384d35c"
+    },
+    "Content/Target/r004.uasset": {
+      "size_bytes": 727726,
+      "sha256": "14cf914ce1698857b5efdeb8e4de9b9c4549a9f9e7fddd5dca423e561cd7c9f5"
+    },
+    "Content/Target/r005.uasset": {
+      "size_bytes": 737962,
+      "sha256": "278a34f39348c2b222fc181f65c523b1c1174accfb9bf9fad162aa408192caa3"
+    },
+    "Content/Target/r006.uasset": {
+      "size_bytes": 1387451,
+      "sha256": "7cdafc7a2636626374e0dc44614162f5983ac1f3c2e045ac448a77e369cd70fc"
+    },
+    "Content/Target/r007.uasset": {
+      "size_bytes": 2453249,
+      "sha256": "bf385b8b00c8191e5410e5226f6fb8c5cc83da142725e4cac7efa09168a0adfc"
+    },
+    "Content/Target/r008.uasset": {
+      "size_bytes": 4219719,
+      "sha256": "63f7e24f4095b25252ed4816215d374f0c7f3650472f94b3dfdeefe5f2881b20"
+    },
+    "Content/Target/r009.uasset": {
+      "size_bytes": 6676614,
+      "sha256": "81b0db49466b00f83f0b6bf06c1184aece80f8935349146613bb85b7643ff327"
+    },
+    "Content/Target/test/c009.uasset": {
+      "size_bytes": 7594777,
+      "sha256": "319aea0252d7bb3b6f5c0da1de0ef0f679acebc2967d5bdab1aebfc397e3ffb2"
+    },
+    "Content/Target/test/c010.uasset": {
+      "size_bytes": 2640600,
+      "sha256": "1527d58ece12a501e6e48617157cdc6ab4ae622db1d6550954adf95b6cccc07c"
+    },
+    "Content/Target/test/r010.uasset": {
+      "size_bytes": 1053585,
+      "sha256": "2dd4ae1f0cfba21c1e83628c0d70de2800710940c184b7692d06a842c632d159"
+    },
+    "Content/Target/test/r011.uasset": {
+      "size_bytes": 1275338,
+      "sha256": "b62e5006601134776335257476f0000decf1cf266341b3ca448f499437f4bf51"
+    }
+  },
+  "total_bytes": 4114174177,
+  "missing_project_dependencies": []
+}

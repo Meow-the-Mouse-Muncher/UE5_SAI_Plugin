@@ -1,0 +1,36 @@
+{
+  "success": true,
+  "status": "final",
+  "map_count": 28,
+  "map_directory": "/Game/Map/dataset",
+  "asset_directory": "/Game/ForestDataset",
+  "asset_files_checked": 613,
+  "exact_actor_component_and_foliage_instance_states_preserved": true,
+  "owned_mesh_geometries_preserved": 36,
+  "sampling_sequences": {
+    "train": 17280,
+    "test": 1920
+  },
+  "validation_split": null,
+  "unit_and_compatibility_tests_passed": 18,
+  "remote_render_validation": {
+    "map_count": 8,
+    "sequences": 12,
+    "rgb_files": 600,
+    "depth_files": 600,
+    "fbx_files": 12
+  },
+  "post_render_assets_unchanged": true,
+  "production_capture_started": false,
+  "manifest_sha256": "a128e0aca4ce3ea563803a747297c31d8befe1f122cdb201d941e84464872e46",
+  "asset_manifest_sha256": "645027c2265aee296e4976e22e926bde21bcb501a8a5715d164c16ced962cf2d",
+  "source_files_sha256": {
+    "Plugins/MatrixCityPlugin/misc/dataset_plan.py": "640c170e6b687612ac3b56e16c2dfeb54e6cc2b4be11d146efdcdad007dbcef4",
+    "Plugins/MatrixCityPlugin/misc/render_dataset.py": "7b9df8750b9765bfcafe7e4f8315455f66148908aeff7eebefd4d46c4e2b2e2a",
+    "Plugins/MatrixCityPlugin/Content/Python/batch_utils.py": "ca894689a441ac09821cf91aaff1d282d0f8ca05fe84ef1b9a49501b401ee9e9",
+    "Plugins/MatrixCityPlugin/Content/Python/render_controller.py": "904a780ad18344efb5e684cd82b4d9b86322f2a12c66e8498ad779fdfaf5e00e",
+    "Plugins/MatrixCityPlugin/Content/Python/custom_movie_pipeline.py": "854bf73bde66e444090d79fc6a712c228dbf9a65895164c30af66ad42f46299e",
+    "Plugins/MatrixCityPlugin/Content/Python/utils_sequencer.py": "15ab6d36fb0942c5c9a1ff4d989c8a773a777353fd3c3168b53656182d439884"
+  },
+  "source_semantics_preserved_after_line_ending_normalization": true
+}

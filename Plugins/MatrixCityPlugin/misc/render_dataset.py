@@ -106,6 +106,8 @@ def main(argv=None):
     parser.add_argument("--workers-per-gpu", "--processes_per_gpu", type=int, default=1)
     parser.add_argument("--num_gpus", "--num-gpus", type=int, default=None, help="Legacy limit; --gpu-ids auto still excludes busy cards")
     parser.add_argument("--maps", "-m", nargs="+")
+    parser.add_argument("--split", choices=("train", "test", "all"), default="train")
+    parser.add_argument("--sequence-plan", help="Approved CSV; defaults to Config/Dataset for the selected split")
     parser.add_argument("--targets", nargs="+")
     parser.add_argument("--trajectory-config", default=str(PLUGIN_ROOT / "misc/trajectory_config.yaml"))
     parser.add_argument("--render-config")
@@ -137,7 +139,13 @@ def main(argv=None):
     trajectory_path = resolve_path(args.trajectory_config)
     trajectory = yaml.safe_load(trajectory_path.read_text(encoding="utf-8"))
     render = load_render_config(resolve_path(args.render_config or config["render_config"], config_path.parent))
-    output_root = Path(args.output_root or render["Output_Path"]).expanduser().resolve()
+    final_dataset = (project.parent / 'Config/Dataset/dataset_manifest.json').is_file()
+    configured_output = Path(render['Output_Path']).expanduser()
+    if not configured_output.is_absolute():
+        configured_output = project.parent / configured_output
+    if final_dataset:
+        configured_output = configured_output / args.split
+    output_root = Path(args.output_root or configured_output).expanduser().resolve()
     render["Output_Path"] = str(output_root)
     if args.dry_run and args.gpu_ids != "auto":
         identities = [g.strip() for g in args.gpu_ids.split(",")]
@@ -152,15 +160,29 @@ def main(argv=None):
         gpus = gpus[:args.num_gpus]
     slots = len(gpus) * args.workers_per_gpu
     shard_count = args.shards_per_scene or (slots * 2 if len(maps) < slots else 1)
-    jobs = prepare_plan(config, trajectory, maps, shard_count, args.task_limit, args.targets)
+    dataset_identity = None
+    selected_rows = []
+    if final_dataset:
+        import dataset_plan
+        manifest, dataset_identity = dataset_plan.installed_manifest(project)
+        splits = ('train', 'test') if args.split == 'all' else (args.split,)
+        plan_paths = ([resolve_path(args.sequence_plan)] if args.sequence_plan else
+                      [project.parent / ('Config/Dataset/' + s + '_sequences.csv') for s in splits])
+        jobs, summary, selected_rows = dataset_plan.jobs_from_csv(plan_paths, manifest, maps, args.targets,
+            shard_count, args.task_limit, trajectory_tasks(trajectory))
+        dataset_identity.update(summary)
+    else:
+        if args.sequence_plan:
+            raise ValueError('A sequence plan requires the installed final dataset manifest')
+        jobs = prepare_plan(config, trajectory, maps, shard_count, args.task_limit, args.targets)
     fingerprint_data = {"jobs": jobs, "render": render, "trajectory": trajectory,
-                        "seed": args.seed, "sync_profile": args.sync_profile}
+                        "seed": args.seed, "sync_profile": args.sync_profile, "dataset": dataset_identity}
     fingerprint = hashlib.sha256(json.dumps(fingerprint_data, sort_keys=True).encode()).hexdigest()
     default_run = project.parent / "Saved/RenderRuns" / (time.strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:8])
     run_dir = Path(args.run_dir or default_run).resolve()
     plan = {"fingerprint": fingerprint, "run_dir": str(run_dir), "output_root": str(output_root),
             "gpus": gpus, "workers_per_gpu": args.workers_per_gpu, "jobs": jobs,
-            "render_config": render, "trajectory_config": trajectory}
+            "render_config": render, "trajectory_config": trajectory, "dataset": dataset_identity}
     if args.dry_run:
         print(json.dumps(plan, indent=2))
         return 0
@@ -172,6 +194,8 @@ def main(argv=None):
     output_root.mkdir(parents=True, exist_ok=True)
     dump_json(run_dir / "plan.json", plan)
     dump_json(run_dir / "launch.json", config)
+    if selected_rows:
+        dataset_plan.output_index(selected_rows, run_dir / 'sequence_index.csv')
     (run_dir / "trajectory.yaml").write_text(yaml.safe_dump(trajectory, sort_keys=False), encoding="utf-8")
     (run_dir / "render.yaml").write_text(yaml.safe_dump(render, sort_keys=False), encoding="utf-8")
     pending = queue.Queue()
@@ -180,7 +204,13 @@ def main(argv=None):
         if args.resume and marker.is_file():
             old = json.loads(marker.read_text())
             current = output_inventory(output_root, job)
-            if old.get("fingerprint") == fingerprint and current == old.get("output"):
+            valid_frames = True
+            if final_dataset:
+                try:
+                    dataset_plan.check_output(output_root, job, render)
+                except ValueError:
+                    valid_frames = False
+            if valid_frames and old.get("fingerprint") == fingerprint and current == old.get("output"):
                 logging.info("RESUME_SKIP %s", job["id"])
                 continue
         pending.put(job)
@@ -211,8 +241,10 @@ def main(argv=None):
                        "telemetry_path": str(job_dir / "steps.jsonl"),
                        "export_output_path": str(output_root / "Exported_FBX"),
                        "performance_settings": SYNC_PROFILES[args.sync_profile]}
-                if args.targets:
-                    options["target_names"] = args.targets
+                if job.get('target_names'):
+                    options['target_names'] = job['target_names']
+                if 'occlusion_actor_names' in job:
+                    options['occlusion_actor_names'] = job['occlusion_actor_names']
                 dump_json(job_dir / "worker.json", options)
                 port = args.base_port + slot if args.base_port is not None else allocate_port()
                 command = [sys.executable, str(PLUGIN_ROOT / "misc/run_cmd_async.py"),
@@ -233,6 +265,8 @@ def main(argv=None):
                                 pass
                     returncode = proc.wait()
                 inventory = output_inventory(output_root, job)
+                if returncode == 0 and final_dataset:
+                    dataset_plan.check_output(output_root, job, render)
                 result = {"id": job["id"], "gpu": gpu["index"], "returncode": returncode,
                       "wall_seconds": round(time.monotonic() - start, 3), "output": inventory,
                       "fingerprint": fingerprint}

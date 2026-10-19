@@ -14,3 +14,9 @@ scripts/trajectory_figs
 # Python runtime caches are generated locally.
 **/__pycache__/
 *.py[cod]
+
+!/FOREST_DATASET.md
+!/.gitattributes
+!/Config/
+!/Config/Dataset/
+!/Config/Dataset/**

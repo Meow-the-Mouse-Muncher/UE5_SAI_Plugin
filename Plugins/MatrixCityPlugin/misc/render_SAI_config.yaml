@@ -1,88 +1,56 @@
-# 批量渲染配置文件
 _BASE_: render_config.yaml
-
-# 基础渲染设置
-Resolution: [512, 512]
-Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders_rot/test_data/"
-File_Name_Format: "{sequence_name}/{render_pass}/{frame_number}"
+Resolution:
+- 512
+- 512
+Output_Path: Saved/MovieRenders/forest_dataset
+File_Name_Format: '{sequence_name}/{render_pass}/{frame_number}'
 Motion_Blur: false
-
-# Capture bounds are within 10 km. Skip history-based occlusion inside this range.
-# Keep the query infrastructure enabled to avoid Vulkan GPU-readback assertions.
 Console_Variables:
-    r.AllowOcclusionQueries: 1
-    r.HZBOcclusion: 0
-    r.NeverOcclusionTestDistance: 1000000  # UE cm = 10 km
-
-# 仅补 OCC 深度单帧（用于快速恢复缺失数据）
+  r.AllowOcclusionQueries: 1
+  r.HZBOcclusion: 0
+  r.NeverOcclusionTestDistance: 1000000
+  r.Test.OverrideTimeMaterialExpressions: 0
 Only_OCC: false
 Single_Frame_Only: false
 Single_Frame_Index: 12
-
 Anti_Alias:
-    enable: true
-    spatial_samples: 8
-    temporal_samples: 1
-
-# 渲染通道设置
+  enable: true
+  spatial_samples: 8
+  temporal_samples: 1
 Render_Passes:
-    -
-        pass_name: 'rgb'
-        enable: true
-        ext: "png"
-    -
-        pass_name: 'depth'
-        enable: true
-        ext: "exr"
-    -
-        pass_name: 'normal'
-        enable: false
-        ext: "exr"
-    -
-        pass_name: 'diffuse'
-        enable: false
-        ext: "png"
-    -
-        pass_name: 'metallic'
-        enable: false
-        ext: "png"
-    -
-        pass_name: 'roughness'
-        enable: false
-        ext: "png"
-    -
-        pass_name: 'specular'
-        enable: false
-        ext: "png"
-    -
-        pass_name: 'basecolor'
-        enable: false
-        ext: "png"
-
-# 批量处理设置
+- pass_name: rgb
+  enable: true
+  ext: png
+- pass_name: depth
+  enable: true
+  ext: exr
+- pass_name: normal
+  enable: false
+  ext: exr
+- pass_name: diffuse
+  enable: false
+  ext: png
+- pass_name: metallic
+  enable: false
+  ext: png
+- pass_name: roughness
+  enable: false
+  ext: png
+- pass_name: specular
+  enable: false
+  ext: png
+- pass_name: basecolor
+  enable: false
+  ext: png
 Batch_Settings:
-  # 地图文件夹路径
-  maps_folder: "/Game/Map"
-  
-  # 目标物前缀
-  target_prefix: "Target_"
-  
-  # 遮挡物前缀
-  occlusion_prefix: "SM_"
-  
-  # 相机名称
-  camera_name: "CineCameraActor1"
-  
-  # 序列设置
+  maps_folder: /Game/Map/dataset
+  target_prefix: Target_
+  occlusion_prefix: SM_
+  camera_name: CineCameraActor1
   sequence_fps: 24
-  sequence_folder: "/Game/Sequences"
-
-# 输出设置
+  sequence_folder: /Game/Sequences
 Output_Settings:
-  # 文件命名格式
-  # 支持的变量: {map_name}, {target_name}, {suffix}, {render_pass}, {frame_number}
-  file_name_format: "{map_name}_{target_name}_{suffix}/{render_pass}/{frame_number}"
-  
-  # 后缀设置
-  occlusion_suffix: "occ"    # 有遮挡物的后缀
-  ground_truth_suffix: "GT"  # 无遮挡物的后缀
+  file_name_format: '{map_name}_{target_name}_{suffix}/{render_pass}/{frame_number}'
+  occlusion_suffix: occ
+  ground_truth_suffix: GT
+  base_output_path: Saved/MovieRenders/forest_dataset

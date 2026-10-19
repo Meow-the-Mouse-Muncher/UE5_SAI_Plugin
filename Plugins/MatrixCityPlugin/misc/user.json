@@ -2,7 +2,34 @@
   "ue_command": "/home/user1/Unreal_Engine_5.6/Engine/Binaries/Linux/UnrealEditor",
   "ue_project": "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/PCGBiomeForestPoplar.uproject",
   "maps": [
-    "scene_010"
+    "/Game/Map/dataset/test/scene_010_edge",
+    "/Game/Map/dataset/test/scene_010_grass",
+    "/Game/Map/dataset/test/scene_010_litter",
+    "/Game/Map/dataset/test/scene_010_road",
+    "/Game/Map/dataset/train/scene_007_edge",
+    "/Game/Map/dataset/train/scene_007_grass",
+    "/Game/Map/dataset/train/scene_007_litter",
+    "/Game/Map/dataset/train/scene_007_road",
+    "/Game/Map/dataset/train/scene_008_edge",
+    "/Game/Map/dataset/train/scene_008_grass",
+    "/Game/Map/dataset/train/scene_008_litter",
+    "/Game/Map/dataset/train/scene_008_road",
+    "/Game/Map/dataset/train/scene_009_edge",
+    "/Game/Map/dataset/train/scene_009_grass",
+    "/Game/Map/dataset/train/scene_009_litter",
+    "/Game/Map/dataset/train/scene_009_road",
+    "/Game/Map/dataset/train/scene_011_edge",
+    "/Game/Map/dataset/train/scene_011_grass",
+    "/Game/Map/dataset/train/scene_011_litter",
+    "/Game/Map/dataset/train/scene_011_road",
+    "/Game/Map/dataset/train/scene_012_edge",
+    "/Game/Map/dataset/train/scene_012_grass",
+    "/Game/Map/dataset/train/scene_012_litter",
+    "/Game/Map/dataset/train/scene_012_road",
+    "/Game/Map/dataset/train/scene_013_edge",
+    "/Game/Map/dataset/train/scene_013_grass",
+    "/Game/Map/dataset/train/scene_013_litter",
+    "/Game/Map/dataset/train/scene_013_road"
   ],
   "camera_name": "CineCameraActor1",
   "render_config": "misc/render_SAI_config.yaml",
@@ -10,5 +37,5 @@
   "batch_mode": true,
   "target_prefix": "Target_",
   "occlusion_prefix": "SM_",
-  "ue_map": "/Game/Map/scene_010"
+  "ue_map": "/Game/Map/dataset/test/scene_010_grass"
 }

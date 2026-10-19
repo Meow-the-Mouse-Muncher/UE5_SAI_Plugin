@@ -1,0 +1,6 @@
+# Dataset manifests are checksummed as exact bytes.
+Config/Dataset/** -text
+Plugins/MatrixCityPlugin/Content/Python/*.py text eol=lf
+Plugins/MatrixCityPlugin/misc/*.py text eol=lf
+Plugins/MatrixCityPlugin/misc/*.yaml text eol=lf
+scripts/forest_dataset/*.py text eol=lf

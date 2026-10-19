@@ -588,7 +588,9 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
     if map_name is None:
         level = config.get('ue_map', '/Game/Map/main')
     else:
-        level = render_worker.get_worker_config().get('map_package_path') or f'/Game/Map/{map_name}'
+        level = render_worker.get_worker_config().get('map_package_path') or unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world().get_path_name().split('.')[0]
+        if level.rsplit('/', 1)[-1] != map_name:
+            raise ValueError('The loaded map does not match the requested final map')
         
     # 从配置中获取相机名称，默认为 'CineCameraActor1'
     target_camera_name = config.get('camera_name', 'CineCameraActor1')
