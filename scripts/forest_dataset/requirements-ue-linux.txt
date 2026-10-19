@@ -1,0 +1,8 @@
+numpy==2.3.5
+PyYAML==6.0.3
+yacs==0.1.8
+pydantic==2.12.5
+pydantic_core==2.41.5
+annotated-types==0.7.0
+typing-inspection==0.4.2
+typing-extensions==4.15.0

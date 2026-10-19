@@ -20,28 +20,34 @@
 
 训练24图，共17280条完整序列，每图720条；测试4图，共1920条，每图480条。训练/测试序列约9:1，不设验证集。同一原始场景的全部环境类型归属同一集合。正式清单位于 `Config/Dataset/`。
 
-## 在user1渲染
+## 在moqi_h20_UE渲染
 
-服务器项目为 `/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/`，使用原有UE5.6.1和已修正的Linux渲染插件。在服务器执行：
+项目部署在 `/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/`，直接使用现有 `Plugins/MatrixCityPlugin/misc/render_dataset.py` 入口和 `misc/user.json`。UE使用 `/opt/UE_5.6` 的5.6.1，通过已有 `/usr/local/bin/ue56` 启动。
 
 ```bash
-cd /home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar
+cd /mnt/nas_b/sjy/code/PCGBiomeForestPoplar
 
-# 只检查计划与素材，不启动UE。
-python3 Plugins/MatrixCityPlugin/misc/render_dataset.py --split train --gpu-ids 1 --dry-run
+# 检查正式计划与素材，不启动UE。
+python3 Plugins/MatrixCityPlugin/misc/render_dataset.py --split train --gpu-ids 0 --dry-run
 
-# 正式训练集；确认GPU1可用后执行。
+# 正式训练集。
 python3 Plugins/MatrixCityPlugin/misc/render_dataset.py \
-  --split train --gpu-ids 1 --workers-per-gpu 1 --sync-profile balanced
+  --split train --gpu-ids 0 --workers-per-gpu 1 --sync-profile balanced
 
 # 正式测试集。
 python3 Plugins/MatrixCityPlugin/misc/render_dataset.py \
-  --split test --gpu-ids 1 --workers-per-gpu 1 --sync-profile balanced
+  --split test --gpu-ids 0 --workers-per-gpu 1 --sync-profile balanced
 ```
+
+root运行时，原入口根据 `user.json` 自动切换为非root的 `ue` 用户，并为GPU预探测和UE设置相同的NVIDIA Vulkan环境。H20为物理GPU0；项目及输出目录须允许 `ue` 写入。
+
+系统Python负责调度和验证，UE内置Python3.11负责场景脚本；两者使用各自现有的site-packages，不创建虚拟环境。UE依赖版本记录在 `scripts/forest_dataset/requirements-ue-linux.txt`。
+
+当前H20实际使用VULKAN_SM6。驱动未提供UE5.6硬件光追配置所需的 `rayTracingPositionFetch` 特性，UE自动禁用硬件光追；项目已启用网格距离场，Lumen可以使用软件回退。分辨率、采样和Nanite配置保留。正式采集统一在moqi完成，以保持渲染后端一致。
 
 默认按CSV中已批准的Target/高度/方向/轨迹组合渲染，保留既定预算。`--maps`可接完整包路径，例如 `--maps /Game/Map/dataset/test/scene_010_grass`；`--targets Target_001`可只验证一个完整目标，`--task-limit 1`可限制每个Target的序列数。`--split all`选择两个集合。
 
-不指定GPU编号时只自动选择空闲GPU。初次验证采用单worker，原场景的双worker显存预算不能直接套用终版实体地被场景。原有GPU UUID与Vulkan适配器匹配、深度读回兼容设置、独立worker端口与序列目录保留。
+不指定GPU编号时只自动选择空闲GPU。初次验证采用单worker，原场景的双worker显存预算不能直接套用终版实体地被场景。GPU UUID与Vulkan适配器匹配、深度读回兼容设置、独立worker端口与序列目录保留。
 
 默认输出为 `Saved/MovieRenders/forest_dataset/train` 或 `test`，可用 `--output-root`指定独立目录。`Saved/RenderRuns/.../plan.json`、`sequence_index.csv`、`progress.json`和`result.json`记录运行状态。恢复时复用相同 `--run-dir`、输出和参数，并加 `--resume`；缺帧不能作为成功任务跳过。
 
@@ -55,7 +61,7 @@ OCC/GT按终版清单中的树木内部Actor名称切换。OCC显示原树，GT�
 
 ## 验收与限制
 
-`Config/Dataset/asset_manifest.json`记录素材SHA，渲染前会核对实际文件；`dataset_manifest.json`记录地图与完整Target。更名验收及继承的静态几何/遮挡证据位于 `Saved/ForestDataset/`，服务器部署与实际渲染验证记录也放在该目录。
+`Config/Dataset/asset_manifest.json`记录素材SHA，渲染前会核对实际文件；`dataset_manifest.json`记录地图与完整Target。更名及静态几何/遮挡的历史验收证据保存在user1原工程的 `Saved/ForestDataset/`。本次moqi迁移和实际渲染证据位于当前工程的 `Saved/Migration/`。
 
 已接受的408个Target/地图状态均有树木遮挡，平均约86.7%，静态检查未发现穿模。为保留原树布局，scene_007的Target_006、scene_009的Target_005与Target_016分别整体平移约0.5、4.5、1.75米，内部组合保留。
 
@@ -63,4 +69,9 @@ OCC/GT按终版清单中的树木内部Actor名称切换。OCC显示原树，GT�
 
 本轮仅进行小规模部署验证；正式17280/1920条采集由上述正式命令启动。
 
-服务器实际验证已通过：8张地图、12条完整序列、600张RGB、600张可解码且有限非零的深度EXR及12份FBX；五种轨迹均覆盖。渲染后613个素材SHA保持一致。结果见 `Saved/ForestDataset/render_validation.json`、`server_ready.json`及 `previews/server_render_samples.png`。
+user1上的历史验证已通过：8张地图、12条完整序列、600张RGB、600张可解码且有限非零的深度EXR及12份FBX；五种轨迹均覆盖。渲染后613个素材SHA保持一致。历史结果保存在user1原工程的 `Saved/ForestDataset/render_validation.json` 和 `server_ready.json`。
+
+
+moqi实际验收通过：8张地图覆盖四类环境及训练/测试集合，12条完整序列覆盖五种轨迹，共600张RGB、600张可解码且有限非零的深度EXR、12份FBX。渲染后613个素材SHA均未改变。仅完成上述小规模验收，正式17280/1920条采集由前述命令启动。
+
+验收汇总为 `Saved/Migration/moqi_ready.json`，运行环境为 `runtime_environment.json`；两轮逐帧检查报告位于 `smoke/five_trajectories/render_validation.json` 和 `smoke/seven_environments/render_validation.json`。部署传输校验覆盖702个文件、4,124,271,840字节，未迁移原始渲染输出、旧缓存和无关素材。

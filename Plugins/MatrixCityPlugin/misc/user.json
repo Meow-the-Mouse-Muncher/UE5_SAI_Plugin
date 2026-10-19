@@ -1,6 +1,6 @@
 {
-  "ue_command": "/home/user1/Unreal_Engine_5.6/Engine/Binaries/Linux/UnrealEditor",
-  "ue_project": "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/PCGBiomeForestPoplar.uproject",
+  "ue_command": "/usr/local/bin/ue56",
+  "ue_project": "/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/PCGBiomeForestPoplar.uproject",
   "maps": [
     "/Game/Map/dataset/test/scene_010_edge",
     "/Game/Map/dataset/test/scene_010_grass",
@@ -37,5 +37,26 @@
   "batch_mode": true,
   "target_prefix": "Target_",
   "occlusion_prefix": "SM_",
-  "ue_map": "/Game/Map/dataset/test/scene_010_grass"
+  "ue_map": "/Game/Map/dataset/test/scene_010_grass",
+  "run_as_user": "ue",
+  "unset_environment": [
+    "DISPLAY",
+    "WAYLAND_DISPLAY",
+    "SDL_VIDEODRIVER",
+    "PYTHONHOME",
+    "PYTHONPATH",
+    "LD_PRELOAD"
+  ],
+  "environment": {
+    "HOME": "/opt/ue-home",
+    "USER": "ue",
+    "LOGNAME": "ue",
+    "PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+    "XDG_RUNTIME_DIR": "/opt/ue-home/runtime",
+    "XDG_CACHE_HOME": "/opt/ue56-cache",
+    "LD_LIBRARY_PATH": "/usr/lib/x86_64-linux-gnu:/usr/local/nvidia/lib64:/usr/local/nvidia/lib",
+    "VK_ICD_FILENAMES": "/opt/ue56-install/nvidia-egl.json",
+    "VK_DRIVER_FILES": "/opt/ue56-install/nvidia-egl.json",
+    "UE-LocalDataCachePath": "/opt/ue56-cache/ddc"
+  }
 }

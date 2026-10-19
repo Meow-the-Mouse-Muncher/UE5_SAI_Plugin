@@ -29,6 +29,37 @@ SYNC_PROFILES = {
 }
 
 
+def configure_runtime(config, argv):
+    """Select the configured Linux user before applying its runtime environment."""
+    user = config.get("run_as_user")
+    if user is not None:
+        if not isinstance(user, str) or not user:
+            raise ValueError("run_as_user must be a nonempty username")
+        if sys.platform != "linux":
+            raise ValueError("run_as_user is supported only on Linux")
+        import pwd
+        try:
+            target_uid = pwd.getpwnam(user).pw_uid
+        except KeyError as exc:
+            raise ValueError("Configured runtime user does not exist: " + user) from exc
+        uid = os.geteuid()
+        if uid != target_uid:
+            if uid != 0:
+                raise PermissionError("Run this renderer as root or as " + user)
+            return os.execvp("runuser", ["runuser", "-u", user, "--", sys.executable,
+                                        str(Path(__file__).resolve()), *argv])
+    environment = config.get("environment", {})
+    unset = config.get("unset_environment", [])
+    if not isinstance(environment, dict) or not all(
+            isinstance(key, str) and isinstance(value, str) for key, value in environment.items()):
+        raise ValueError("environment must be a dictionary of strings")
+    if not isinstance(unset, list) or not all(isinstance(key, str) for key in unset):
+        raise ValueError("unset_environment must be a list of strings")
+    for key in unset:
+        os.environ.pop(key, None)
+    os.environ.update(environment)
+
+
 def choose_gpus(requested):
     from gpu_devices import find_gpu, gpu_inventory
     inventory = gpu_inventory()
@@ -100,6 +131,7 @@ def output_inventory(root, job):
 
 
 def main(argv=None):
+    argv = list(sys.argv[1:] if argv is None else argv)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", "-c", default=str(PLUGIN_ROOT / "misc/user.json"))
     parser.add_argument("--gpu-ids", "--gpu_ids", default="auto")
@@ -132,6 +164,7 @@ def main(argv=None):
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     config_path = resolve_path(args.config)
     config = json.loads(config_path.read_text(encoding="utf-8"))
+    configure_runtime(config, argv)
     for key in ("ue_project", "ue_command", "python_script", "render_config"):
         config[key] = str(resolve_path(config[key], config_path.parent))
     project = resolve_path(config["ue_project"], config_path.parent)

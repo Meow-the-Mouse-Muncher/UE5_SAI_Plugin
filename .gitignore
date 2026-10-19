@@ -20,3 +20,7 @@ scripts/trajectory_figs
 !/Config/
 !/Config/Dataset/
 !/Config/Dataset/**
+
+# Runtime project settings required by the Linux renderer.
+!/PCGBiomeForestPoplar.uproject
+!/Config/DefaultEngine.ini
