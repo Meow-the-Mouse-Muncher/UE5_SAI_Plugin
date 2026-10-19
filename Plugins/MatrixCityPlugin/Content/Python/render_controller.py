@@ -4,6 +4,10 @@
 """
 
 import unreal
+import json
+import time
+from pathlib import Path
+import render_worker
 from typing import List, Dict, Any, Callable, Optional
 from enum import Enum
 
@@ -57,12 +61,16 @@ class RenderState(Enum):
 class RenderController:
     """渲染控制器 - 协程模拟模式"""
     
-    def __init__(self, executor=None):
+    def __init__(self, executor=None, performance_settings=None):
         self.state = RenderState.IDLE
         self.render_steps = []
         self.current_step_index = 0
         self.current_context = {}
         self.executor = executor
+        self.performance_settings = (performance_settings if performance_settings is not None
+                                     else render_worker.performance_settings())
+        self._step_started_at = None
+        self._expected_frame_count = None
         
         # 场景状态缓存
         self._scene_actors_cache = {}
@@ -200,6 +208,14 @@ class RenderController:
             raise ValueError(f"Missing render configuration for step: {step.step_id}")
         
         self.state = RenderState.RENDERING
+        self._step_started_at = time.perf_counter()
+        self._expected_frame_count = None
+        try:
+            sequence = unreal.load_asset(step.sequence_path)
+            self._expected_frame_count = (1 if step.render_config.get('Single_Frame_Only', False)
+                else sequence.get_playback_end() - sequence.get_playback_start())
+        except Exception:
+            pass
         
         # 动态导入避免循环依赖
         from custom_movie_pipeline import CustomMoviePipeline
@@ -247,6 +263,7 @@ class RenderController:
             self._on_step_complete(step)
         else:
             unreal.log_error(f"Render step failed: {step.step_id}")
+            self._emit_step_telemetry(step, False)
             self.state = RenderState.FAILED
             if self.on_sequence_failed:
                 self.on_sequence_failed(f"Render step failed: {step.step_id}")
@@ -269,6 +286,8 @@ class RenderController:
         # 【修复】在渲染步骤之间添加 GPU 同步等待
         # 防止 Vulkan 渲染查询未完成就被销毁导致 SIGSEGV 崩溃
         self._wait_for_gpu_flush()
+        if step.step_type in (RenderStepType.RENDER_OCC, RenderStepType.RENDER_GT):
+            self._emit_step_telemetry(step, True)
         
         # 移动到下一步
         self.current_step_index += 1
@@ -277,28 +296,33 @@ class RenderController:
         # 执行下一步
         self._execute_current_step()
     
-    def _wait_for_gpu_flush(self, wait_time: float = 1.0):
+    def _wait_for_gpu_flush(self, wait_time=None):
         """等待 GPU 完成所有挂起的渲染命令
         
         Args:
             wait_time: 等待时间（秒），默认1秒
         """
         import time
+        if wait_time is None:
+            wait_time = self.performance_settings['step_wait_seconds']
         
         unreal.log(f"[GPU Sync] Waiting {wait_time}s for GPU to complete pending commands...")
         
         try:
             # 1. 强制垃圾回收，释放 Python 端的引用
-            unreal.SystemLibrary.collect_garbage()
+            if self.performance_settings['step_collect_garbage']:
+                unreal.SystemLibrary.collect_garbage()
             
             # 2. 刷新 Slate 应用程序，处理挂起的 UI 事件
             # 这有助于确保渲染线程完成当前帧
             
             # 3. 等待一段时间让 GPU 完成清理
-            time.sleep(wait_time)
+            if wait_time:
+                time.sleep(wait_time)
             
             # 4. 再次 GC 确保资源释放
-            unreal.SystemLibrary.collect_garbage()
+            if self.performance_settings['step_collect_garbage']:
+                unreal.SystemLibrary.collect_garbage()
             
             unreal.log("[GPU Sync] GPU flush completed")
             
@@ -306,6 +330,38 @@ class RenderController:
             unreal.log_warning(f"[GPU Sync] Warning during GPU flush: {e}")
             # 即使出错也等待一下
             time.sleep(wait_time)
+
+    def _emit_step_telemetry(self, step, success):
+        if self._step_started_at is None:
+            return
+        event = {
+            'event': 'render_step',
+            'step_id': step.step_id,
+            'success': bool(success),
+            'wall_seconds': round(time.perf_counter() - self._step_started_at, 6),
+            'expected_output_frames': self._expected_frame_count,
+            'sequence_path': step.sequence_path,
+            'output_path': step.render_config.get('Output_Path'),
+        }
+        # These are actual files present, not an assumed successful frame count.
+        # Worker output roots are isolated, so historical files cannot inflate a
+        # benchmark. Skip generic legacy filename templates we cannot resolve.
+        try:
+            template = step.render_config.get('File_Name_Format', '')
+            prefix = template.split('{render_pass}', 1)[0]
+            if prefix and '{' not in prefix:
+                directory = Path(step.render_config['Output_Path']) / prefix
+                files = [path for path in directory.rglob('*') if path.is_file()]
+                event['output_files_present'] = len(files)
+                event['output_frame_stems_present'] = len({path.stem for path in files})
+        except Exception as error:
+            unreal.log_warning(f"Unable to count output files for telemetry: {error}")
+        unreal.log('[RENDER_STEP_METRICS] ' + json.dumps(event, sort_keys=True))
+        try:
+            render_worker.append_telemetry(event, render_worker.get_worker_config().get('telemetry_path'))
+        except Exception as error:
+            unreal.log_warning(f"Unable to write render telemetry: {error}")
+        self._step_started_at = None
     
     def _on_sequence_complete(self):
         """序列完成处理"""

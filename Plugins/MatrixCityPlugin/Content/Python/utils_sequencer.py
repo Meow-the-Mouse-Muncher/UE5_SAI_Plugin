@@ -12,6 +12,8 @@ import math
 import numpy as np
 import random
 import yaml
+import render_worker
+import trajectory_geometry
 
 ################################################################################
 # misc
@@ -42,7 +44,8 @@ def load_trajectory_config() -> Dict[str, Any]:
 
     Returns an empty dict on failure or if file not present.
     """
-    yaml_file = PLUGIN_ROOT / 'misc' / 'trajectory_config.yaml'
+    yaml_file = Path(render_worker.get_worker_config().get('trajectory_config_path') or
+                     PLUGIN_ROOT / 'misc' / 'trajectory_config.yaml')
     try:
         if not yaml_file.exists():
             unreal.log_warning(f"trajectory config not found: {yaml_file}")
@@ -456,7 +459,10 @@ def add_possessable_camera_to_sequence(
     camera_cut_section.set_editor_property("CameraBindingID", camera_binding_id)
 
     # set the camera location and rotation (应用轨迹)
-    add_transforms_to_binding(camera_binding, camera_trans, key_type)
+    transform_track = add_transforms_to_binding(camera_binding, camera_trans, key_type)
+    # Euler charts can wrap while the actual camera frame stays smooth. UE's
+    # quaternion interpolation takes the shortest rotation between keyed poses.
+    transform_track.get_sections()[0].set_editor_property('use_quaternion_interpolation', True)
 
 
 
@@ -488,532 +494,45 @@ def generate_sequence(
 
     return new_sequence
 
+def _geometry_sequence_keys(target_actor, geometry, num_frames, current_frame, **parameters):
+    location = target_actor.get_actor_location()
+    target = np.array([location.x, location.y, location.z], dtype=float)
+    positions, rotations = geometry(target, num_frames, **parameters)
+    keys = [SequenceKey(frame=current_frame + index,
+                        location=tuple(float(value) for value in position),
+                        rotation=tuple(float(value) for value in rotation))
+            for index, (position, rotation) in enumerate(zip(positions, rotations))]
+    return keys, current_frame + num_frames
+
+
 def fix_line(target_actor, num_frames, angle_degrees, height_offset, trajectory_size, current_frame=0):
-    """
-    在目标物正上方生成直线轨迹
-    
-    Args:
-        target_actor: 目标物Actor
-        num_frames (int): 图像张数（帧数）
-        angle_degrees (float): 与x轴的夹角（度）- 直线的方向角度
-        height_offset (float): 相对于目标物的高度偏移（UE单位：cm）
-        trajectory_size (float): 运动轨迹的长度（UE单位：cm）
-        current_frame (int): 起始帧数，默认为0
-    
-    Returns:
-        tuple: (camera_trans, end_frame) - 相机轨迹列表和结束帧数
-    """
-    # 获取目标物位置
-    target_location = target_actor.get_actor_location()
-    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
-    
-    # 计算相机高度
-    camera_z = target_z + height_offset
-    
-    # 将角度转换为弧度
-    angle_radians = math.radians(angle_degrees)
-    
-    # 计算直线的方向向量
-    dx = math.cos(angle_radians)
-    dy = math.sin(angle_radians)
-    
-    # 修正：计算起点和终点，确保起点在angle_degrees的反方向
-    # 这样轨迹从angle_degrees的反方向开始，向angle_degrees方向移动
-    half_length = trajectory_size / 2.0
-    
-    # 起点：从目标物沿angle_degrees反方向偏移half_length
-    start_x = target_x - half_length * dx
-    start_y = target_y - half_length * dy
-    
-    # 终点：从目标物沿angle_degrees正方向偏移half_length
-    end_x = target_x + half_length * dx
-    end_y = target_y + half_length * dy
-    
-    # 生成轨迹点
-    camera_trans = []
-    
-    # 用于存储前一帧的 yaw 角度，处理奇点情况
-    previous_yaw = 0.0
-    
-    for i in range(num_frames):
-        # 计算当前帧的插值比例 (0.0 到 1.0)
-        t = i / (num_frames - 1) if num_frames > 1 else 0.0
-        
-        # 线性插值计算当前位置
-        camera_x = start_x + t * (end_x - start_x)
-        camera_y = start_y + t * (end_y - start_y)
-        
-        # 计算相机朝向目标物的旋转角度
-        # 计算从相机到目标物的向量
-        look_vector_x = target_x - camera_x
-        look_vector_y = target_y - camera_y
-        look_vector_z = target_z - camera_z
-        
-        # 计算俯仰角（pitch）
-        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
-        pitch = -90
-        
-        # 计算偏航角（yaw）- 处理奇点情况
-        if horizontal_distance < 1e-6:  # 相机在目标物正上方（奇点）
-            yaw = previous_yaw  # 使用前一帧的 yaw 角度
-        else:
-            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
-            previous_yaw = yaw  # 更新前一帧的 yaw 角度
-        
-        # 翻滚角保持为0
-        roll = 0
-        
-        # 添加轨迹点
-        camera_trans.append(
-            SequenceKey(
-                frame=current_frame + i,
-                location=(camera_x, camera_y, camera_z),
-                rotation=(roll, pitch, yaw)
-            )
-        )
-    
-    end_frame = current_frame + num_frames
-    return camera_trans, end_frame
+    """Nadir line with fixed yaw; no 180-degree image flip after the midpoint."""
+    return _geometry_sequence_keys(target_actor, trajectory_geometry.line, num_frames, current_frame,
+                                   height=height_offset, length=trajectory_size, base_yaw=angle_degrees)
 
 
 def plane_grid(target_actor, num_frames, trajectory_size, height_offset, angle_degrees, current_frame=0):
-    """
-    在目标物正上方生成方阵扫描轨迹 (Snake Scan)
-    [Update] 居中逻辑：确保中间帧(num_frames//2)精确位于目标物正上方 (0,0)
-    相机朝向与 fix_line 一致：Pitch -90 (俯视), Yaw 指向目标
-    
-    Args:
-        target_actor: 目标物Actor
-        num_frames (int): 图像张数（帧数）
-        trajectory_size (float): 方阵的参考尺寸（步长依据），非严格边界
-        height_offset (float): 相对于目标物的高度偏移（UE单位：cm）
-        angle_degrees (float): 方阵的旋转角度（度）
-        current_frame (int): 起始帧数
-    """
-    # 获取目标物位置
-    target_location = target_actor.get_actor_location()
-    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
-
-    # 计算相机高度
-    camera_z = target_z + height_offset
-
-    if num_frames <= 0:
-        return [], current_frame
-
-    # 固定 33 帧阵列采样：32 个非中心点 + 1 个中心点
-    # 采用 7x5 奇数网格，保证几何中心是网格点
-    # 为了得到 32 个非中心点：从 34 个非中心网格点中对称移除一对对角角点
-    if num_frames != 33:
-        unreal.log_warning(f"plane_grid is designed for 33 frames, but got {num_frames}; output will still be generated.")
-
-    cols = 7
-    rows = 5
-    long_steps = max(cols - 1, rows - 1)
-    step = trajectory_size / long_steps if long_steps > 0 else 0.0
-    cx = (cols - 1) / 2.0
-    cy = (rows - 1) / 2.0
-
-    # 生成蛇形扫描路径（从上到下，行内往返），保证轨迹连续
-    # 坐标使用中心化局部坐标，后续统一旋转到世界坐标
-    non_center_points = []
-    for rr in range(rows):
-        r = rows - 1 - rr  # top -> bottom
-        if rr % 2 == 0:
-            col_iter = range(cols)
-        else:
-            col_iter = range(cols - 1, -1, -1)
-
-        for c in col_iter:
-            local_x = (c - cx) * step
-            local_y = (r - cy) * step
-            if abs(local_x) < 1e-9 and abs(local_y) < 1e-9:
-                continue
-            non_center_points.append((local_x, local_y))
-
-    # 7x5 去中心后共有 34 个点；对称移除一对角点，保留 32 个非中心点
-    corner_a = (-3.0 * step, 2.0 * step)
-    corner_b = (3.0 * step, -2.0 * step)
-    selected_points = [
-        p for p in non_center_points
-        if not ((abs(p[0] - corner_a[0]) < 1e-6 and abs(p[1] - corner_a[1]) < 1e-6) or
-                (abs(p[0] - corner_b[0]) < 1e-6 and abs(p[1] - corner_b[1]) < 1e-6))
-    ]
-
-    # 非 33 帧时按需求裁剪/补齐，中心帧仍锁定在中间索引
-    needed_non_center = max(0, num_frames - 1)
-    if len(selected_points) < needed_non_center:
-        selected_points.extend([(0.0, 0.0)] * (needed_non_center - len(selected_points)))
-    selected_points = selected_points[:needed_non_center]
-
-    mid_index = num_frames // 2
-    before_count = mid_index
-    after_count = num_frames - mid_index - 1
-
-    before_points = selected_points[:before_count]
-    after_points = selected_points[before_count:before_count + after_count]
-
-    # 中心帧强制锁定目标正上方
-    ordered_points = before_points + [(0.0, 0.0)] + after_points
-
-    angle_radians = math.radians(angle_degrees)
-    cos_a = math.cos(angle_radians)
-    sin_a = math.sin(angle_radians)
-
-    pitch = -90.0
-    yaw = float(angle_degrees)
-    roll = 0.0
-    camera_trans = []
-
-    for i, (local_x, local_y) in enumerate(ordered_points):
-        if i == mid_index:
-            local_x = 0.0
-            local_y = 0.0
-
-        # 旋转并平移到世界坐标
-        rel_x = local_x * cos_a - local_y * sin_a
-        rel_y = local_x * sin_a + local_y * cos_a
-        camera_x = target_x + rel_x
-        camera_y = target_y + rel_y
-
-        camera_trans.append(
-            SequenceKey(
-                frame=current_frame + i,
-                location=(camera_x, camera_y, camera_z),
-                rotation=(roll, pitch, yaw)
-            )
-        )
-
-    end_frame = current_frame + num_frames
-    return camera_trans, end_frame
+    """Complete square 5x5 array in snake order; canonical reference is frame 12."""
+    return _geometry_sequence_keys(target_actor, trajectory_geometry.planar, num_frames, current_frame,
+                                   height=height_offset, side=trajectory_size, base_yaw=angle_degrees)
 
 
 def rot_spiral(target_actor, num_frames, num_turns, arc_angle_degrees, radius, start_angle, current_frame=0):
-    """
-    [Modified] Hemisphere Fibonacci Sampling (preserving function name 'rot_spiral')
-    Generates points on a spherical cap (cone) using Fibonacci lattice.
-    The last frame is FORCED to be strictly at the top (Zenith), looking down.
-    
-    Args:
-        target_actor: Target Actor
-        num_frames (int): Total number of frames
-        num_turns (float): [Unused in Fibonacci]
-        arc_angle_degrees (float): Cone angle (full angle). 
-                                   Example: 180 = full hemisphere (z from 0 to R).
-                                   90 = 45-degree cone (z from R*sin(45) to R).
-        radius (float): Radius of the sphere (UE units)
-        start_angle (float): Starting azimuth offset (degrees)
-        current_frame (int): Start frame index
-    """
-    # Get target location
-    target_location = target_actor.get_actor_location()
-    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
-    
-    camera_trans = []
-    # 顶部奇点时使用配置角度，确保 GT 朝向可控且跨轨迹一致
-    previous_yaw = float(start_angle)
-    
-    # Golden Angle
-    phi = math.pi * (3.0 - math.sqrt(5.0))  # ~2.3999 radians
-
-    # We need to generate num_frames points.
-    # The last point (index num_frames-1) is strictly top.
-    # So we generate num_frames-1 points on the spiral.
-    
-    num_spiral_points = num_frames - 1
-    
-    # Calculate height range based on arc_angle_degrees
-    # arc_angle is total cone angle at the apex.
-    # 180 degrees -> Bottom is Equator (Elev=0)
-    # 90 degrees -> Bottom is Elev=45 (90 - 90/2)
-    # min_elevation = 90 - (arc / 2)
-    
-    half_angle = arc_angle_degrees / 2.0
-    min_elev_deg = max(0.0, 90.0 - half_angle)
-    
-    # z = R * sin(elev)
-    z_min = radius * math.sin(math.radians(min_elev_deg))
-    z_max = radius
-    z_range = z_max - z_min
-
-    for i in range(num_spiral_points):
-        # 0 <= i < num_spiral_points
-        
-        # Normalized linear index
-        if num_spiral_points > 0:
-            lz = i / num_spiral_points  # 0.0 to ~1.0
-            
-            # Map lz to actual Height Z
-            # Distribute points from z_min upwards
-            z_offset = z_min + lz * z_range
-        else:
-            z_offset = z_max # Fallback
-
-        # Radius at this height
-        # r^2 = z^2 + r_xy^2 => r_xy = sqrt(R^2 - z^2)
-        radius_xy = math.sqrt(max(0, radius**2 - z_offset**2))
-        
-        theta = phi * i + math.radians(start_angle)
-        
-        x_offset = radius_xy * math.cos(theta)
-        y_offset = radius_xy * math.sin(theta)
-        
-        cam_x = target_x + x_offset
-        cam_y = target_y + y_offset
-        cam_z = target_z + z_offset
-        
-        # Rotation: Look at target
-        # Vector from Cam to Target
-        vx = target_x - cam_x
-        vy = target_y - cam_y
-        vz = target_z - cam_z
-        
-        # Standard LookAt
-        xy_dist = math.sqrt(vx*vx + vy*vy)
-        pitch = math.degrees(math.atan2(vz, xy_dist)) # looking down is negative? 
-        # UE Camera: X is forward.
-        # If I am at (0,0,100) looking at (0,0,0):
-        # vector is (0,0,-100). z=-100, xy=0. atan2(-100, 0) = -90. Correct.
-        
-        yaw = math.degrees(math.atan2(vy, vx))
-        previous_yaw = yaw
-        roll = 0.0
-        
-        camera_trans.append(
-            SequenceKey(
-                frame=current_frame + i,
-                location=(cam_x, cam_y, cam_z),
-                rotation=(roll, pitch, yaw)
-            )
-        )
-
-    # --- Force Last Frame: Top Down ---
-    i_final = num_frames - 1
-    cam_x_final = target_x
-    cam_y_final = target_y
-    cam_z_final = target_z + radius
-    
-    # GT: 顶视，Yaw 使用 start_angle（由 plane_angles 注入）
-    camera_trans.append(
-        SequenceKey(
-            frame=current_frame + i_final,
-            location=(cam_x_final, cam_y_final, cam_z_final),
-            rotation=(0.0, -90.0, float(start_angle))
-        )
-    )
-
-    end_frame = current_frame + num_frames
-    return camera_trans, end_frame
+    """Continuous spherical spiral, sampled by arc length and ending at the GT pose."""
+    return _geometry_sequence_keys(target_actor, trajectory_geometry.spiral, num_frames, current_frame,
+                                   radius=radius, span=arc_angle_degrees, turns=num_turns, base_yaw=start_angle)
 
 
 def rot_line(target_actor, num_frames, arc_angle_degrees, height, plane_angle_degrees, current_frame=0):
-    """
-    以目标物为中心生成直线轨迹，相机始终对准目标物
-    按角度均匀采样生成直线上的点，相机在固定高度的水平面上移动
-    
-    Args:
-        target_actor: 目标物Actor
-        num_frames (int): 图像张数（帧数）
-        arc_angle_degrees (float): 角度范围（度），用于角度均匀采样
-        height (float): 相机相对于目标物的垂直高度偏移（UE单位：cm）
-        plane_angle_degrees (float): 直线与X轴的夹角（度）
-            - 0度: 直线沿X轴方向
-            - 90度: 直线沿Y轴方向
-        current_frame (int): 起始帧数，默认为0
-    
-    Returns:
-        tuple: (camera_trans, end_frame) - 相机轨迹列表和结束帧数
-    """
-    # 获取目标物位置
-    target_location = target_actor.get_actor_location()
-    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
-    
-    # 计算相机高度（固定高度偏移）
-    camera_z = target_z + height
-    
-    # 将角度转换为弧度
-    arc_angle_radians = math.radians(arc_angle_degrees)
-    plane_angle_radians = math.radians(plane_angle_degrees)
-    
-    # 计算直线的长度（基于高度和角度范围）
-    # 使用高度作为参考距离，根据角度范围计算直线长度
-    reference_distance = height  # 使用高度作为参考距离
-    line_length = 2.0 * reference_distance * math.tan(arc_angle_radians / 2.0)
-    
-    # 计算直线的起点和终点（在水平面上）
-    # 直线方向向量
-    line_direction_x = math.cos(plane_angle_radians)
-    line_direction_y = math.sin(plane_angle_radians)
-    
-    # 直线中心点（目标物在水平面上的投影）
-    line_center_x = target_x
-    line_center_y = target_y
-    
-    # 计算起点和终点
-    half_length = line_length / 2.0
-    start_x = line_center_x - half_length * line_direction_x
-    start_y = line_center_y - half_length * line_direction_y
-    end_x = line_center_x + half_length * line_direction_x
-    end_y = line_center_y + half_length * line_direction_y
-    
-    # 生成轨迹点
-    camera_trans = []
-    
-    # 用于存储前一帧的 yaw 角度，处理奇点情况
-    previous_yaw = 0.0
-    
-    for i in range(num_frames):
-        # 按角度均匀采样的思路：
-        # 1. 先计算角度采样点
-        # 2. 将角度采样点映射到直线上的位置
-        if num_frames > 1:
-            angle_t = i / (num_frames - 1)  # 0.0 到 1.0
-        else:
-            angle_t = 0.0
-        
-        # 将角度采样转换为直线上的位置参数
-        # 使用正弦函数映射，使得角度均匀采样对应直线上的非均匀采样
-        # 这样可以保持与rot_arc相似的角度采样特性
-        current_angle = -arc_angle_radians / 2.0 + angle_t * arc_angle_radians
-        
-        # 将角度映射到直线位置参数 t (0.0 到 1.0)
-        # 使用正弦函数的反函数来实现角度到位置的映射
-        if arc_angle_radians > 0:
-            position_t = (math.sin(current_angle) + math.sin(arc_angle_radians / 2.0)) / (2.0 * math.sin(arc_angle_radians / 2.0))
-        else:
-            position_t = angle_t
-        
-        # 确保position_t在[0,1]范围内
-        position_t = max(0.0, min(1.0, position_t))
-        
-        # 根据位置参数计算相机在直线上的位置
-        camera_x = start_x + position_t * (end_x - start_x)
-        camera_y = start_y + position_t * (end_y - start_y)
-        
-        # 计算相机朝向目标物的旋转角度
-        # 计算从相机到目标物的向量
-        look_vector_x = target_x - camera_x
-        look_vector_y = target_y - camera_y
-        look_vector_z = target_z - camera_z
-        
-        # 计算俯仰角（pitch）
-        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
-        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
-        
-        # 计算偏航角（yaw）- 处理奇点情况
-        if horizontal_distance < 1e-6:  # 相机在目标物正上方（奇点）
-            yaw = float(plane_angle_degrees)  # 使用配置角度，保证 GT 一致
-        else:
-            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
-            previous_yaw = yaw  # 更新前一帧的 yaw 角度
-        
-        # 翻滚角保持为0
-        roll = 0.0
-        
-        # 添加轨迹点
-        camera_trans.append(
-            SequenceKey(
-                frame=current_frame + i,
-                location=(camera_x, camera_y, camera_z),
-                rotation=(roll, pitch, yaw)
-            )
-        )
-    
-    end_frame = current_frame + num_frames
-    return camera_trans, end_frame
+    """Target-tracking line with signed pitch and no zenith attitude flip."""
+    return _geometry_sequence_keys(target_actor, trajectory_geometry.tracking_line, num_frames, current_frame,
+                                   height=height, span=arc_angle_degrees, base_yaw=plane_angle_degrees)
 
 
 def rot_arc(target_actor, num_frames, arc_angle_degrees, radius, plane_angle_degrees, current_frame=0):
-    """
-    以目标物为中心生成圆弧轨迹，相机始终对准目标物
-    圆弧轨迹在包含目标物Z轴的垂直平面内
-    
-    Args:
-        target_actor: 目标物Actor
-        num_frames (int): 图像张数（帧数）
-        arc_angle_degrees (float): 圆弧的角度范围（度）
-        radius (float): 圆弧半径（UE单位：cm）
-        plane_angle_degrees (float): 垂直平面与X轴的夹角（度）
-            - 0度: 圆弧在XZ平面内，起点朝向X轴正方向
-            - 90度: 圆弧在YZ平面内，起点朝向Y轴正方向
-        current_frame (int): 起始帧数，默认为0
-    
-    Returns:
-        tuple: (camera_trans, end_frame) - 相机轨迹列表和结束帧数
-    """
-    # 获取目标物位置
-    target_location = target_actor.get_actor_location()
-    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
-    
-    # 将角度转换为弧度
-    arc_angle_radians = math.radians(arc_angle_degrees)
-    plane_angle_radians = math.radians(plane_angle_degrees)
-    
-    # 计算圆弧的起始角度（以垂直向上90度为中心）
-    # 这样圆弧的中心点在目标物正上方，相机在圆弧上看向地面目标物
-    center_angle = math.pi / 2.0  # 90度，垂直向上
-    start_angle = center_angle - arc_angle_radians / 2.0
-    end_angle = center_angle + arc_angle_radians / 2.0
-    
-    # 生成轨迹点
-    camera_trans = []
-    
-    # 用于存储前一帧的 yaw 角度，处理奇点情况
-    previous_yaw = 0.0
-    
-    for i in range(num_frames):
-        # 计算当前帧在圆弧上的角度
-        if num_frames > 1:
-            t = i / (num_frames - 1)  # 0.0 到 1.0
-        else:
-            t = 0.0
-        
-        current_angle = start_angle + t * (end_angle - start_angle)
-        
-        # 在垂直平面的局部坐标系中计算圆弧上的点
-        # 局部坐标系：水平方向为local_r，垂直方向为local_z
-        local_r = radius * math.cos(current_angle)  # 水平距离（从目标物向外的距离）
-        local_z = radius * math.sin(current_angle)  # 垂直距离（相对于目标物的高度）
-        
-        # 将局部坐标转换到世界坐标系
-        # 根据plane_angle_degrees确定水平方向在XY平面的投影
-        camera_x = target_x + local_r * math.cos(plane_angle_radians)
-        camera_y = target_y + local_r * math.sin(plane_angle_radians)
-        camera_z = target_z + local_z
-        
-        # 计算相机朝向目标物的旋转角度
-        # 计算从相机到目标物的向量
-        look_vector_x = target_x - camera_x
-        look_vector_y = target_y - camera_y
-        look_vector_z = target_z - camera_z
-        
-        # 计算俯仰角（pitch）
-        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
-        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
-        
-        # 计算偏航角（yaw）- 处理奇点情况
-        if horizontal_distance < 1e-6:  # 相机在目标物正上方（奇点）
-            yaw = previous_yaw  # 使用前一帧的 yaw 角度
-        else:
-            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
-            previous_yaw = yaw  # 更新前一帧的 yaw 角度
-        
-        # 翻滚角保持为0
-        roll = 0.0
-        
-        # 添加轨迹点
-        camera_trans.append(
-            SequenceKey(
-                frame=current_frame + i,
-                location=(camera_x, camera_y, camera_z),
-                rotation=(roll, pitch, yaw)
-            )
-        )
-    
-    end_frame = current_frame + num_frames
-    return camera_trans, end_frame
-
-
-
+    """Vertical-plane arc with continuous signed pitch and the shared nadir GT pose."""
+    return _geometry_sequence_keys(target_actor, trajectory_geometry.arc, num_frames, current_frame,
+                                   radius=radius, span=arc_angle_degrees, base_yaw=plane_angle_degrees)
 
 
 def catmull_rom_spline(P0, P1, P2, P3, num_points):
@@ -1041,165 +560,11 @@ def catmull_rom_spline(P0, P1, P2, P3, num_points):
     return curve
 
 def rand_shell(target_actor, num_frames, min_radius, max_radius, arc_angle_degrees, mid_height, plane_angle_degrees=0.0, current_frame=0):
-    """
-    生成球层内的随机连续轨迹 (Random Sphere Shell Walk with Spline)
-    [Update] 0~N-1帧为完全随机轨迹，第N帧为标准GT位姿 (正顶视/侧视)，用于Ground Truth
-    """
-    # 获取目标物位置
-    target_location = target_actor.get_actor_location()
-    target_x, target_y, target_z = target_location.x, target_location.y, target_location.z
-    
-    # --- 1. 确定控制点数量 (奇数) ---
-    # [Mod] 减少一帧留给 GT，以保证总帧数 = num_frames
-    num_random_frames = num_frames - 1
-    
-    # 控制点数量：每 10 帧一个控制点，至少 5 个
-    num_control_points = max(5, num_random_frames // 6)
-    # 因为不需要锚定中间点了，奇偶其实无所谓，但保持原逻辑也无妨
-    
-    control_points = []
-    
-    # 随机采样函数
-    def sample_point():
-        r = random.uniform(min_radius, max_radius)
-        # Uniform sampling on sphere cap: cos(theta) ~ U[cos(max_angle), 1]
-        max_theta_rad = math.radians(arc_angle_degrees / 2.0)
-        min_cos = math.cos(max_theta_rad)
-        cos_theta = random.uniform(min_cos, 1.0)
-        theta = math.acos(cos_theta)
-        phi = random.uniform(0, 2 * math.pi)
-        
-        sin_theta = math.sin(theta)
-        # 局部坐标 (相对于 Target)
-        x = r * sin_theta * math.cos(phi)
-        y = r * sin_theta * math.sin(phi)
-        z = r * cos_theta # Z is up relative to target
-        return np.array([x, y, z])
+    """Bounded smooth random curve; the canonical GT is its endpoint, not a jump."""
+    return _geometry_sequence_keys(target_actor, trajectory_geometry.random_shell, num_frames, current_frame,
+                                   minimum=min_radius, maximum=max_radius, span=arc_angle_degrees,
+                                   height=mid_height, base_yaw=plane_angle_degrees)
 
-    # --- 2. 生成完全随机的控制点 (不再锚定中间点) ---
-    for i in range(num_control_points):
-        control_points.append(sample_point())
-            
-    # --- 3. 分配帧数 ---
-    num_segments_total = num_control_points - 1
-    
-    # [修复] 处理样条连接处的点重复问题
-    # catmull_rom_spline 生成 N 个点包含起点和终点
-    # 直接拼接会导致连接点重复 (Seg1 end == Seg2 start)
-    # 解决方法：除了最后一段，每段生成后丢弃最后一个点
-    # 因此，为了得到 num_frames 个有效不重复点，我们需要分配 num_frames + (segments - 1) 个点
-    
-    total_points_needed = num_random_frames + (num_segments_total - 1)
-    
-    # 将总点数分配给各段
-    def distribute_frames(total_f, n_segs):
-        if n_segs == 0: return []
-        base = total_f // n_segs
-        rem = total_f % n_segs
-        return [base + 1 if i < rem else base for i in range(n_segs)]
-    
-    frames_per_segment = distribute_frames(total_points_needed, num_segments_total)
-
-    # --- 4. 生成样条曲线 ---
-    full_path = []
-    # Catmull-Rom 需要 P0, P1, P2, P3，为了闭合或平滑，可以重复首尾点作为辅助
-    cps = [control_points[0]] + control_points + [control_points[-1]]
-    
-    for i in range(num_segments_total):
-        p0 = cps[i]
-        p1 = cps[i+1]
-        p2 = cps[i+2]
-        p3 = cps[i+3]
-        n_points = frames_per_segment[i]
-        
-        if n_points > 0:
-            segment_points = catmull_rom_spline(p0, p1, p2, p3, n_points)
-            
-            # [修复] 去重逻辑
-            if i < num_segments_total - 1:
-                # 如果不是最后一段，去掉最后一个点（它将是下一段的起点）
-                segment_points = segment_points[:-1]
-                
-            full_path.extend(segment_points)
-    
-    # --- 5. 应用 Plane Angle 旋转并生成相机关键帧 ---
-    camera_trans = []
-    previous_yaw = 0.0
-    
-    # 预计算旋转矩阵 (绕 Z 轴)
-    rad_angle = math.radians(plane_angle_degrees)
-    cos_a = math.cos(rad_angle)
-    sin_a = math.sin(rad_angle)
-    
-    # 处理 0 ~ num_frames-1 的随机轨迹
-    for i, pos_local in enumerate(full_path):
-        # 旋转局部坐标
-        # pos_local = [x, y, z]
-        # x_new = x cos - y sin
-        # y_new = x sin + y cos
-        rot_x = pos_local[0] * cos_a - pos_local[1] * sin_a
-        rot_y = pos_local[0] * sin_a + pos_local[1] * cos_a
-        rot_z = pos_local[2]
-        
-        # 转换到世界坐标
-        camera_x = target_x + rot_x
-        camera_y = target_y + rot_y
-        camera_z = target_z + rot_z
-        
-        # 计算朝向 (LookAt)
-        look_vector_x = target_x - camera_x
-        look_vector_y = target_y - camera_y
-        look_vector_z = target_z - camera_z
-        
-        horizontal_distance = math.sqrt(look_vector_x**2 + look_vector_y**2)
-        pitch = math.degrees(math.atan2(look_vector_z, horizontal_distance))
-        
-        if horizontal_distance < 1e-6:
-            yaw = previous_yaw
-        else:
-            yaw = math.degrees(math.atan2(look_vector_y, look_vector_x))
-            previous_yaw = yaw
-            
-        roll = 0.0
-        
-        camera_trans.append(
-            SequenceKey(
-                frame=current_frame + i,
-                location=(camera_x, camera_y, camera_z),
-                rotation=(roll, pitch, yaw)
-            )
-        )
-        
-    # --- 6. [NEW] 添加最后一帧 GT (Ground Truth) ---
-    # GT 位置：目标物正上方 mid_height 处 (或者根据 plane_angle_degrees 偏移)
-    # 这里我们设定 Standard Pose: 
-    #   Location: (target_x, target_y, target_z + mid_height)
-    #   Rotation: Pitch=-90, Roll=0, Yaw=plane_angle_degrees
-    
-    gt_frame_index = current_frame + num_random_frames
-    
-    gt_x = target_x
-    gt_y = target_y
-    gt_z = target_z + mid_height
-    
-    gt_pitch = -90.0
-    gt_yaw = plane_angle_degrees # 也可以设为0，视需求而定
-    gt_roll = 0.0
-    
-    camera_trans.append(
-        SequenceKey(
-            frame=gt_frame_index,
-            location=(gt_x, gt_y, gt_z),
-            rotation=(gt_roll, gt_pitch, gt_yaw)
-        )
-    )
-
-    # 返回 end_frame（半开区间上界）
-    # UE5 set_playback_end(N) 渲染帧 [0, N)，即 0 ~ N-1
-    # GT 帧在 gt_frame_index，要被渲染到就需要 end_frame = gt_frame_index + 1
-    # 与 rot_spiral 保持一致：end_frame = current_frame + num_frames
-    end_frame = gt_frame_index + 1  # == current_frame + num_frames
-    return camera_trans, end_frame
 
 def generate_single_trajectory(target_actor, map_name, trajectory_type, trajectory_params, camera_height, num_frames):
     """生成单个轨迹类型的序列
@@ -1223,13 +588,13 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
     if map_name is None:
         level = config.get('ue_map', '/Game/Map/main')
     else:
-        level = f'/Game/Map/{map_name}'
+        level = render_worker.get_worker_config().get('map_package_path') or f'/Game/Map/{map_name}'
         
     # 从配置中获取相机名称，默认为 'CineCameraActor1'
     target_camera_name = config.get('camera_name', 'CineCameraActor1')
     
     # 根据轨迹类型设置序列保存目录
-    sequence_base_dir = '/Game/Sequences'
+    sequence_base_dir = render_worker.get_worker_config().get('sequence_root', '/Game/Sequences')
     sequence_dir = f'{sequence_base_dir}/{trajectory_type}'  # 按轨迹类型分文件夹
     
     seq_fps = 24
@@ -1295,7 +660,7 @@ def generate_single_trajectory(target_actor, map_name, trajectory_type, trajecto
             )
         elif trajectory_type == 'rot_spiral':
             # 使用rot_spiral轨迹
-            num_turns = trajectory_params.get('num_turns', 3.0)
+            num_turns = trajectory_params.get('num_turns', 1.5)
             arc_angle_degrees = trajectory_params.get('arc_angle_degrees', 90.0)
             # 使用 global plane_angles 作为起始方位角
             start_angle = trajectory_params.get('plane_angle_degrees', 0.0)
@@ -1448,15 +813,25 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
     camera_heights = global_params.get('camera_heights', [5000.0])  # 默认单一高度
     trajectory_size = global_params.get('trajectory_size', 4000.0)  # 获取全局 trajectory_size
     plane_angles = global_params.get('plane_angles', [0.0])
-    num_frames = global_params.get('num_frames', 32)
+    num_frames = global_params.get('num_frames', 25)
+    if num_frames != 25:
+        raise ValueError('The dataset protocol requires 25 OCC frames for every trajectory')
     
     unreal.log(f"Using global params: trajectory_types={trajectory_types}, camera_heights={camera_heights}, plane_angles={plane_angles}, num_frames={num_frames}")
     results = {}
+
+    worker_config = render_worker.get_worker_config()
+    selected_tasks = render_worker.selected_trajectory_keys(
+        [(kind, height, angle) for kind in trajectory_types
+         for height in camera_heights for angle in plane_angles], worker_config)
     
     # 为每种轨迹类型、每种高度和每个角度生成序列
     for traj_type in trajectory_types:
         for camera_height in camera_heights:
             for plane_angle in plane_angles:
+                task_key = render_worker.task_key((traj_type, camera_height, plane_angle))
+                if task_key not in selected_tasks:
+                    continue
                 height_in_meters = str(int(camera_height / 100.0)).zfill(3)
                 angle_in_degrees = str(int(plane_angle)).zfill(3)
                 unreal.log(f"Generating trajectory: {traj_type} at height {height_in_meters}m, angle {angle_in_degrees}")
@@ -1481,6 +856,11 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
 
                 try:
                     # 生成单个轨迹序列
+                    random_state = random.getstate()
+                    if 'random_seed' in worker_config:
+                        random.seed(render_worker.trajectory_seed(
+                            worker_config['random_seed'], map_name,
+                            target_actor.get_actor_label() if target_actor else '', task_key))
                     level, sequence_name = generate_single_trajectory(
                         target_actor=target_actor,
                         map_name=map_name,
@@ -1496,8 +876,16 @@ def main(target_actor=None, map_name=None, trajectory_type=None, trajectory_para
                     
                 except Exception as e:
                     unreal.log_error(f"Failed to generate {traj_type} trajectory at {height_in_meters}m angle {angle_in_degrees}: {e}")
+                    if worker_config:
+                        # An isolated worker must not report partial generation
+                        # as a completed shard; legacy standalone keeps its retry behavior.
+                        raise
                     # 继续生成其他轨迹类型、高度和角度
                     continue
+                finally:
+                    # A seeded task must not perturb unrelated Python tooling.
+                    if 'random_seed' in worker_config:
+                        random.setstate(random_state)
     
     unreal.log(f"Generated {len(results)} trajectory sequences")
     return results

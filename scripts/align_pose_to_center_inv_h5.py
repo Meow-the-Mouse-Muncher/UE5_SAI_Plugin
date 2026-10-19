@@ -142,6 +142,8 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
     ])
     
     frames = pose_data['frames']
+    if len(frames) != 25:
+        raise ValueError('Expected exactly 25 OCC frames including center')
     # Load center depth map from GT depth directory
     if any(traj in h5_path for traj in ['rot_spiral', 'rand_shell']):
         # 对于 rot_spiral 和 rand_shell，使用最后一张作为深度图
@@ -152,6 +154,8 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
     poses = [np.array(frame['transform_matrix']) for frame in frames]
     center_depth_path = os.path.join(gt_depth_dir, f"{center_idx:04d}.exr")
     center_depth = load_depth(center_depth_path)
+    if center_depth is None:
+        raise ValueError(f'Missing canonical GT depth: {center_depth_path}')
     # 1. 计算鲁棒的统计量
     mindep = np.percentile(center_depth, 1)
     maxdep = np.percentile(center_depth, 99)
@@ -159,9 +163,6 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
     # 2. 直接裁剪深度图本身，将“深度巨大”或“深度极小”的噪点修正到合理区间
     # 这样即便后续保存到 H5 或进行 3D 投影，也不会因为离群点导致数值崩溃
     center_depth = np.clip(center_depth, mindep, maxdep)
-    if center_depth is None:
-        print(f"Failed to load center depth map: {center_depth_path}")
-        return False
     depth_min = np.min(center_depth)
     depth_max = np.max(center_depth)
     avg_depth = (depth_min + depth_max) / 2.0
@@ -210,6 +211,9 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
             refocused_imgs[i] = refocused_rgb
             processed_count += 1
                 
+    if processed_count != 25:
+        raise ValueError(f'Expected 25 readable observations, got {processed_count}: {rgb_dir}')
+
     # Save to H5
     os.makedirs(os.path.dirname(h5_path), exist_ok=True)
     try:
@@ -220,9 +224,12 @@ def process_dataset(transforms_file, rgb_dir, gt_rgb_dir, gt_depth_dir, src_dept
 
             # --- occ_ref Group ---
             ref_g = f.create_group('occ_ref')
-            # 排除中间帧，因为它会保存在 occ_center 中
-            ref_imgs_filtered = np.delete(refocused_imgs, center_idx, axis=0)
-            ref_g.create_dataset('rgb', data=ref_imgs_filtered)
+            # All 25 observations participate, including the OCC center.
+            ref_g.create_dataset('rgb', data=refocused_imgs)
+            f.attrs['num_views'] = 25
+            f.attrs['includes_occ_center'] = True
+            f.attrs['center_idx'] = center_idx
+            f.attrs['view_order'] = 'sequence'
 
 
             # --- occ_center Group ---
@@ -253,10 +260,12 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
     else:
         print(f"Base dir {base_dir} does not exist")
         return
-    trajectories = ['plane_grid', 'rot_spiral', 'rand_shell'] # Only process these trajectories for now
+    trajectories = ['fix_line', 'plane_grid', 'rot_arc', 'rot_spiral', 'rand_shell']
 
     for trajectory_type in trajectories:
         trajectory_dir = os.path.join(base_dir, trajectory_type)
+        if not os.path.isdir(trajectory_dir):
+            continue
             
         for sequence_name in os.listdir(trajectory_dir):
             # We focus on OCC sequences to fix them

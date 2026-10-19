@@ -152,6 +152,8 @@ def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, outpu
     ])
     
     frames = pose_data['frames']
+    if len(frames) != 25:
+        raise ValueError('Expected exactly 25 OCC frames including center')
     
     # [Modify] Determine center_idx based on trajectory type available in context or heuristic
     # We infer trajectory type from output_dir or pass it in.
@@ -161,7 +163,7 @@ def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, outpu
     
     traj_type = os.path.basename(os.path.dirname(output_dir)) # e.g. 'rand_shell'
     
-    if 'rand_shell' in traj_type or 'rot_spiral' in traj_type:
+    if any(name in transforms_file for name in ('rand_shell', 'rot_spiral')):
         center_idx = len(frames) - 1
     else:
         center_idx = len(frames) // 2
@@ -220,6 +222,12 @@ def process_dataset(transforms_file, rgb_dir, gt_depth_dir, src_depth_dir, outpu
                 if cv2.imwrite(output_path, refocused_rgb):
                     processed_count += 1
     
+    if processed_count != 25:
+        raise ValueError(f'Expected 25 readable observations, got {processed_count}: {rgb_dir}')
+    # DeOccNet selects the canonical GT using the original acquisition metadata.
+    os.makedirs(os.path.join(output_dir, 'pose'), exist_ok=True)
+    with open(os.path.join(output_dir, 'pose', 'transforms.json'), 'w') as handle:
+        json.dump(pose_data, handle, indent=2)
     return processed_count, len(frames)
 
 def batch_process_render_data(base_dir, output_base, use_gpu=True):
@@ -235,7 +243,7 @@ def batch_process_render_data(base_dir, output_base, use_gpu=True):
     else:
         print(f"Base dir {base_dir} does not exist")
         return
-    trajectories = ['plane_grid'] # Only process these trajectories for now
+    trajectories = ['fix_line', 'plane_grid', 'rot_arc', 'rot_spiral', 'rand_shell']
 
     for trajectory_type in trajectories:
         trajectory_dir = os.path.join(base_dir, trajectory_type)

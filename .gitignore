@@ -10,3 +10,7 @@
 !/pipeline_automation/**
 !README.md
 scripts/trajectory_figs
+
+# Python runtime caches are generated locally.
+**/__pycache__/
+*.py[cod]

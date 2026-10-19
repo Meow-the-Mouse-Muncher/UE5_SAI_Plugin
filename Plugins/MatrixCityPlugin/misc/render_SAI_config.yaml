@@ -7,10 +7,17 @@ Output_Path: "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/Saved/MovieRenders_
 File_Name_Format: "{sequence_name}/{render_pass}/{frame_number}"
 Motion_Blur: false
 
+# Capture bounds are within 10 km. Skip history-based occlusion inside this range.
+# Keep the query infrastructure enabled to avoid Vulkan GPU-readback assertions.
+Console_Variables:
+    r.AllowOcclusionQueries: 1
+    r.HZBOcclusion: 0
+    r.NeverOcclusionTestDistance: 1000000  # UE cm = 10 km
+
 # 仅补 OCC 深度单帧（用于快速恢复缺失数据）
 Only_OCC: false
 Single_Frame_Only: false
-Single_Frame_Index: 16
+Single_Frame_Index: 12
 
 Anti_Alias:
     enable: true

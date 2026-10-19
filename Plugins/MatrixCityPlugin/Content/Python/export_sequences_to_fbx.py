@@ -78,9 +78,7 @@ def export_sequences_for_map(
         output_base_dir = os.path.join(project_dir, "Exported_FBX")
     
     # Create base output directory
-    if not os.path.exists(output_base_dir):
-        os.makedirs(output_base_dir)
-        unreal.log(f"Created output directory: {output_base_dir}")
+    os.makedirs(output_base_dir, exist_ok=True)
     
     # Prefer the exact asset list returned by utils_sequencer for this run. This
     # prevents newly rendered images from being paired with historical FBX files.
@@ -137,8 +135,7 @@ def export_sequences_for_map(
         
         # Create category output directory
         category_output_dir = os.path.join(output_base_dir, category)
-        if not os.path.exists(category_output_dir):
-            os.makedirs(category_output_dir)
+        os.makedirs(category_output_dir, exist_ok=True)
         
         # Export sequences in this category
         for asset_path in asset_paths:

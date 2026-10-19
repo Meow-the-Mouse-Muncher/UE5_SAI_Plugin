@@ -1,243 +1,182 @@
-import ast
+"""Run one UE render worker; GPU IDs refer to physical nvidia-smi devices."""
+import argparse
 import asyncio
-import datetime
-import time
 import json
-import os
-import socket
-import subprocess
-import sys
 import logging
+import os
+import signal
+import time
 from pathlib import Path
-from typing import List, Optional
 
-import colorama
-import psutil
-
-from config import CfgNode
-
-p = None
-output_path = None
-unreal_loaded = False
+from pipeline_config import PLUGIN_ROOT, load_render_config, resolve_path
 
 
+def completion_message(message):
+    """Per-queue completion and log lines containing 'error' are not terminal."""
+    stripped = message.strip()
+    if stripped == "Pipeline Finished":
+        return "finished"
+    if stripped == "Pipeline Failed":
+        return "failed"
+    return None
 
 
-
-
-
-def format_time(seconds: float) -> str:
-    return time.strftime("%Hh %Mm %Ss", time.gmtime(seconds))
-
-
-def calculate_remaining_time(i_current, n_total, time_log: List[float]) -> str:
-    remaining_time = 'N/A'
-    if len(time_log) > 0:
-        avg_time = sum(time_log) / len(time_log)
-        remaining_time = (n_total - i_current) * avg_time
-        remaining_time = format_time(remaining_time)
-    return remaining_time
-
-
-def ask_exit():
-    for task in asyncio.all_tasks():
-        task.cancel()
-
-
-async def handle_client(client, host='127.0.0.1', port=9999, parent_loop=None):
-    global unreal_loaded
-    loop__ = asyncio.get_event_loop()
-    while True:
-        try:
-            data_size = await loop__.sock_recv(client, 4)  # 4 byte (int32) size prefix on the message (ue defined)
-            data_size = int.from_bytes(data_size, byteorder='little')
-            data = (await loop__.sock_recv(client, data_size)).decode()
-        except OSError:
-            if parent_loop:
-                # logging.info('Error Occurred. Restarting Unreal Engine & Socket Connection...\n')
-                server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                server.bind((host, port))
-                server.listen(8)
-                server.setblocking(False)
-                client, _ = await parent_loop.sock_accept(server)
-
-
-        if not data:
-            break
-            
-        logging.info(data)
-
-        if data == '[*] Unreal Engine Loaded!':
-            unreal_loaded = True
-
-        # handle error
-        if 'error' in data.lower():
-            if p:
-                logging.error('Unreal Engine Exit with Error. Killing Unreal Engine...')
-                p.kill()
-        
-        # handle exit
-        if data == 'Render completed. Success: True' or data == 'Pipeline Finished' or 'exit' in data.lower():
-            if p:
-                logging.info('Exiting Unreal Engine...')
-                p.kill()
-            break
-
-        # await loop.sock_sendall(client, data.encode('utf8'))
-    client.close()
-    ask_exit()
-
-
-async def run_server(host, port):
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((host, port))
-    server.listen(8)
-    server.setblocking(False)
-
-    loop_ = asyncio.get_event_loop()
-
-    # while True:
-    client, _ = await loop_.sock_accept(server)
-    logging.info(f'Socket Connection from {client.getpeername()}')
-    loop_.create_task(handle_client(client, host, port, loop_))
-
-
-async def run_cmd(command, gpu_id=None):
-    global p, unreal_loaded
-    unreal_loaded = False
-    env = dict(os.environ)
-    if gpu_id is not None:
-        env['CUDA_VISIBLE_DEVICES'] = str(gpu_id)
-        logging.info(f'[*] Setting CUDA_VISIBLE_DEVICES={gpu_id}')
-    p = subprocess.Popen(command, shell=True, env=env)
-    logging.info('[*] Starting Unreal Engine...')
-    logging.info(f'[*] Unreal Engine PID: {p.pid}')
-
-    if sys.version_info[1] > 8:
-        AsyncioCancelledError = asyncio.exceptions.CancelledError
+def build_command(config, args, adapter_index, config_dir=None):
+    project = resolve_path(config["ue_project"], config_dir)
+    script = resolve_path(config["python_script"], config_dir)
+    render = resolve_path(args.render_config or config["render_config"], config_dir)
+    level = args.ue_map or config.get("ue_map", "")
+    command = [str(resolve_path(config["ue_command"], config_dir)), str(project)]
+    if level:
+        command.append(level)
+    command += ["-ExecCmds=py " + str(script), "-render_config_path=" + str(render),
+                "-socket_port=" + str(args.port), "-notexturestreaming", "-LOCALLOGTIMES",
+                "-NoVSync", "-unattended", "-nosound", "-NoSplash"]
+    if level:
+        command.append("-target_map=" + level)
+    if adapter_index is not None:
+        command.append("-graphicsadapter=" + str(adapter_index))
+    if args.worker_config:
+        command.append("-worker_config_path=" + str(Path(args.worker_config).resolve()))
+        # UE explicitly forbids shared registry/config writes in multiprocess
+        # mode. Workers still read the common cache and save their own assets.
+        command.extend([
+            "-Multiprocess", "-NoAssetRegistryCacheWrite",
+            "-ini:Engine:[ConsoleVariables]:AssetRegistry.DisableDirectoryWatcher=1",
+            "-ini:EditorPerProjectUserSettings:[/Script/UnrealEd.EditorLoadingSavingSettings]:bMonitorContentDirectories=False",
+            # UE 5.6/NVIDIA: depth CPU readback can stall waiting for a timeline
+            # completion task. The ordinary-fence path preserves pixel values.
+            "-ini:Engine:[ConsoleVariables]:r.Vulkan.Submission.AllowTimelineSemaphores=0",
+        ])
+    if args.headless:
+        command.append("-RenderOffScreen")
+    if args.log_file:
+        log_path = Path(args.log_file).resolve()
+        command.append("-Abslog=" + str(log_path))
     else:
-        AsyncioCancelledError = asyncio.CancelledError
+        command.append("LOG=Pipeline.log")
+    command.extend(args.ue_arg)
+    return command
 
-    while True:
+
+async def supervise(command, env, port, timeout=0, grace=45):
+    finished = asyncio.Event()
+    failed = asyncio.Event()
+    connected = asyncio.Event()
+
+    async def client(reader, writer):
+        connected.set()
         try:
-            await asyncio.sleep(10)
-            poll = p.poll()
+            while True:
+                length = int.from_bytes(await reader.readexactly(4), "little")
+                if not 0 < length <= 16 * 1024 * 1024:
+                    raise ValueError("Invalid UE socket message size")
+                message = (await reader.readexactly(length)).decode("utf-8", "replace")
+                logging.info("UE: %s", message)
+                terminal = completion_message(message)
+                if terminal == "finished":
+                    finished.set()
+                elif terminal == "failed":
+                    failed.set()
+        except asyncio.IncompleteReadError:
+            pass
+        except Exception:
+            logging.exception("Worker socket read failed")
+        finally:
+            writer.close()
+            await writer.wait_closed()
 
-            crashed = False
-            # Check for crash reporter process
-            for proc in psutil.process_iter(['pid', 'name']):
-                try:
-                    # Linux crash reporter name might vary, usually CrashReportClient
-                    if proc.info['name'] and 'CrashReportClient' in proc.info['name']:
-                        logging.info(f"Found CrashReportClient (PID: {proc.info['pid']}), killing it...")
-                        proc.kill()
-                        crashed = True
-                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-                    pass
+    server = await asyncio.start_server(client, "127.0.0.1", port)
+    proc = None
+    begin = time.monotonic()
 
-            # 如果进程已退出，不再重启，直接退出循环
-            if poll is not None:
-                if crashed:
-                    logging.error(f'[!] Unreal Engine crashed with poll code {poll}')
-                else:
-                    logging.info(f'[*] Unreal Engine exited with code {poll}')
-                break
-                
-        except AsyncioCancelledError as e:
-            break
+    async def terminate_owned_process():
+        if proc is None or proc.returncode is not None:
+            return
+        try:
+            proc.terminate()
+        except ProcessLookupError:
+            return
+        try:
+            await asyncio.wait_for(proc.wait(), timeout=15)
+        except asyncio.TimeoutError:
+            proc.kill()
+            await proc.wait()
 
-
-def main(config_file: str='misc/user.json', gpu_id: Optional[int]=None, port: int=9999, map_filter: Optional[List[str]]=None):
-    colorama.init(autoreset=True)
-
-    config_file = Path(config_file).resolve()
-    with open(config_file) as f:
-        config = json.load(f)
-    ue_command = config['ue_command']
-    ue_project = config['ue_project']
-    # 新增：读取地图路径，如果没有则默认为空字符串
-    ue_map = config.get('ue_map', '')
-
-    global output_path
-    render_config_path = Path(config['render_config']).resolve()
-    render_config = CfgNode.load_yaml_with_base(str(render_config_path))
-    output_path = Path(render_config['Output_Path']).resolve()
-
-    # if ' ' in ue_project:
-    #     raise ValueError(f"Found blanks in `ue_project` path. UE can't handle that. `ue_project`: {ue_project}")
-
-    # python_dir = Path(ue_project).parent / 'Plugins/MatrixCityPlugin/Content/Python'
-    # python_script = python_dir / 'pipeline.py'
-    python_script = Path(config['python_script']).resolve() # 运行的python脚本路径
-
-
-    script_path_str = str(python_script).replace('\\', '/')
-    print(f'script_path_str: {script_path_str}')
-    
-    command=[
-        f'"{ue_command}"',
-        f'"{ue_project}"',
-        f'"{ue_map}"' if ue_map else '',  # 加载指定地图
-        f'-ExecCmds="py {script_path_str}"',
-        f'-render_config_path="{render_config_path}"',
-        f'-socket_port={port}',
-        f'-target_map="{ue_map}"' if ue_map else '',  # 传递地图路径参数
-        
-        f'-notexturestreaming',
-        # f'-silent',
-        f'LOG=Pipeline.log',
-        f'-LOCALLOGTIMES',
-    ]
-    
-    # 添加 GPU 选择参数
-    if gpu_id is not None:
-        command.append(f'-graphicsadapter={gpu_id}')
-        logging.info(f'[*] Setting GPU adapter to: {gpu_id}')
-    
-    command = ' '.join(map(str, command))
-    logging.info(colorama.Fore.BLUE + command)
-
-    ue_log_file = Path(ue_project).parent / "Saved/Logs/Pipeline.log"
-    logging.info(colorama.Fore.YELLOW + f'[*] UE log file: {ue_log_file.as_uri()}')
-
-    host = '127.0.0.1'
-    # port参数从函数参数传入
-    logging.info(f'[*] Using port: {port}, GPU: {gpu_id if gpu_id is not None else "default"}')
-
-    loop = asyncio.get_event_loop()
     try:
-        print('now we need cmd pipeline')
-        loop.create_task(run_server(host, port))
-        loop.run_until_complete(run_cmd(command, gpu_id=gpu_id))
+        proc = await asyncio.create_subprocess_exec(*command, env=env, cwd=str(PLUGIN_ROOT))
+        logging.info("UE_WORKER_PID=%s", proc.pid)
+        completion_at = None
+        while proc.returncode is None:
+            try:
+                await asyncio.wait_for(proc.wait(), timeout=0.5)
+            except asyncio.TimeoutError:
+                pass
+            now = time.monotonic()
+            if (finished.is_set() or failed.is_set()) and completion_at is None:
+                completion_at = now
+            if timeout and now - begin > timeout:
+                raise TimeoutError("UE worker exceeded {} seconds".format(timeout))
+            # The terminal socket marker precedes the engine's final GPU flush.
+            if completion_at is not None and now - completion_at > grace:
+                logging.warning("Completed worker did not exit after grace; terminating this UE process")
+                await terminate_owned_process()
+                return 0 if not failed.is_set() else 1
+        if failed.is_set():
+            return 1
+        if not finished.is_set():
+            logging.error("UE exited %s without Pipeline Finished", proc.returncode)
+            return proc.returncode or 1
+        return proc.returncode or 0
+    finally:
+        server.close()
+        await server.wait_closed()
+        if proc is not None and proc.returncode is None:
+            await terminate_owned_process()
 
-        # asyncio.ensure_future(run_server(host, port)),
-        # asyncio.ensure_future(run_cmd(command))
-        # loop.run_forever()
 
-    except KeyboardInterrupt:
-        global p
-        if p:
-            p.kill()
-            logging.info('[*] Unreal Engine is killed by keyboard interrupt.')
-        pass
-
-    else:
-        # logging.info("Pipeline Finished!")
-        loop.close()
-        logging.info(f'output_path: {output_path.as_uri()}')
-
-
-        # TODO: add post-processing
-        # logging.info('Doing some post-processing...')
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--config_file", "-f", default=str(PLUGIN_ROOT / "misc/user.json"))
+    parser.add_argument("--gpu_id", "-g", default=None)
+    parser.add_argument("--port", "-p", type=int, default=9999)
+    parser.add_argument("--maps", "-m", nargs="*", help="One full map path or name; use run_parallel.py for batches")
+    parser.add_argument("--ue-map")
+    parser.add_argument("--render-config")
+    parser.add_argument("--worker-config")
+    parser.add_argument("--headless", action="store_true")
+    parser.add_argument("--log-file")
+    parser.add_argument("--timeout", type=float, default=0)
+    parser.add_argument("--exit-grace", type=float, default=45)
+    parser.add_argument("--ue-arg", action="append", default=[])
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args(argv)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    config_path = resolve_path(args.config_file)
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    if args.maps:
+        if len(args.maps) != 1:
+            parser.error("Use run_parallel.py to render multiple maps")
+        from pipeline_config import resolve_map
+        args.ue_map = resolve_map(resolve_path(config["ue_project"], config_path.parent), args.maps[0])
+    render_path = resolve_path(args.render_config or config["render_config"], config_path.parent)
+    render_config = load_render_config(render_path)
+    env = dict(os.environ)
+    adapter = None
+    if args.gpu_id is not None:
+        from gpu_devices import resolve_vulkan_adapter
+        adapter, env, info = resolve_vulkan_adapter(args.gpu_id, env)
+        env["CUDA_VISIBLE_DEVICES"] = info["uuid"]
+        logging.info("GPU_BINDING %s", json.dumps(info, sort_keys=True))
+    command = build_command(config, args, adapter, config_path.parent)
+    logging.info("UE_COMMAND_ARGV %s", json.dumps(command))
+    if args.dry_run:
+        return 0
+    Path(render_config["Output_Path"]).mkdir(parents=True, exist_ok=True)
+    if args.log_file:
+        Path(args.log_file).resolve().parent.mkdir(parents=True, exist_ok=True)
+    return asyncio.run(supervise(command, env, args.port, args.timeout, args.exit_grace))
 
 
 if __name__ == "__main__":
-    import argparse
-    parser = argparse.ArgumentParser(description='main')
-    parser.add_argument('--config_file', '-f', type=str, default='misc/user.json')
-    parser.add_argument('--gpu_id', '-g', type=int, default=None, help='GPU ID to use (e.g., 0, 1)')
-    parser.add_argument('--port', '-p', type=int, default=9999, help='Socket port to use')
-    parser.add_argument('--maps', '-m', type=str, nargs='*', default=None, help='Specific maps to process')
-    args = parser.parse_args()
-
-    main(args.config_file, gpu_id=args.gpu_id, port=args.port, map_filter=args.maps)
+    raise SystemExit(main())

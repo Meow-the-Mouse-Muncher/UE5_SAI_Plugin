@@ -2,6 +2,7 @@ from typing import Callable, Optional
 
 import unreal
 import utils
+import render_worker
 from data.config import CfgNode
 
 from GLOBAL_VARS import MATERIAL_PATHS, PLUGIN_ROOT
@@ -40,6 +41,7 @@ class CustomMoviePipeline():
     _is_batch_target_rendering = False  # 是否在批量目标物渲染模式
     _current_map_context = None  # 当前地图上下文
     _batch_sequence_paths = set()  # 当前批次实际创建的 Sequence 资产路径
+    _batch_failures = []
 
     @classmethod
     def clear_queue(cls):
@@ -381,6 +383,15 @@ class CustomMoviePipeline():
             motion_blur=render_config['Motion_Blur'],
             single_frame_index=single_frame_index,
         )
+        # Capture overrides belong to this MRQ job; the executor restores them
+        # after completion rather than changing the project's renderer defaults.
+        console_variables = render_config.get('Console_Variables', {})
+        if console_variables:
+            console_config = movie_preset.find_or_add_setting_by_class(
+                unreal.MoviePipelineConsoleVariableSetting)
+            for name, value in console_variables.items():
+                console_config.add_or_update_console_variable(name, value)
+
         newJob.set_configuration(movie_preset)
         unreal.log(f"Added new job ({newJob.job_name}) to queue.")
         return True
@@ -412,7 +423,8 @@ class CustomMoviePipeline():
         from render_controller import RenderController, RenderSequenceBuilder, SceneConfig
         
         # 创建渲染控制器
-        cls._render_controller = RenderController(executor)
+        cls._render_controller = RenderController(
+            executor, performance_settings=render_worker.performance_settings(render_config_occ))
         
         # 准备场景配置
         # 1. OCC渲染场景配置：当前目标物可见，遮挡物可见，其他目标物隐藏
@@ -455,6 +467,7 @@ class CustomMoviePipeline():
         
         def on_sequence_failed(error):
             unreal.log_error(f"Serial rendering failed: {error}")
+            cls._batch_failures.append(str(error))
             if cls._is_batch_target_rendering:
                 cls._current_target_index += 1
                 cls._process_next_target()
@@ -493,7 +506,8 @@ class CustomMoviePipeline():
         from render_controller import RenderController, RenderSequenceBuilder, SceneConfig
         
         # 创建渲染控制器
-        cls._render_controller = RenderController(executor)
+        cls._render_controller = RenderController(
+            executor, performance_settings=render_worker.performance_settings(render_config))
         
         # 准备场景配置
         # OCC渲染场景配置：当前目标物可见，遮挡物可见，其他目标物隐藏
@@ -572,6 +586,7 @@ class CustomMoviePipeline():
         
         def on_sequence_failed(error):
             unreal.log_error(f"Multi-trajectory multi-height rendering failed: {error}")
+            cls._batch_failures.append(str(error))
             if cls._is_batch_target_rendering:
                 cls._current_target_index += 1
                 cls._process_next_target()
@@ -605,16 +620,22 @@ class CustomMoviePipeline():
         cls._is_batch_target_rendering = True
         cls._current_target_index = 0
         cls._batch_sequence_paths = set()
+        cls._batch_failures = []
         
         # 保存上下文
         cls._current_map_context = {
             'map_name': map_name,
-            'executor': executor
+            'executor': executor,
+            'performance_settings': render_worker.performance_settings(render_config),
         }
         
         # 准备目标物渲染队列
         cls._target_render_queue = []
+        selected_indices = set(render_worker.select_target_indices(
+            [actor.get_actor_label() for actor in target_actors]))
         for target_idx, target_actor in enumerate(target_actors, 1):
+            if target_idx - 1 not in selected_indices:
+                continue
             target_task = {
                 'target_actor': target_actor,
                 'target_name': target_actor.get_actor_label(),
@@ -627,7 +648,7 @@ class CustomMoviePipeline():
             }
             cls._target_render_queue.append(target_task)
         
-        unreal.log(f"Starting batch target rendering for {len(target_actors)} targets in {map_name}")
+        unreal.log(f"Starting batch target rendering for {len(cls._target_render_queue)}/{len(target_actors)} targets in {map_name}")
         
         # 开始处理第一个目标物
         cls._process_next_target()
@@ -652,18 +673,29 @@ class CustomMoviePipeline():
         
         # 生成所有轨迹类型和高度的相机序列
         import utils_sequencer
-        trajectory_results = utils_sequencer.main(
-            target_actor=current_task['target_actor'], 
-            map_name=current_task['map_name']
-        )
+        try:
+            trajectory_results = utils_sequencer.main(
+                target_actor=current_task['target_actor'],
+                map_name=current_task['map_name']
+            )
+        except Exception as error:
+            cls._batch_failures.append(str(error))
+            unreal.log_error(f"Trajectory generation failed: {error}")
+            cls._current_target_index += 1
+            cls._process_next_target()
+            return
         
         if not trajectory_results:
             unreal.log_error("Failed to generate any trajectories")
+            cls._batch_failures.append(f"No trajectories for {current_task['target_name']}")
             cls._current_target_index += 1
             cls._process_next_target()
             return
         
         log_msg_with_socket(executor, f'[*] Created {len(trajectory_results)} trajectory sequences')
+        expected_tasks = render_worker.get_worker_config().get('trajectory_tasks')
+        if expected_tasks is not None and len(trajectory_results) != len(expected_tasks):
+            cls._batch_failures.append(f"Incomplete trajectories for {current_task['target_name']}")
         
         # 启动多轨迹多高度串行渲染
         log_msg_with_socket(executor, f'[*] Processing target {current_task["target_idx"]}/{current_task["total_targets"]}: {current_task["target_name"]} - Starting multi-trajectory multi-height rendering')
@@ -687,22 +719,33 @@ class CustomMoviePipeline():
         map_context = cls._current_map_context
         map_name = map_context['map_name']
         executor = map_context.get('executor')
+        performance = map_context['performance_settings']
         unreal.log(f"All targets completed for map: {map_name}")
         
         # 【修复】在进行任何清理操作前，先等待 GPU 完成所有渲染命令
         # 这是解决 Vulkan SIGSEGV 崩溃的关键
         unreal.log("[*] Waiting for GPU to complete all pending render commands...")
-        cls._flush_gpu_and_wait(wait_cycles=3, cycle_time=1.0)
+        try:
+            cls._flush_gpu_and_wait(wait_cycles=performance['map_wait_cycles'],
+                                   cycle_time=performance['map_wait_seconds'])
+        except Exception as error:
+            cls._abort_render_sync_failure(error, executor)
+            return
         
         # 渲染完成后自动导出FBX
         try:
             from export_sequences_to_fbx import export_sequences_for_map
             sequence_paths = sorted(cls._batch_sequence_paths)
             unreal.log(f"[*] Starting FBX export for {len(sequence_paths)} current-run sequences in map: {map_name}")
-            export_sequences_for_map(map_name, sequence_paths=sequence_paths)
+            exported_count = export_sequences_for_map(
+                map_name, sequence_paths=sequence_paths,
+                output_base_dir=render_worker.get_worker_config().get('export_output_path'))
+            if exported_count != len(sequence_paths):
+                cls._batch_failures.append(f"FBX export incomplete: {exported_count}/{len(sequence_paths)}")
             unreal.log(f"[*] FBX export completed for map: {map_name}")
         except Exception as e:
             unreal.log_error(f"Failed to export FBX for map {map_name}: {e}")
+            cls._batch_failures.append(f"FBX export failed: {e}")
         
         # 重置批量目标物渲染状态
         cls._is_batch_target_rendering = False
@@ -714,51 +757,74 @@ class CustomMoviePipeline():
         # 发送完成信号并退出编辑器
         if executor:
             try:
-                executor.send_socket_message("Pipeline Finished")
-                unreal.log("[*] Sent 'Pipeline Finished' signal to socket")
+                completion_message = "Pipeline Failed" if cls._batch_failures else "Pipeline Finished"
+                executor.send_socket_message(completion_message)
+                unreal.log(f"[*] Sent '{completion_message}' signal to socket")
             except Exception as e:
                 unreal.log_warning(f"Failed to send socket message: {e}")
         
         # 【修复】退出前再次等待 GPU，确保所有资源正确释放
         unreal.log("[*] Final GPU flush before exit...")
-        cls._flush_gpu_and_wait(wait_cycles=2, cycle_time=1.5)
+        try:
+            cls._flush_gpu_and_wait(wait_cycles=performance['exit_wait_cycles'],
+                                   cycle_time=performance['exit_wait_seconds'])
+        except Exception as error:
+            cls._abort_render_sync_failure(error, executor)
+            return
         
         # 退出编辑器
         unreal.log("[*] Exiting Unreal Editor...")
         unreal.SystemLibrary.quit_editor()
     
+    @staticmethod
+    def _synchronize_rendering():
+        library = getattr(unreal, 'MatrixCityRenderSyncLibrary', None)
+        synchronize = getattr(library, 'synchronize_rendering', None) if library else None
+        if synchronize is None:
+            raise RuntimeError(
+                "MatrixCityRenderSyncLibrary.synchronize_rendering is missing; "
+                "rebuild MatrixCityPlugin and restart Unreal Editor")
+        if synchronize(True) is not True:
+            raise RuntimeError("MatrixCity native rendering/GPU synchronization failed")
+
+    @classmethod
+    def _abort_render_sync_failure(cls, error, executor=None):
+        """Stop this worker explicitly; a delay is not a renderer barrier."""
+        message = f"Rendering/GPU synchronization failed: {error}"
+        cls._batch_failures.append(message)
+        cls._is_batch_target_rendering = False
+        unreal.log_error(message)
+        if executor is None:
+            executor = cls.new_executor
+        try:
+            if executor:
+                executor.send_socket_message('Pipeline Failed')
+        except Exception as socket_error:
+            unreal.log_error(f"Unable to send render failure: {socket_error}")
+        # UE owns final teardown; never start another render after sync failure.
+        unreal.SystemLibrary.quit_editor()
+
     @classmethod
     def _flush_gpu_and_wait(cls, wait_cycles: int = 3, cycle_time: float = 1.0):
-        """强制刷新 GPU 并等待所有渲染命令完成
-        
-        关键：必须使用 UE 的渲染命令刷新，而不只是 Python sleep
-        这个函数通过刷新渲染命令队列和 GC 来确保 Vulkan 渲染查询完成，
-        防止在资源清理时出现 SIGSEGV 崩溃。
-        
+        """通过原生屏障同步渲染线程和已提交 GPU 工作，再保留可配置等待。
+
+        Python sleep 本身不提供渲染同步；collect_garbage 仅请求后续
+        引擎 tick 执行 GC。本函数没有新增同步 GC，也不保证消除所有
+        Vulkan 或驱动崩溃。原生桥接缺失或失败时抛出异常，调用方须
+        将当前 worker 标记失败并退出。
+
         Args:
-            wait_cycles: 等待循环次数
-            cycle_time: 每个循环的等待时间（秒）
+            wait_cycles: 附加等待循环次数；为 0 时仍执行一次真实屏障
+            cycle_time: 每次屏障后的附加等待时间（秒）
         """
         import time
         
-        for i in range(wait_cycles):
-            try:
-                # 【关键】使用控制台命令强制刷新渲染命令队列
-                # 这会同步等待 GPU 完成所有挂起的渲染操作
-                unreal.SystemLibrary.execute_console_command(
-                    None, "r.FlushRenderingCommands", False
-                )
-                
-                # 强制垃圾回收释放 Python 端引用
-                unreal.SystemLibrary.collect_garbage()
-                
-                unreal.log(f"[GPU Flush] Cycle {i+1}/{wait_cycles}: Flushed rendering commands + GC, waiting {cycle_time}s...")
-                
-                # 额外等待确保稳定
-                time.sleep(cycle_time)
-                
-            except Exception as e:
-                unreal.log_warning(f"[GPU Flush] Warning in cycle {i+1}: {e}")
+        for i in range(max(1, wait_cycles)):
+            cls._synchronize_rendering()
+            # This requests GC on a future engine tick; it is not synchronous GC.
+            unreal.SystemLibrary.collect_garbage()
+            unreal.log(f"[GPU Flush] Cycle {i+1}: Native rendering/GPU barrier completed")
+            if i < wait_cycles and cycle_time:
                 time.sleep(cycle_time)
         
         unreal.log("[GPU Flush] All cycles completed, GPU should be ready")
@@ -773,28 +839,27 @@ class CustomMoviePipeline():
             success (bool): Whether the queue finished successfully.
         """
         import time
+        controller = CustomMoviePipeline._render_controller
+        performance = (controller.performance_settings if controller else
+                       render_worker.performance_settings())
         
         mss = f"Render completed. Success: {success}"
         unreal.log(mss)
         
-        # 【关键修复】在回调中立即添加 GPU 同步等待
-        # 这必须在 _on_render_complete 之前执行，防止 PIE 世界过早清理
+        # Synchronize before advancing Python state; PIE owns its teardown.
         unreal.log("[GPU Sync] Immediate GPU flush after render completion...")
         try:
-            # 使用渲染命令刷新而不是简单 sleep
-            # 这是解决 Vulkan SIGSEGV 的关键
-            for i in range(3):
-                # 强制刷新渲染命令队列 - 这是同步操作
-                unreal.SystemLibrary.execute_console_command(
-                    None, "r.FlushRenderingCommands", False
-                )
-                unreal.SystemLibrary.collect_garbage()
-                unreal.log(f"[GPU Sync] Flush cycle {i+1}/3 completed")
-                time.sleep(0.5)
+            for i in range(max(1, performance['queue_wait_cycles'])):
+                CustomMoviePipeline._synchronize_rendering()
+                if performance['queue_collect_garbage']:
+                    unreal.SystemLibrary.collect_garbage()
+                unreal.log(f"[GPU Sync] Flush cycle {i+1}/{performance['queue_wait_cycles']} completed")
+                if i < performance['queue_wait_cycles'] and performance['queue_wait_seconds']:
+                    time.sleep(performance['queue_wait_seconds'])
             unreal.log("[GPU Sync] GPU flush completed in callback")
-        except Exception as e:
-            unreal.log_warning(f"[GPU Sync] Warning during flush: {e}")
-            time.sleep(2.0)  # 即使出错也等待
+        except Exception as error:
+            CustomMoviePipeline._abort_render_sync_failure(error, executor)
+            return
         
         # 如果有渲染控制器，通知它渲染完成
         if CustomMoviePipeline._render_controller:
@@ -845,8 +910,7 @@ class CustomMoviePipeline():
             return
 
         # add job_name to class variable `Jobs` for monitoring progress in the individual job finished callback
-        for job in cls.pipeline_queue.get_jobs():
-            cls.jobs.append(job.job_name)
+        cls.jobs = [job.job_name for job in cls.pipeline_queue.get_jobs()]
 
         # set Executor
         if executor:
@@ -856,9 +920,10 @@ class CustomMoviePipeline():
 
         # connect socket (只在需要时连接)
         try:
-            if not hasattr(cls.new_executor, '_socket_connected') or not cls.new_executor._socket_connected:
+            # The caller-provided executor is already connected by pipeline.py.
+            # Reconnecting it here used to redirect every worker to port 9999.
+            if executor is None:
                 cls.new_executor.connect_socket(cls.host, cls.port)
-                cls.new_executor._socket_connected = True
         except Exception as e:
             unreal.log_warning(f"Socket connection failed: {e}, continuing without socket")
 

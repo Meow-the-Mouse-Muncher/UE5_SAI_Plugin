@@ -1,23 +1,25 @@
 import unreal
 import utils_sequencer  # 轨迹脚本
 import batch_utils  # 批量处理工具
+import render_worker
 from pathlib import Path
 
 from GLOBAL_VARS import PLUGIN_ROOT
 from data.config import CfgNode
-from utils import loader_func, log_msg_with_socket
+from utils import log_msg_with_socket
 from custom_movie_pipeline import CustomMoviePipeline # 导入自定义的渲染管线类
 
 unreal.log_warning("######################################################")
 unreal.log_warning("### BATCH PIPELINE.PY HAS STARTED EXECUTION ###")
 unreal.log_warning("######################################################")
 
-@loader_func
 def main(render_config_path):
 
     (cmdTokens, cmdSwitches, cmdParameters) = unreal.SystemLibrary.parse_command_line(
         unreal.SystemLibrary.get_command_line()
     )
+
+    worker_config = render_worker.configure_worker(cmdParameters.get('worker_config_path'))
 
     # 1. connect to the worker-specific socket when one was supplied.
     host = '127.0.0.1'
@@ -28,6 +30,8 @@ def main(render_config_path):
         port = 9999
     PIEExecutor = unreal.MoviePipelinePIEExecutor()
     PIEExecutor.connect_socket(host, port)
+    CustomMoviePipeline.host = host
+    CustomMoviePipeline.port = port
     log_msg_with_socket(PIEExecutor, '[*] Unreal Engine Loaded!')
 
     # 2. 读取渲染配置
@@ -49,7 +53,7 @@ def main(render_config_path):
     
     # 3. 获取指定地图路径
     # 从命令行参数获取目标地图
-    target_map = cmdParameters.get('target_map', '')
+    target_map = worker_config.get('map_package_path') or cmdParameters.get('target_map', '')
     if target_map:
         map_name = target_map.split('/')[-1]  # 从路径中提取地图名称
         map_package_path = target_map
@@ -73,6 +77,10 @@ def main(render_config_path):
     # 获取遮挡物
     occlusion_actors = batch_utils.get_occlusion_actors_by_prefix("SM_")
     log_msg_with_socket(PIEExecutor, f'[*] Found {len(occlusion_actors)} occlusion objects in {map_name}')
+
+    # Keep the complete actor list for OCC/GT visibility; selection is applied
+    # only when building the render task queue.
+    render_config['Performance_Settings'] = render_worker.performance_settings(render_config)
     
     # 5. 启动批量目标物串行渲染
     CustomMoviePipeline.start_batch_target_rendering(
@@ -84,9 +92,43 @@ def main(render_config_path):
     )
     
         
-    log_msg_with_socket(PIEExecutor, f'[*] Completed processing map: {map_name}')
-    log_msg_with_socket(PIEExecutor, '[*] All targets processed successfully!')
+    log_msg_with_socket(PIEExecutor, f'[*] Render tasks submitted for map: {map_name}')
     # unreal.SystemLibrary.quit_editor()
+
+
+_pipeline_start_handle = None
+
+
+def start_when_assets_ready(render_config_path):
+    """Capture config explicitly: Slate passes delta_seconds to tick callbacks."""
+    global _pipeline_start_handle
+
+    def on_start_tick(_delta_seconds=0.0):
+        global _pipeline_start_handle
+        if unreal.AssetRegistryHelpers.get_asset_registry().is_loading_assets():
+            return
+        handle = _pipeline_start_handle
+        if handle is None:
+            return
+        _pipeline_start_handle = None
+        unreal.unregister_slate_pre_tick_callback(handle)
+        try:
+            main(render_config_path)
+        except Exception:
+            import traceback
+            unreal.log_error(traceback.format_exc())
+            # Startup errors must not leave a headless editor waiting forever.
+            try:
+                _, _, parameters = unreal.SystemLibrary.parse_command_line(
+                    unreal.SystemLibrary.get_command_line())
+                failure_executor = unreal.MoviePipelinePIEExecutor()
+                failure_executor.connect_socket('127.0.0.1', int(parameters.get('socket_port', '9999')))
+                failure_executor.send_socket_message('Pipeline Failed')
+            finally:
+                unreal.SystemLibrary.quit_editor()
+
+    _pipeline_start_handle = unreal.register_slate_pre_tick_callback(on_start_tick)
+    on_start_tick()
 
 
 if __name__ == "__main__":
@@ -100,4 +142,4 @@ if __name__ == "__main__":
     unreal.log(f"Using config from command line: {render_config_path}")
     unreal.log(f"Target map from command line: {target_map}")
     
-    main(render_config_path)
+    start_when_assets_ready(render_config_path)

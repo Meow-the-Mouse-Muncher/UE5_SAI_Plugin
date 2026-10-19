@@ -141,19 +141,20 @@ def validate_render_pair(parent_dir, fbx_name, pose_count):
             raise ValueError(f"RGB/depth stem mismatch in {render_dir}")
         frame_sets[label] = rgb_stems
 
-    if frame_sets["GT"] != frame_sets["occ"]:
-        raise ValueError(f"GT/OCC frame-stem mismatch for {fbx_name}")
-
-    frame_stems = sorted(frame_sets["GT"])
-    if len(frame_stems) != pose_count:
+    frame_stems = [f"{index:04d}" for index in range(25)]
+    if frame_sets["occ"] != set(frame_stems):
+        raise ValueError(f"Expected OCC frames 0000..0024 for {fbx_name}")
+    if frame_sets["GT"] != set(frame_stems):
+        raise ValueError(f"Expected all 25 per-view GT RGB/depth annotations for {fbx_name}")
+    if pose_count != 25:
         raise ValueError(
             f"Render/pose frame count mismatch for {fbx_name}: "
             f"renders={len(frame_stems)}, poses={pose_count}"
         )
 
     expected_size = None
-    for render_dir in render_dirs.values():
-        for frame_stem in frame_stems:
+    for label, render_dir in render_dirs.items():
+        for frame_stem in sorted(frame_sets[label]):
             size = _png_size(os.path.join(render_dir, "rgb", f"{frame_stem}.png"))
             if expected_size is None:
                 expected_size = size
@@ -209,7 +210,11 @@ def generate_3dgs_transforms_direct(out_data, output_dir, config, frame_stems, r
         "p1": p1, "p2": p2,
         "cx": cx, "cy": cy,
         "w": w, "h": h,
-        "frames": all_frames
+        "frames": all_frames,
+        "num_views": 25,
+        "includes_occ_center": True,
+        "view_order": "sequence",
+        "center_idx": 24 if os.path.basename(os.path.dirname(output_dir)) in ('rot_spiral', 'rand_shell') else 12,
     }
     
     fbx_name = os.path.basename(output_dir)
