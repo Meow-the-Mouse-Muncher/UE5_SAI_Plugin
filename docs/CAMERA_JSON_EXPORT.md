@@ -113,3 +113,24 @@ center_idx = camera["center_idx"]
 ```
 
 新 JSON 已经是 OpenCV 相机轴，方法端无需再次翻转 Y/Z；平移已经是米，原始厘米深度转换为米后再与位姿使用同一尺度。转换为 LFNR H5 时，位姿与深度再共同应用既定归一化尺度。Declutter-NeRF 使用统一适配器完成后续射线坐标转换。
+
+## 实际几何校验
+
+`scripts/forest_dataset/validate_geometry.py` 在已有的审计目录中读取 `reproduce/selection.json` 和 `reproduce/cameras.json`，校验实际 RGB/EXR 与相机几何，并生成离线 `index.html`、`evidence/metrics.json`、输入 SHA-256 和特征对应点。完整 CPU 依赖见根目录 `requirements-dev.txt`。
+
+```bash
+python3 /mnt/nas_b/sjy/code/PCGBiomeForestPoplar/scripts/forest_dataset/validate_geometry.py \
+  --audit-dir /mnt/nas_b/sjy/code/PCGBiomeForestPoplar/Saved/GeometryValidation/20261021_054538
+```
+
+审计目录的 `reproduce/` 保存 Blender 提取脚本、抽样配方、合并相机记录和字体，`evidence/` 保存指标、输入哈希、对应点和复核图。审计副本与报告不修改生产输出。仅重新生成 HTML 可追加 `--html-only`；显示数据直接从现有 HTML 读取，不另存重复的 `visuals.json`。
+
+HTML 的三维图旁提供场景选择、直线/网格/圆弧/螺旋/随机球壳五类轨迹按钮，以及俯视/侧视/斜视。轨迹切换同步更新点云、RGB 和残差；只有直线的补充环境样本会明确标注，完整五类比较请选择正式样本或已有 JSON 验证样本。
+
+三维图默认显示所选轨迹的全部 25 个相机和全部 25 帧 GT 点云。每帧按 16 像素间隔取点，共 25,600 点。页面显示当前帧数和点数。展开“筛选点云帧”后，可单独选择任意帧。相机轨迹始终保留全部帧。点云也可按帧着色。
+
+旧报告若只包含部分帧的点云，可在 `--html-only` 后追加 `--refresh-pointclouds`。脚本重新读取全部 GT RGB 和深度。脚本先核对原始输入哈希，再更新内嵌点云。该操作不修改数值检查结果或原始数据。
+
+校验包含逐帧 UE 轨迹到 OpenCV 的独立轴/单位转换、原始 FBX 焦距与胶片尺寸、多视角 RGB-D 重投影、图像特征匹配，以及错误单位、坐标轴、矩阵方向、焦距、深度定义和帧错位对照。图像特征帧对至少需要 12 个匹配点才参与汇总，深度可见掩码不使用 RGB 误差。
+
+绝对尺度还需依靠已批准的 UE 轨迹和目标位置：如果 pose 平移和深度同时乘同一个比例，多视角重投影仍会一致。EXR 实际以 HALF 存储，50 米附近间隔约 4 厘米，120 米附近约 8 厘米；不能据此声明毫米级深度。树叶、透明物和遮挡变化会使 OCC 共同可见支持变少，报告分别展示 GT 与 OCC 的覆盖范围。
