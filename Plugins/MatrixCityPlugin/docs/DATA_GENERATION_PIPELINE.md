@@ -1,179 +1,57 @@
-# MatrixCityPlugin Data Generation Pipeline
+# 配置与执行流程
 
-This document describes the behavior implemented by the current plugin code. It
-is intentionally separate from the historical City Sample GUI tutorials. For
-known reliability gaps, see [Synthetic Pipeline Audit](SYNTHETIC_PIPELINE_AUDIT.md).
+正式入口 `scripts/render_forest_dataset.py` 先运行 train，再运行 test；每个 split 使用 `misc/render_dataset.py` 调度独立 UE worker，并在图像与 FBX 完成后导出相机 JSON。
 
-## Scope and prerequisites
+## 配置归属
 
-The pipeline automates one or more Unreal maps. Before launching it, each map
-must satisfy these scene conventions:
-
-| Item | Current convention |
+| 配置 | 作用 |
 | --- | --- |
-| Map asset | `/Game/Map/<map_name>` |
-| Target actor | Actor label begins with `Target_` |
-| Occluder | `StaticMeshActor` label begins with `SM_` |
-| Camera | Label from `misc/user.json`, default `CineCameraActor1` |
-| Sequence assets | `/Game/Sequences/<trajectory_type>/` |
+| `misc/user.example.json` | 入库的部署模板；包括全部正式地图 |
+| 本机 `misc/user.json` 或 `--config` 指定文件 | 编辑器、项目、地图、Python 入口和渲染配置路径 |
+| `misc/render_SAI_config.yaml` | 正式分辨率、通道、采样和输出默认值；继承 `render_config.yaml` |
+| `--render-config` | 单 split 调度器的显式渲染配置覆盖 |
+| `misc/trajectory_config.yaml` | 轨迹参数、25 帧和相机名称 |
+| `Config/Dataset/` | 正式素材哈希、目标、遮挡树和批准的 train/test 序列 |
+| `Saved/RenderRuns/<session>/` | 本地任务计划、配置快照、完成标记和日志 |
 
-The target and occluder prefixes are currently hard-coded by `pipeline.py`.
-`Batch_Settings` in the render YAML is descriptive only; changing it does not
-change actor selection.
+系统配置的相对路径先按配置文件目录解析，找不到时按插件根目录解析。`pipeline.py` 尊重启动器传入的 `render_config_path`，未传入时使用 `misc/render_SAI_config.yaml`。
 
-## Configuration ownership
+Linux 的可选 `run_as_user` 在应用运行环境前切换用户；`environment` 为字符串键值表，`unset_environment` 为待移除变量名列表。模板不预设服务器用户名、驱动路径或固定引擎包装器。
 
-| File or argument | Consumed by | Effective behavior |
-| --- | --- | --- |
-| `misc/user.json` | `run_cmd_async.py`, `run_parallel.py` | Defines the editor command, project, map, external Python entry point, and the requested render-config path. |
-| `-target_map` | `pipeline.py` | Chooses the map; if omitted, the currently loaded map is used. |
-| `misc/render_SAI_config.yaml` | `pipeline.py` | The effective render configuration for the current batch path. `pipeline.py` currently overrides the command-line render-config path with this file. |
-| `misc/trajectory_config.yaml` | `utils_sequencer.py` | Defines trajectory types, camera heights (cm), azimuth angles, frame count, sequence FPS, and the camera label. |
-
-Do not assume that changing `user.json.render_config` changes the render run.
-Until `pipeline.py` is changed, update `render_SAI_config.yaml` for the active
-batch pipeline and record that file with the produced data.
-
-## Entry points
-
-Run commands from the Unreal project root so relative paths in `user.json` are
-resolved consistently.
-
-```bash
-# One map or the map already set in misc/user.json.
-python Plugins/MatrixCityPlugin/misc/run_cmd_async.py \
-  --config_file Plugins/MatrixCityPlugin/misc/user.json
-
-# Partition maps across GPUs. The map list comes from --maps, user.json.maps,
-# or Content/Map/scene_*.umap in that order.
-python Plugins/MatrixCityPlugin/misc/run_parallel.py \
-  --config Plugins/MatrixCityPlugin/misc/user.json \
-  --num_gpus 1 --maps scene_010
-
-# Export existing Level Sequences to FBX without rendering new images.
-python Plugins/MatrixCityPlugin/misc/run_export_only.py \
-  --config_file Plugins/MatrixCityPlugin/misc/user.json \
-  --maps scene_010
-```
-
-`run_parallel.py` creates a temporary `ue_map` config per worker and invokes
-`run_cmd_async.py`. The launcher starts Unreal with `-ExecCmds="py .../pipeline.py"`
-and starts a local progress socket.
-
-## Execution flow
-
-```mermaid
-flowchart TD
-    A[run_parallel.py or run_cmd_async.py] --> B[Read user.json]
-    B --> C[Launch Unreal with target_map and pipeline.py]
-    C --> D[pipeline.py loads map]
-    D --> E[Find Target_ actors and SM_ static-mesh actors]
-    E --> F[For each target: utils_sequencer.main]
-    F --> G[Create or replace Level Sequences]
-    G --> H[For each trajectory x height x angle]
-    H --> I[Render OCC]
-    I --> J{Only_OCC?}
-    J -- no --> K[Render GT]
-    J -- yes --> L[Next sequence or target]
-    K --> L
-    L --> M[Export matching /Game/Sequences assets to FBX]
-    M --> N[Quit Unreal]
-```
-
-### 1. Map and actor discovery
-
-`pipeline.py` loads `-target_map` when one is supplied, then gathers all actor
-labels beginning with `Target_` and all static mesh actor labels beginning with
-`SM_`. Targets are sorted by label. It gives both sets to
-`CustomMoviePipeline.start_batch_target_rendering`.
-
-### 2. Sequence generation
-
-For each target, `utils_sequencer.main` expands the Cartesian product of
-`trajectory_types`, `camera_heights`, and `plane_angles` from
-`trajectory_config.yaml`. Each generated Level Sequence is saved under:
+## 调度与渲染
 
 ```text
-/Game/Sequences/<trajectory_type>/
+scripts/render_forest_dataset.py
+  → misc/render_dataset.py（train / test）
+    → misc/run_cmd_async.py（独立 GPU、端口、日志与 worker 配置）
+      → Content/Python/pipeline.py
+        → utils_sequencer.py / trajectory_geometry.py
+        → custom_movie_pipeline.py / render_controller.py
+        → export_sequences_to_fbx.py
+    → scripts/export_camera_json.py
+      → Blender / scripts/blender_extract_transforms.py
 ```
 
-Sequence names include the map, target, height in metres, and azimuth, for
-example:
+调度器校验地图和素材，按正式 CSV 分片，为 worker 分配互不重叠的任务。随机种子按任务身份派生，GPU 和 worker 调整不应改变轨迹。实际运行的渲染配置、轨迹配置与计划写入运行目录。
 
-```text
-scene_010_Target_003_height_050_ang_120
-```
+UE 按目标创建精确 Level Sequence。OCC 与 GT 复用相同轨迹；正式数据仅切换清单指定的原树，保留地形、草、石块与其他背景。其他互斥目标隐藏。默认两份均输出完整 25 帧 RGB 和深度。
 
-The generator binds the named scene camera as a possessable camera. If that
-camera is missing, generation of that combination fails. Existing assets with
-the same sequence path may be replaced by the generator, so a rerun is not an
-immutable dataset version.
+每个 worker 使用隔离的 `/Game/Sequences/_workers/...` 目录，自动 FBX 导出接收本轮生成的精确序列列表。C++ `MatrixCityRenderSyncLibrary` 在推进 Python 渲染状态前执行原生同步；同步失败使任务失败。
 
-### 3. OCC and GT rendering
+## 恢复与停止
 
-`CustomMoviePipeline.render_multi_trajectory_multi_height_serial` serializes
-the generated sequences through the Movie Render Queue.
+`--resume` 复用记录的计划和配置，拒绝不兼容的采样或清单变化。完整图像和非空 FBX 通过检查后可复用；相机 JSON 缺失或失效时补导出。`render_done.json` 标记图像/FBX 阶段，`done.json` 表示任务所需阶段全部完成。
 
-* **OCC**: only the current target remains visible among target actors; `SM_`
-  occluders remain visible.
-* **GT**: only the current target remains visible among target actors; `SM_`
-  occluders are hidden.
+同一 session 和输出目录有进程锁。SIGINT/SIGTERM 由调度器转给 worker，worker 通过 MRQ 取消和 PIE 退出完成清理。`result.json`、`progress.json`、`ue.log`、`launcher.log` 与 `camera_export.log` 用于定位任务状态。
 
-`Only_OCC: true` in the active render YAML suppresses the GT step. Render pass
-selection, resolution, anti-aliasing, output root, and the optional single-frame
-mode are also controlled by `render_SAI_config.yaml`.
+具体运行命令见[快速开始](Get-Started.md)，已部署服务器的路径、引擎修复和恢复状态见[森林数据集](../../../FOREST_DATASET.md)。
 
-With the shipped filename template, the output tree is:
+## 相机元数据
 
-```text
-<Output_Path>/
-  <trajectory_type>/
-    <map>_<target>_height_<metres>_ang_<degrees>_{occ|GT}/
-      <render_pass>/
-        <frame_number>.<extension>
-```
+`export_camera_json.py` 通过明确的任务清单调用 Blender。JSON 使用 OpenCV 相机到世界矩阵、米单位平移、固定 25 视角及原生 512×512 图像。GT/OCC 两份 JSON 必须一致。完整字段、验证边界和单独补导出命令见[相机协议](../../../docs/CAMERA_JSON_EXPORT.md)。
 
-The default active passes are `rgb` (PNG) and `depth` (EXR). Do not infer depth
-units or channel semantics from the filename alone; the depth material is a UE
-asset and requires calibration for geometry-sensitive use.
+## 其他维护入口
 
-### 4. FBX export and downstream poses
+`misc/run_parallel.py` 转发到当前调度器。`misc/run_cmd_async.py` 可用于单 worker 调试，`misc/benchmark_render.py` 用于独立性能采样。
 
-After all targets for a map finish, the plugin calls
-`export_sequences_for_map(map_name)`. It searches `/Game/Sequences` for
-Level Sequence asset names containing the map name and exports them to:
-
-```text
-<ProjectDir>/Exported_FBX/<trajectory_type>/<sequence_name>.fbx
-```
-
-The plugin does **not** produce `transforms.json` or validate that RGB, EXR,
-FBX, and camera poses correspond to the same frames. Any Blender pose extraction
-and dataset packing is a separate downstream step and must retain explicit frame
-identity and run metadata.
-
-## Operational limits in the current implementation
-
-These are current behaviors, not guarantees:
-
-* `pipeline.py` connects its progress socket to port `9999`. Workers assigned
-  another port by `run_parallel.py` are therefore not reliably isolated.
-* A `Pipeline Finished` socket message means the code reached the map-complete
-  branch; it is not a manifest-based validation of every expected output file.
-* If a target fails to generate trajectories, the current batch path logs the
-  failure and does not advance to a structured failed-run result.
-* FBX export filters by map name across all `/Game/Sequences` assets, so stale
-  sequences with matching names can be included.
-
-Use a single worker, a dedicated output directory, and a small map/target smoke
-test before a large run. The audit document records the code evidence and
-recommended remediation for these limits.
-
-## Related implementation files
-
-* `misc/run_parallel.py` - multi-process map scheduler.
-* `misc/run_cmd_async.py` - one Unreal process plus local socket monitor.
-* `Content/Python/pipeline.py` - UE-side map, actor, and batch entry point.
-* `Content/Python/utils_sequencer.py` - trajectory and Level Sequence creation.
-* `Content/Python/custom_movie_pipeline.py` - OCC/GT visibility and MRQ queue.
-* `Content/Python/export_sequences_to_fbx.py` - automatic FBX export.
+FBX 由正式 worker 自动导出本轮精确序列，相机 JSON 可通过 `scripts/export_camera_json.py` 单独补导出。旧手工导出、重聚焦、可视化与历史文档已删除，维护范围见[仓库维护清单](../../../docs/REPOSITORY_MAINTENANCE.md)。

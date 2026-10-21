@@ -1,515 +1,178 @@
 #!/usr/bin/env python3
-"""
-Improved Blender script based on your provided code
-Extracts camera transforms from imported FBX files and exports to JSON format
-Compatible with 3D Gaussian Splatting training data format
-Integrates generate_transforms_3dgs.py processing logic
-Reads configuration from MatrixCityPlugin config files
-"""
+"""Headless FBX camera export for the 25-view, native-512 data protocol.
 
-import sys
-# Add user's local Python packages to path for snap Blender
-sys.path.append('/home/user1/.local/lib/python3.11/site-packages')
-
-import bpy
-import os
+Normally launched by export_camera_json.py. This script only reads existing
+FBX/RGB/depth files and writes camera metadata; it never renders images.
+"""
+import argparse
+import hashlib
 import json
-import glob
-import struct
-import numpy as np
-import yaml
+from pathlib import Path
+import sys
 
-def load_config():
-    """
-    Load configuration from MatrixCityPlugin config files
-    """
-    project_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar"
-    user_config_path = os.path.join(project_dir, "Plugins/MatrixCityPlugin/misc/user.json")
-    render_config_path = os.path.join(project_dir, "Plugins/MatrixCityPlugin/misc/render_SAI_config.yaml")
-    
-    config = {}
-    
-    # Load user.json
-    try:
-        with open(user_config_path, 'r') as f:
-            user_config = json.load(f)
-            config.update(user_config)
-        print(f"Loaded user config from: {user_config_path}")
-    except Exception as e:
-        print(f"Warning: Could not load user config: {e}")
-    
-    # Load render config
-    try:
-        with open(render_config_path, 'r') as f:
-            render_config = yaml.safe_load(f)
-            config.update(render_config)
-        print(f"Loaded render config from: {render_config_path}")
-    except Exception as e:
-        print(f"Warning: Could not load render config: {e}")
-    
-    return config
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from camera_json_protocol import (build_payload, discover_jobs, load_jobs_manifest, intrinsics_from_projection,
+                                  rigid_opencv_c2w, write_pair)
 
-def listify_matrix(matrix):
-    """Convert Blender matrix to list format"""
-    matrix_list = []
-    for row in matrix:
-        matrix_list.append(list(row))
-    return matrix_list
 
-def get_camera_keyframes(camera_obj):
-    """
-    Detect frames where camera transform actually changes
-    """
-    scene = bpy.context.scene
-    keyframes = []
-    
-    # Store original frame
-    original_frame = scene.frame_current
-    
-    # Sample every frame and detect changes
-    previous_matrix = None
-    tolerance = 1e-6
-    
-    for frame in range(scene.frame_start, scene.frame_end + 1):
-        scene.frame_set(frame)
-        bpy.context.view_layer.update()
-        
-        current_matrix = camera_obj.matrix_world.copy()
-        
-        # Check if transform changed from previous frame
-        if previous_matrix is not None:
-            diff_found = False
-            for i in range(4):
-                for j in range(4):
-                    if abs(current_matrix[i][j] - previous_matrix[i][j]) > tolerance:
-                        diff_found = True
-                        break
-                if diff_found:
-                    break
-            
-            if diff_found:
-                keyframes.append(frame)
-        else:
-            # Always include first frame
-            keyframes.append(frame)
-        
-        previous_matrix = current_matrix
-    
-    # Restore original frame
-    scene.frame_set(original_frame)
-    
-    return keyframes
+def arguments(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--output-root', required=True)
+    parser.add_argument('--fbx-root')
+    parser.add_argument('--trajectory', action='append')
+    parser.add_argument('--sequence', action='append')
+    parser.add_argument('--limit', type=int)
+    parser.add_argument('--camera-name', default='CineCameraActor1')
+    parser.add_argument('--overwrite', action='store_true')
+    parser.add_argument('--report', required=True)
+    parser.add_argument('--jobs-file')
+    parser.add_argument('--dry-run', action='store_true')
+    return parser.parse_args(argv)
 
-def clear_scene():
-    """Clear all objects from the scene"""
+
+def _clear_scene(bpy):
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.delete(use_global=False)
-
-def _frame_stems(directory, extension):
-    if not os.path.isdir(directory):
-        return set()
-    return {
-        os.path.splitext(name)[0]
-        for name in os.listdir(directory)
-        if name.lower().endswith(extension)
-    }
-
-
-def _png_size(path):
-    with open(path, "rb") as image_file:
-        header = image_file.read(24)
-    if header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
-        raise ValueError(f"Invalid PNG file: {path}")
-    return struct.unpack(">II", header[16:24])
-
-
-def validate_render_pair(parent_dir, fbx_name, pose_count):
-    """Return verified render-frame stems and their shared RGB resolution."""
-    render_dirs = {
-        "GT": os.path.join(parent_dir, f"{fbx_name}_GT"),
-        "occ": os.path.join(parent_dir, f"{fbx_name}_occ"),
-    }
-    frame_sets = {}
-    for label, render_dir in render_dirs.items():
-        rgb_dir = os.path.join(render_dir, "rgb")
-        depth_dir = os.path.join(render_dir, "depth")
-        rgb_stems = _frame_stems(rgb_dir, ".png")
-        depth_stems = _frame_stems(depth_dir, ".exr")
-        if not rgb_stems or not depth_stems:
-            raise ValueError(f"Missing RGB or depth frames in {render_dir}")
-        if rgb_stems != depth_stems:
-            raise ValueError(f"RGB/depth stem mismatch in {render_dir}")
-        frame_sets[label] = rgb_stems
-
-    frame_stems = [f"{index:04d}" for index in range(25)]
-    if frame_sets["occ"] != set(frame_stems):
-        raise ValueError(f"Expected OCC frames 0000..0024 for {fbx_name}")
-    if frame_sets["GT"] != set(frame_stems):
-        raise ValueError(f"Expected all 25 per-view GT RGB/depth annotations for {fbx_name}")
-    if pose_count != 25:
-        raise ValueError(
-            f"Render/pose frame count mismatch for {fbx_name}: "
-            f"renders={len(frame_stems)}, poses={pose_count}"
-        )
-
-    expected_size = None
-    for label, render_dir in render_dirs.items():
-        for frame_stem in sorted(frame_sets[label]):
-            size = _png_size(os.path.join(render_dir, "rgb", f"{frame_stem}.png"))
-            if expected_size is None:
-                expected_size = size
-            elif size != expected_size:
-                raise ValueError(
-                    f"RGB resolution mismatch for {fbx_name}: {size} vs {expected_size}"
-                )
-    return frame_stems, expected_size
-
-
-def generate_3dgs_transforms_direct(out_data, output_dir, config, frame_stems, resolution, scale=100):
-    """
-    Convert raw transforms to 3DGS format directly from memory
-    Generate JSON files for both GT and occ folders
-    """
-    all_frames = []
-    frames = out_data.get('frames', [])
-    
-    w = float(resolution[0])
-    h = float(resolution[1])
-    print(f"Using verified render resolution: {int(w)}x{int(h)}")
-
-    for frame, frame_stem in zip(frames, frame_stems):
-        image_name = f"{frame_stem}.png"
-        file_path = os.path.join("..", "rgb", image_name)
-
-        c2w = np.array(frame['rot_mat'])
-        
-        # Preserve the existing coordinate convention; its scale needs calibration.
-        c2w[:3, :3] *= 100
-        # c2w[:3, 3] /= scale
-        
-        all_frames.append({
-            'file_path': file_path,
-            'transform_matrix': c2w.tolist()
-        })
-
-    # Camera intrinsics
-    angle_x = out_data['camera_angle_x']
-    fl_x = float(.5 * w / np.tan(.5 * angle_x))
-    fl_y = fl_x
-    
-    # Distortion parameters (default to 0)
-    k1 = k2 = k3 = k4 = p1 = p2 = 0
-    cx = w / 2
-    cy = h / 2
-    
-    pose = {
-        "camera_angle_x": angle_x,
-        "fl_x": fl_x,
-        "fl_y": fl_y,
-        "k1": k1, "k2": k2, "k3": k3, "k4": k4,
-        "p1": p1, "p2": p2,
-        "cx": cx, "cy": cy,
-        "w": w, "h": h,
-        "frames": all_frames,
-        "num_views": 25,
-        "includes_occ_center": True,
-        "view_order": "sequence",
-        "center_idx": 24 if os.path.basename(os.path.dirname(output_dir)) in ('rot_spiral', 'rand_shell') else 12,
-    }
-    
-    fbx_name = os.path.basename(output_dir)
-    # 获取父目录（轨迹类型目录）
-    parent_dir = os.path.dirname(output_dir)
-    
-    # 检查父目录是否存在，不存在则跳过
-    if not os.path.exists(parent_dir):
-        print(f"Parent directory not found: {parent_dir}")
-        print(f"Skipping transform generation for: {fbx_name}")
-        return []
-    
-    output_files = []
-    
-    # Both render folders passed validation, so they receive the same verified poses.
-    for suffix in ["_GT", "_occ"]:
-        target_name = fbx_name + suffix
-        target_dir = os.path.join(parent_dir, target_name)
-        pose_dir = os.path.join(target_dir, "pose")
-        os.makedirs(pose_dir,exist_ok=True)
-        
-        output_file = os.path.join(pose_dir, "transforms.json")
-        with open(output_file, "w") as outfile:
-            json.dump(pose, outfile, indent=2)
-        
-        output_files.append(output_file)
-        print(f"Generated 3DGS transforms ({suffix[1:]}): {output_file} with {len(all_frames)} frames")
-    
-    return output_files
-    
-    # 原有逻辑：只生成一个 JSON 文件
-    pose_dir = os.path.join(output_dir, "pose")
-    if not os.path.exists(pose_dir):
-        os.makedirs(pose_dir)
-    
-    output_file = os.path.join(pose_dir, "transforms.json")
-    with open(output_file, "w") as outfile:
-        json.dump(pose, outfile, indent=2)
-        
-    print(f"Generated 3DGS transforms: {output_file} with {len(all_frames)} frames")
-    return output_file
-
-def generate_3dgs_transforms(raw_transforms_path, output_dir, config, scale=100):
-    """
-    Convert raw transforms to 3DGS format (from generate_transforms_3dgs.py logic)
-    """
-    with open(raw_transforms_path, "r") as f:
-        tj = json.load(f)
-
-    all_frames = []
-    frames = tj.get('frames', [])
-    
-    # Get resolution from config, fallback to default
-    resolution = config.get('Resolution', [1920, 1080])
-    w = float(resolution[0])
-    h = float(resolution[1])
-    
-    print(f"Using resolution from config: {int(w)}x{int(h)}")
-
-    for frame in frames:
-        # Generate image file path (assuming images will be in rgb subdirectory)
-        image_name = str(frame['frame_index']).zfill(4) + '.png'
-        file_path = os.path.join("..", "rgb", image_name)
-
-        c2w = np.array(frame['rot_mat'])
-        
-        # Transformation logic from generate_transforms_3dgs.py
-        c2w[:3, :3] *= 100
-        c2w[:3, 3] /= scale
-        
-        all_frames.append({
-            'file_path': file_path,
-            'transform_matrix': c2w.tolist()
-        })
-
-    # Camera intrinsics
-    angle_x = tj['camera_angle_x']
-    fl_x = float(.5 * w / np.tan(.5 * angle_x))
-    fl_y = fl_x
-    
-    # Distortion parameters (default to 0)
-    k1 = k2 = k3 = k4 = p1 = p2 = 0
-    cx = w / 2
-    cy = h / 2
-    
-    pose = {
-        "camera_angle_x": angle_x,
-        "fl_x": fl_x,
-        "fl_y": fl_y,
-        "k1": k1, "k2": k2, "k3": k3, "k4": k4,
-        "p1": p1, "p2": p2,
-        "cx": cx, "cy": cy,
-        "w": w, "h": h,
-        "frames": all_frames
-    }
-    
-    # Create pose directory
-    pose_dir = os.path.join(output_dir, "pose")
-    if not os.path.exists(pose_dir):
-        os.makedirs(pose_dir)
-    
-    output_file = os.path.join(pose_dir, "transforms.json")
-    with open(output_file, "w") as outfile:
-        json.dump(pose, outfile, indent=2)
-        
-    print(f"Generated 3DGS transforms: {output_file} with {len(all_frames)} frames")
-    return output_file
-
-def process_single_fbx(fbx_path, output_base_dir, config, scale=100):
-    """
-    Process a single FBX file and extract camera transforms
-    """
-    # Clear scene
-    clear_scene()
-    
-    # Import FBX
-    try:
-        bpy.ops.import_scene.fbx(filepath=fbx_path)
-        print(f"Successfully imported: {os.path.basename(fbx_path)}")
-    except Exception as e:
-        print(f"Failed to import {fbx_path}: {e}")
-        return False
-    
-    # Find camera object
-    cam = None
-    camera_name = config.get('camera_name', 'CineCameraActor1')
-    
-    # First try to find camera by name from config
-    for obj in bpy.context.scene.objects:
-        if obj.type == 'CAMERA' and camera_name in obj.name:
-            cam = obj
-            break
-    
-    # If not found, get any camera
-    if not cam:
-        for obj in bpy.context.scene.objects:
-            if obj.type == 'CAMERA':
-                cam = obj
-                break
-    
-    if not cam:
-        print(f"No camera found in {os.path.basename(fbx_path)}")
-        return False
-    
-    print(f"Using camera: {cam.name}")
-    
-    # Select the camera (following your code pattern)
-    bpy.context.view_layer.objects.active = cam
-    cam.select_set(True)
-    
+    for action in list(bpy.data.actions):
+        bpy.data.actions.remove(action)
     scene = bpy.context.scene
-    
-    # Prepare output data structure (matching your format exactly)
-    out_data = {
-        'camera_angle_x': cam.data.angle_x,
-        'frames': []
-    }
-    
-    # Create output directory based on FBX filename
-    fbx_name = os.path.splitext(os.path.basename(fbx_path))[0]
-    output_dir = os.path.join(output_base_dir, fbx_name)  
-    
-    # Get keyframes by detecting camera pose changes
-    keyframes = get_camera_keyframes(cam)
-    
-    if not keyframes:
-        print(f"No pose changes detected, using single frame")
-        keyframes = [scene.frame_start]
-    
-    print(f"Processing {len(keyframes)} frames with pose changes")
+    scene.unit_settings.system = 'METRIC'
+    scene.unit_settings.scale_length = 1.0
+    scene.render.resolution_x = scene.render.resolution_y = 512
+    scene.render.resolution_percentage = 100
+    scene.render.pixel_aspect_x = scene.render.pixel_aspect_y = 1.0
+    return scene
 
+
+def _camera(bpy, requested):
+    cameras = [obj for obj in bpy.context.scene.objects if obj.type == 'CAMERA']
+    exact = [obj for obj in cameras if obj.name == requested]
+    matching = exact or [obj for obj in cameras if requested in obj.name]
+    if len(matching) == 1:
+        return matching[0]
+    if not matching and len(cameras) == 1:
+        return cameras[0]
+    raise ValueError(f'Camera selection is ambiguous: {[obj.name for obj in cameras]}; set --camera-name')
+
+
+def _animation_range(camera):
+    intervals = []
+    objects = []
+    current = camera
+    while current is not None:
+        objects.append(current)
+        current = current.parent
+    objects.append(camera.data)
+    for obj in objects:
+        animation = getattr(obj, 'animation_data', None)
+        action = getattr(animation, 'action', None) if animation else None
+        if action is not None:
+            intervals.append(tuple(float(value) for value in action.frame_range))
+    if not intervals:
+        raise ValueError('FBX camera has no animation; cannot prove its 25-frame alignment')
+    low = min(item[0] for item in intervals)
+    high = max(item[1] for item in intervals)
+    if abs(low) > 1e-3 or high < 24-1e-3 or high > 25+1e-3:
+        raise ValueError(f'FBX camera animation range {low, high} is incompatible with frames 0..24')
+    return low, high
+
+
+def extract_job(job, camera_name):
+    import bpy
+    import numpy as np
+
+    source_hash = hashlib.sha256(Path(job['fbx_path']).read_bytes()).hexdigest()
+    scene = _clear_scene(bpy)
+    # Honor the FBX's declared units. UE's centimeter scene is converted into
+    # this metric, scale_length=1 scene by Blender, with no fixed *100 repair.
     try:
-        frame_stems, render_resolution = validate_render_pair(
-            os.path.dirname(output_dir), fbx_name, len(keyframes)
-        )
-    except ValueError as exc:
-        print(f"Skipping {fbx_name}: {exc}")
-        return False
-    
-    # Extract transforms for each keyframe
-    for i, frame in enumerate(keyframes):
-        scene.frame_set(frame)
+        bpy.ops.import_scene.fbx.get_rna_type()
+    except (AttributeError, RuntimeError):
+        import addon_utils
+        addon_utils.enable('io_scene_fbx', default_set=False, persistent=False)
+    result = bpy.ops.import_scene.fbx(filepath=job['fbx_path'], global_scale=1.0,
+        use_anim=True, anim_offset=0.0, use_manual_orientation=False,
+        bake_space_transform=False)
+    if 'FINISHED' not in result:
+        raise RuntimeError(f'FBX import failed: {job["fbx_path"]}')
+    camera = _camera(bpy, camera_name)
+    if camera.data.type != 'PERSP':
+        raise ValueError('Only perspective pinhole cameras are supported')
+    low, high = _animation_range(camera)
+    poses, intrinsic = [], None
+    raw_scales = []
+    for index in range(25):
+        scene.frame_set(index)
         bpy.context.view_layer.update()
-        
-        frame_data = {
-            'frame_index': i,
-            'rot_mat': listify_matrix(cam.matrix_world)
-        }
-        out_data['frames'].append(frame_data)
-    
-    try:
-        # Generate 3DGS format transforms directly
-        final_transforms = generate_3dgs_transforms_direct(
-            out_data, output_dir, config, frame_stems, render_resolution, scale
-        )
-        
-        print(f"Successfully processed: {fbx_name}")
-        print(f"  - Frames: {len(out_data['frames'])}")
-        print(f"  - Camera FOV: {cam.data.angle_x:.4f} radians")
-        print(f"  - Final transforms: {final_transforms}")
-        
-        return True
-    except Exception as e:
-        print(f"Failed to process {fbx_name}: {e}")
-        return False
+        depsgraph = bpy.context.evaluated_depsgraph_get()
+        evaluated = camera.evaluated_get(depsgraph)
+        matrix = np.asarray(evaluated.matrix_world, dtype=np.float64)
+        raw_scales.append(np.linalg.norm(matrix[:3, :3], axis=0).tolist())
+        poses.append(rigid_opencv_c2w(matrix))
+        projection = evaluated.calc_matrix_camera(depsgraph, x=512, y=512,
+                                                  scale_x=1.0, scale_y=1.0)
+        current = intrinsics_from_projection(np.asarray(projection, dtype=np.float64))
+        if intrinsic is None:
+            intrinsic = current
+        elif not np.allclose([current[key] for key in ('fl_x','fl_y','cx','cy')],
+                             [intrinsic[key] for key in ('fl_x','fl_y','cx','cy')],
+                             atol=1e-5, rtol=1e-6):
+            raise ValueError('Animated camera intrinsics require a different protocol; fixed K cannot represent them')
+    endpoint_hold = False
+    if high > 24+1e-3:
+        scene.frame_set(25)
+        bpy.context.view_layer.update()
+        end_pose = rigid_opencv_c2w(np.asarray(camera.evaluated_get(
+            bpy.context.evaluated_depsgraph_get()).matrix_world, dtype=np.float64))
+        if not np.allclose(end_pose, poses[-1], atol=1e-5, rtol=0):
+            raise ValueError('The extra FBX endpoint is not a duplicate hold; refuse to guess frame mapping')
+        endpoint_hold = True
+    metadata = {
+        'fbx_sha256_before_import': source_hash,
+        'blender_version': bpy.app.version_string,
+        'blender_build_hash': bpy.app.build_hash.decode('ascii', errors='replace'),
+        'camera_name': camera.name,
+        'blender_scene_units': 'METRIC', 'blender_scale_length': 1.0,
+        'unit_conversion': 'FBX-declared units to Blender meters; scale removed from rotation only',
+        'frame_sampling': 'consecutive source frames, never pose-change deduplication',
+        'anim_offset': 0.0, 'source_frame_indices': list(range(25)),
+        'source_animation_range': [low, high], 'ignored_duplicate_endpoint_hold': endpoint_hold,
+        'fps': float(scene.render.fps / scene.render.fps_base),
+        'imported_linear_column_scales': raw_scales,
+        'world_basis': 'Blender FBX importer world basis, shared for all camera poses',
+    }
+    if hashlib.sha256(Path(job['fbx_path']).read_bytes()).hexdigest() != source_hash:
+        raise ValueError('Source FBX changed while importing or sampling its camera')
+    return build_payload(job, poses, intrinsic, metadata)
 
-def batch_process_by_category(scale=100):
-    """
-    Batch process every trajectory category present under Exported_FBX.
-    """
-    # Load configuration
-    config = load_config()
-    
-    # Base paths
-    project_dir = "/home_ssd/sjy/UE5_Project/PCGBiomeForestPoplar/"
-    fbx_dir = os.path.join(project_dir,"Exported_FBX")
-    
-    # Use output path from config if available
-    if 'Output_Path' in config:
-        output_base_dir = config['Output_Path']
-    else:
-        output_base_dir = os.path.join(project_dir, "3dgs_data")
-    
-    if not os.path.exists(fbx_dir):
-        print(f"FBX directory not found: {fbx_dir}")
+
+def main(argv=None):
+    args = arguments(argv)
+    jobs = (load_jobs_manifest(args.jobs_file, args.output_root) if args.jobs_file else
+            discover_jobs(args.output_root, args.fbx_root, args.trajectory, args.sequence, args.limit))
+    if args.dry_run:
+        print(json.dumps({'dry_run': True, 'jobs': jobs}, indent=2))
         return
-    
-    # Create base output directory
-    if not os.path.exists(output_base_dir):
-        os.makedirs(output_base_dir)
-    
-    categories = sorted(
-        entry
-        for entry in os.listdir(fbx_dir)
-        if os.path.isdir(os.path.join(fbx_dir, entry))
-        and glob.glob(os.path.join(fbx_dir, entry, "*.fbx"))
-    )
-    if not categories:
-        print(f"No FBX files found under: {fbx_dir}")
-        return
-    
-    total_processed = 0
-    total_files = 0
-    
-    print(f"Configuration loaded:")
-    print(f"  - Resolution: {config.get('Resolution', [1920, 1080])}")
-    print(f"  - Camera name: {config.get('camera_name', 'CineCameraActor1')}")
-    print(f"  - Map: {config.get('ue_map', 'N/A')}")
-    print(f"  - Scale factor: {scale}")
-    
-    for category in categories:
-        print(f"\n{'='*50}")
-        print(f"Processing category: {category}")
-        print(f"{'='*50}")
-        
-        # Find FBX files for this category
-        category_fbx_dir = os.path.join(fbx_dir, category)
-        if not os.path.exists(category_fbx_dir):
-            print(f"Category directory not found: {category_fbx_dir}")
-            continue
-            
-        pattern = os.path.join(category_fbx_dir, "*.fbx")
-        fbx_files = glob.glob(pattern)
-        
-        if not fbx_files:
-            print(f"No FBX files found for category: {category}")
-            continue
-        
-        print(f"Found {len(fbx_files)} files for {category}")
-        total_files += len(fbx_files)
-        category_output_dir = os.path.join(output_base_dir, category)
-        # Process each FBX file
-        for fbx_path in fbx_files:
-            print(f"\nProcessing: {os.path.basename(fbx_path)}")
-            if process_single_fbx(fbx_path, category_output_dir, config, scale):
-                total_processed += 1
-    
-    print(f"\n{'='*60}")
-    print(f"Batch processing completed!")
-    print(f"Successfully processed: {total_processed}/{total_files} files")
-    print(f"Output directory: {output_base_dir}")
-    print(f"Scale factor used: {scale}")
-    print(f"{'='*60}")
-
-def main():
-    """Main function"""
-    print("Blender Camera Transform Extractor + 3DGS Converter")
-    print("Based on 3D Gaussian Splatting format")
-    print("Reading configuration from MatrixCityPlugin")
-    
-    # You can modify the scale factor here if needed
-    scale_factor = 100
-    batch_process_by_category(scale_factor)
+    completed = []
+    for job in jobs:
+        payload = extract_job(job, args.camera_name)
+        result = write_pair(job, payload, overwrite=args.overwrite)
+        result.update(trajectory=job['trajectory'], prefix=job['prefix'])
+        completed.append(result)
+        print(json.dumps(result), flush=True)
+    report = {'schema_version': 'camera-export-report-v1', 'num_views': 25,
+              'width': 512, 'height': 512, 'coordinate_convention': 'opencv_c2w',
+              'translation_units': 'm', 'depth_units': 'cm', 'jobs': completed,
+              'output_root': str(Path(args.output_root).resolve())}
+    path = Path(args.report).resolve()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name+'.tmp')
+    temporary.write_text(json.dumps(report, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
+    temporary.replace(path)
+    print(f'Camera JSON export complete: {len(completed)} sequences; report: {path}', flush=True)
 
 
-
-if __name__ == "__main__":
-    main()
+if __name__ == '__main__':
+    argv = sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else sys.argv[1:]
+    main(argv)

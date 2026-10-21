@@ -59,14 +59,43 @@ def build_command(config, args, adapter_index, config_dir=None):
     return command
 
 
-async def supervise(command, env, port, timeout=0, grace=45):
+async def supervise(command, env, port, timeout=0, grace=45,
+                    stop_grace=45, terminate_grace=15):
     finished = asyncio.Event()
     failed = asyncio.Event()
-    connected = asyncio.Event()
+    stop_requested = asyncio.Event()
+    writers = set()
+    stop_code = 130
+    stop_packet = b"MatrixCity Cancel"
+    stop_packet = len(stop_packet).to_bytes(4, "little") + stop_packet
+    loop = asyncio.get_running_loop()
+    old_handlers = {}
+
+    def request_stop(signum):
+        nonlocal stop_code
+        if not stop_requested.is_set():
+            stop_code = 128 + signum
+            logging.warning("WORKER_STOP_REQUEST signal=%s", signal.Signals(signum).name)
+            stop_requested.set()
+
+    # Repeated signals must not raise a second KeyboardInterrupt in cleanup.
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        old_handlers[signum] = signal.getsignal(signum)
+        loop.add_signal_handler(signum, request_stop, signum)
+
+    stopping = False
+    forced_stop = False
+
+    def send_stop(writer):
+        if not writer.is_closing():
+            writer.write(stop_packet)
 
     async def client(reader, writer):
-        connected.set()
+        writers.add(writer)
         try:
+            if stopping:
+                send_stop(writer)
+                await writer.drain()
             while True:
                 length = int.from_bytes(await reader.readexactly(4), "little")
                 if not 0 < length <= 16 * 1024 * 1024:
@@ -83,31 +112,76 @@ async def supervise(command, env, port, timeout=0, grace=45):
         except Exception:
             logging.exception("Worker socket read failed")
         finally:
+            writers.discard(writer)
             writer.close()
-            await writer.wait_closed()
+            try:
+                await writer.wait_closed()
+            except (ConnectionError, OSError):
+                pass
 
-    server = await asyncio.start_server(client, "127.0.0.1", port)
+    server = None
     proc = None
     begin = time.monotonic()
 
-    async def terminate_owned_process():
+    async def force_stop():
+        nonlocal forced_stop
         if proc is None or proc.returncode is not None:
             return
+        forced_stop = True
+        logging.error("WORKER_STOP_FORCED: graceful stop timed out; sending SIGTERM to owned UE group")
         try:
-            proc.terminate()
+            os.killpg(proc.pid, signal.SIGTERM)
         except ProcessLookupError:
             return
         try:
-            await asyncio.wait_for(proc.wait(), timeout=15)
+            await asyncio.wait_for(proc.wait(), timeout=terminate_grace)
         except asyncio.TimeoutError:
-            proc.kill()
+            logging.error("WORKER_STOP_FORCED: SIGTERM timed out; sending SIGKILL to owned UE group")
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
             await proc.wait()
 
+    async def stop_owned_process():
+        nonlocal stopping
+        if proc is None or proc.returncode is not None:
+            return
+        stopping = True
+        logging.warning("WORKER_STOP_GRACEFUL: requesting MRQ cancellation over worker socket")
+        for writer in list(writers):
+            try:
+                send_stop(writer)
+                await writer.drain()
+            except (ConnectionError, OSError):
+                pass
+        try:
+            # The listener stays open: a worker still loading its map can
+            # connect during this grace period and receive the stop command.
+            await asyncio.wait_for(proc.wait(), timeout=stop_grace)
+            logging.warning("WORKER_STOP_EXIT: UE exited rc=%s after cancellation request", proc.returncode)
+        except asyncio.TimeoutError:
+            await force_stop()
+
     try:
-        proc = await asyncio.create_subprocess_exec(*command, env=env, cwd=str(PLUGIN_ROOT))
+        server = await asyncio.start_server(client, "127.0.0.1", port)
+        # A scheduler/terminal process-group SIGINT must not reach Unreal's Unix
+        # handler directly; that bypasses CloseEditor/EndPlayMap.
+        proc = await asyncio.create_subprocess_exec(
+            *command, env=env, cwd=str(PLUGIN_ROOT), start_new_session=True)
         logging.info("UE_WORKER_PID=%s", proc.pid)
         completion_at = None
         while proc.returncode is None:
+            if stop_requested.is_set():
+                await stop_owned_process()
+                # A stop request does not make a crash or forced termination
+                # a normal cancellation. Preserve the child's failure status.
+                if proc.returncode:
+                    logging.error("WORKER_STOP_ABNORMAL: child exited rc=%s", proc.returncode)
+                    return proc.returncode if proc.returncode > 0 else 128 - proc.returncode
+                if forced_stop or proc.returncode is None:
+                    return 1
+                return stop_code
             try:
                 await asyncio.wait_for(proc.wait(), timeout=0.5)
             except asyncio.TimeoutError:
@@ -116,12 +190,15 @@ async def supervise(command, env, port, timeout=0, grace=45):
             if (finished.is_set() or failed.is_set()) and completion_at is None:
                 completion_at = now
             if timeout and now - begin > timeout:
-                raise TimeoutError("UE worker exceeded {} seconds".format(timeout))
+                logging.error("UE worker exceeded %s seconds", timeout)
+                await stop_owned_process()
+                return 1
             # The terminal socket marker precedes the engine's final GPU flush.
             if completion_at is not None and now - completion_at > grace:
-                logging.warning("Completed worker did not exit after grace; terminating this UE process")
-                await terminate_owned_process()
-                return 0 if not failed.is_set() else 1
+                logging.error("Completed worker did not exit after grace; requesting editor shutdown")
+                await stop_owned_process()
+                # A terminal marker alone does not prove final GPU teardown.
+                return 1
         if failed.is_set():
             return 1
         if not finished.is_set():
@@ -129,10 +206,18 @@ async def supervise(command, env, port, timeout=0, grace=45):
             return proc.returncode or 1
         return proc.returncode or 0
     finally:
-        server.close()
-        await server.wait_closed()
-        if proc is not None and proc.returncode is None:
-            await terminate_owned_process()
+        try:
+            if proc is not None and proc.returncode is None:
+                await stop_owned_process()
+        finally:
+            if server is not None:
+                server.close()
+                await server.wait_closed()
+            for writer in list(writers):
+                writer.close()
+            for signum, previous in old_handlers.items():
+                loop.remove_signal_handler(signum)
+                signal.signal(signum, previous)
 
 
 def main(argv=None):

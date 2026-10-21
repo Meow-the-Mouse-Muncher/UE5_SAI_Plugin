@@ -1,13 +1,9 @@
-# 森林终版数据渲染
+# 森林数据集并行渲染
 
-完整地图、采样预算、输出和恢复说明见项目根目录 FOREST_DATASET.md。
+使用项目根目录 `scripts/render_forest_dataset.py` 依次调度 train 和 test。命令、素材部署和配置见[仓库 README](../../../README.md)，服务器 session 恢复和验收见[森林数据集](../../../FOREST_DATASET.md)。
 
-在user1的项目根目录执行：
+`--gpu-ids auto` 选择检测到的 GPU，`--workers-per-gpu auto` 结合显存与主存估算并发，`--vram-budget-gb` 默认为每卡 70 GiB。预算是分配估算，实际消耗随场景变化。可显式传入物理编号或 GPU UUID。
 
-    python3 Plugins/MatrixCityPlugin/misc/render_dataset.py --split train --gpu-ids 1 --workers-per-gpu 1 --sync-profile balanced
+每个 worker 有独立端口、序列命名空间和日志。正式计划来自 `Config/Dataset/` 的批准 CSV。每条序列 25 视角，OCC/GT 保留地形与地被，仅切换清单中的原树。
 
---split test只选择独立源场景scene_010；--dry-run只检查计划及素材。调度器读取Config/Dataset下已批准的CSV，不扩展Target/高度/方向的笛卡尔积。使用--maps时请填写/Game/Map/dataset/train/或test/下的完整包路径。
-
-每条轨迹25视角，OCC和GT保留实体草、地形和石块，仅切换清单中的原树。原有GPU UUID/Vulkan匹配、端口和序列隔离、普通fence深度读回设置保留。先用单worker；旧场景的双worker显存预算不适用于当前地被规模。
-
-复用相同--run-dir、输出及参数并加--resume可恢复；每个通道的完整帧号都必须通过检查。素材/计划改变会阻止误用旧完成标记。
+恢复使用原 `--run-dir` 与输出，并加 `--resume`。GPU 数量和并发可调整，采样和清单必须保持兼容。停止时使用 Ctrl+C，等待调度器完成 worker 清理。

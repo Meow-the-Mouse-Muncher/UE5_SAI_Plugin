@@ -2,7 +2,7 @@ _BASE_: render_config.yaml
 Resolution:
 - 512
 - 512
-Output_Path: Saved/MovieRenders/forest_dataset
+Output_Path: /mnt/cpfs_b5/perception_data/sjy/forest_dataset
 File_Name_Format: '{sequence_name}/{render_pass}/{frame_number}'
 Motion_Blur: false
 Console_Variables:
@@ -53,4 +53,4 @@ Output_Settings:
   file_name_format: '{map_name}_{target_name}_{suffix}/{render_pass}/{frame_number}'
   occlusion_suffix: occ
   ground_truth_suffix: GT
-  base_output_path: Saved/MovieRenders/forest_dataset
+  base_output_path: /mnt/cpfs_b5/perception_data/sjy/forest_dataset

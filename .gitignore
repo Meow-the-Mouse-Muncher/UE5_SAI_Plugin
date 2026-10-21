@@ -1,26 +1,42 @@
-# 先忽略全部
+# This repository contains code, plugin assets and dataset recipes.
+# Project Content/ assets and render outputs are deployed separately.
 *
-# 但保留 .gitignore 自身（否则下一行也会被忽略）
-!.gitignore
-!/scripts/
-!/scripts/**
-!/Plugins/
-!/Plugins/**
-!/pipeline_automation/
-!/pipeline_automation/**
-!README.md
-scripts/trajectory_figs
-
-# Python runtime caches are generated locally.
-**/__pycache__/
-*.py[cod]
-
-!/FOREST_DATASET.md
+!/.gitignore
 !/.gitattributes
+!/README.md
+!/FOREST_DATASET.md
+!/pytest.ini
+!/requirements-dev.txt
+!/PCGBiomeForestPoplar.uproject
+!/Source/
+!/Source/**
 !/Config/
+!/Config/DefaultEngine.ini
 !/Config/Dataset/
 !/Config/Dataset/**
+!/Plugins/
+!/Plugins/MatrixCityPlugin/
+!/Plugins/MatrixCityPlugin/**
+!/scripts/
+!/scripts/**
+!/docs/
+!/docs/**
+!/tests/
+!/tests/**
 
-# Runtime project settings required by the Linux renderer.
-!/PCGBiomeForestPoplar.uproject
-!/Config/DefaultEngine.ini
+# Generated files must stay local, including inside otherwise allowed trees.
+**/Binaries/
+**/Intermediate/
+**/Saved/
+**/DerivedDataCache/
+**/__pycache__/
+**/.pytest_cache/
+**/_build/
+*.py[cod]
+.DS_Store
+/scripts/trajectory_figs/
+
+# Deployment settings and optional notification credentials.
+/Plugins/MatrixCityPlugin/misc/user.json
+/Plugins/MatrixCityPlugin/misc/user.local*.json
+/Plugins/MatrixCityPlugin/misc/email.json

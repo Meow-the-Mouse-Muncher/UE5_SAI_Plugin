@@ -2,6 +2,7 @@ import unreal
 import utils_sequencer  # 轨迹脚本
 import batch_utils  # 批量处理工具
 import render_worker
+import os
 from pathlib import Path
 
 from GLOBAL_VARS import PLUGIN_ROOT
@@ -12,6 +13,30 @@ from custom_movie_pipeline import CustomMoviePipeline # 导入自定义的渲染
 unreal.log_warning("######################################################")
 unreal.log_warning("### BATCH PIPELINE.PY HAS STARTED EXECUTION ###")
 unreal.log_warning("######################################################")
+
+_editor_viewport_diagnostic_applied = False
+
+
+def _apply_editor_viewport_diagnostic():
+    """Optionally stop continuous editor viewport redraws for a diagnostic run.
+
+    MRQ owns a separate PIE viewport. Explicit editor invalidations can still
+    draw once while realtime is overridden; this does not disable all drawing.
+    """
+    global _editor_viewport_diagnostic_applied
+    if (_editor_viewport_diagnostic_applied
+            or os.environ.get('MATRIXCITY_DIAGNOSTIC_DISABLE_EDITOR_REALTIME') != '1'):
+        return
+    subsystem = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
+    viewport_keys = list(subsystem.get_viewport_config_keys())
+    if not viewport_keys:
+        raise RuntimeError('Editor realtime diagnostic requested but no level editor viewports were found')
+    for key in viewport_keys:
+        subsystem.editor_set_viewport_realtime(False, key)
+    _editor_viewport_diagnostic_applied = True
+    unreal.log_warning('[ViewportDiagnostic] editor_realtime_override=False viewport_count={} viewport_keys={}'.format(
+        len(viewport_keys), [str(key) for key in viewport_keys]))
+
 
 def main(render_config_path):
 
@@ -29,6 +54,8 @@ def main(render_config_path):
         unreal.log_warning("Invalid socket_port; falling back to 9999")
         port = 9999
     PIEExecutor = unreal.MoviePipelinePIEExecutor()
+    import render_cancellation
+    render_cancellation.install(PIEExecutor)
     PIEExecutor.connect_socket(host, port)
     CustomMoviePipeline.host = host
     CustomMoviePipeline.port = port
@@ -69,6 +96,8 @@ def main(render_config_path):
     # 确保地图已加载（如果指定了地图路径）
     if target_map:
         current_map_name = batch_utils.load_map_if_different(map_package_path, None)
+
+    _apply_editor_viewport_diagnostic()
     
     # 获取目标物
     target_actors = batch_utils.get_target_actors_by_prefix("Target_")

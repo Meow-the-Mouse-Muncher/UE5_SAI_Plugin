@@ -43,7 +43,9 @@ class SchedulerTests(unittest.TestCase):
                                       "python_script": str(root / "pipeline.py"),
                                       "maps": ["scene_010"], "render_config": str(render)}))
         argv = ["--config", str(config), "--trajectory-config", str(trajectory),
-                "--run-dir", str(root / "run"), "--gpu-ids", "1"]
+                "--run-dir", str(root / "run"), "--gpu-ids", "1",
+                # These fixtures exercise scheduling without camera/FBX outputs.
+                "--skip-camera-json"]
         return root, project, trajectory, render, output, config, argv
 
     def test_recursive_dense_map_resolution_and_traversal_rejection(self):
@@ -117,9 +119,11 @@ class SchedulerTests(unittest.TestCase):
                     contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(render_dataset.main(argv + ["--resume"]), 0)
                 launch.assert_not_called()
+                # Resume restores the recorded recipe by default; an explicit
+                # override must still reject a different image configuration.
                 render.write_text(yaml.safe_dump({"Output_Path": str(output), "Resolution": [1024, 1024]}))
                 with self.assertRaises(ValueError):
-                    render_dataset.main(argv + ["--resume"])
+                    render_dataset.main(argv + ["--resume", "--render-config", str(render)])
 
     def test_launcher_dry_run_does_not_create_output_directory(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -161,10 +165,12 @@ class SchedulerTests(unittest.TestCase):
                 if first_join[0]:
                     first_join[0] = False
                     self.assertTrue(entered.wait(timeout=2))
-                    # Popen is still in flight when the scheduler's interrupt
-                    # handler reads active. Let it return just afterwards.
+                    # Exercise the installed signal handler: it records a stop
+                    # without raising through Thread.join(). Popen returns
+                    # after the main loop has requested worker cancellation.
                     threading.Timer(0.05, release.set).start()
-                    raise KeyboardInterrupt()
+                    signal.getsignal(signal.SIGINT)(signal.SIGINT, None)
+                    return
                 return original_join(thread, timeout=1)
 
             try:
@@ -172,8 +178,7 @@ class SchedulerTests(unittest.TestCase):
                         patch.object(render_dataset.subprocess, "Popen", side_effect=launch), \
                         patch.object(threading.Thread, "join", join), \
                         contextlib.redirect_stdout(io.StringIO()):
-                    with self.assertRaises(KeyboardInterrupt):
-                        render_dataset.main(argv)
+                    self.assertEqual(render_dataset.main(argv), 130)
                 self.assertIn(signal.SIGINT, signals)
             finally:
                 release.set()

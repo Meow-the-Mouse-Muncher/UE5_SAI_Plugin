@@ -1,54 +1,85 @@
-# UE5 to 3DGS/NeRF Data Pipeline (PCGBiomeForestPoplar)
+# UE5 SAI Plugin
 
-## 简介 (Introduction)
+从 UE5.6 森林场景生成 OCC/GT 配对 RGB、深度、FBX 和相机 JSON，支持按已批准序列计划分配 GPU、断点恢复和输出校验。
 
-本仓库提供了一套完整的数据处理流水线（Pipeline）工具集，用于从 Unreal Engine 5 (UE5) 项目中导出摄像机轨迹，并转换为可用于训练 **3D Gaussian Splatting (3DGS)** 或 NeRF 等神经渲染模型的标准数据集格式。
+本项目基于 [MatrixCity](https://github.com/city-super/MatrixCity) 的插件与导出流程开发，保留原有署名。插件的模块名和资产路径仍为 `MatrixCityPlugin`，以保持 UE 资产引用有效。
 
-> **声明 / Acknowledgement**: 本项目基于 [MatrixCity](https://github.com/city-super/MatrixCity/tree/main) 仓库的流程与插件进行构建和定制化扩展。特别感谢原项目提供的基础导出架构。
+## 仓库范围
 
-**请注意**：本仓库**仅包含数据导出插件和后处理脚本**，并不包含 UE5 项目本身的资产（如场景模型、PCG 生态系统等）。它是作为一个工具集集成到现有的 UE5 环境（如 PCGBiomeForestPoplar 项目）中使用的。
+仓库包含插件 C++/Python 源码、插件蓝图和材质、项目构建源码、UE 配置、数据集清单及 CPU 测试。森林地图、模型、纹理等项目 `Content/` 素材需单独部署；克隆代码不能直接得到完整森林工程。
 
-## 主要功能 (Key Features)
+| 路径 | 用途 |
+| --- | --- |
+| `Plugins/MatrixCityPlugin/Source/` | MRQ 输出和渲染同步的 C++ 实现 |
+| `Plugins/MatrixCityPlugin/Content/` | UE 内 Python、配套蓝图与材质 |
+| `Plugins/MatrixCityPlugin/misc/` | 系统 Python 调度器、GPU 分配、配置与恢复逻辑 |
+| `Source/`、`.uproject`、`Config/DefaultEngine.ini` | 项目模块的构建入口和渲染设置 |
+| `Config/Dataset/` | 已批准的地图、素材哈希与 train/test 序列清单 |
+| `scripts/render_forest_dataset.py` | train → test 的持久任务入口 |
+| `scripts/export_camera_json.py` | 已有 RGB/深度/FBX 的独立相机元数据导出 |
+| `tests/`、`scripts/forest_dataset/test_*.py`、插件 `tests/` | CPU 回归测试 |
 
-- **UE5 序列导出插件**：包含了修改版的 `MatrixCityPlugin`，提供了在 UE5 内控制和导出数据的底层能力。
-- **批量轨迹数据导出**：通过 Python 脚本（`scripts/ue5_export_sequences_to_fbx.py`）在 UE5 Editor 中批量将 Level Sequence 的相机运动轨迹导出为 FBX 文件。
-- **3DGS 数据集生成**：利用 Blender 命令行模式（`scripts/blender_extract_transforms.py`）读取导出的 FBX 文件，提取相机的世界变换矩阵，并自动生成 3DGS 训练所需的 `transforms.json` 文件。
-- **位姿对齐与精调**：提供一系列后处理脚本（如 `align_pose_to_center_*.py`），用于调整和对齐相机位姿，使其更适合后续 3DGS/NeRF 模型的训练要求。
+## 安装和配置
 
-## 仓库结构 (Repository Structure)
+系统 Python 需 3.10 或以上。调度器和 CPU 测试依赖可通过以下命令安装；UE 内置 Python 的部署版本单独记录在 [requirements-ue-linux.txt](scripts/forest_dataset/requirements-ue-linux.txt)。Blender 使用自己的 Python。
 
-```text
-├── Plugins/
-│   └── MatrixCityPlugin/      # 用于 UE5 内数据渲染和导出的核心插件
-├── scripts/                   # 包含所有工作流自动化和数据后处理的 Python 脚本
-│   ├── ue5_export_sequences_to_fbx.py      # (UE5 环境运行) 批量导出动画序列到 FBX
-│   ├── blender_extract_transforms.py       # (Blender 环境运行) 从 FBX 提取位姿并生成 transforms.json
-│   ├── align_pose_to_center_*.py           # 用于对齐和中心化相机位姿的后处理脚本
-│   └── Trans_3Dgs_Data.md                  # 详细的脚本使用指南与说明
-└── .gitignore                 # Git 忽略配置
+```bash
+python3 -m pip install -r requirements-dev.txt
 ```
 
-## 工作流程 (Workflow Overview)
+将代码放在对应森林工程根目录，并单独部署 `Content/` 素材。插件和项目二进制由本机 UE 构建，不进入 Git。在 Linux 上可使用对应 UE5.6 安装目录构建：
 
-完整的 3DGS 数据导出工作流程主要包含以下步骤（详细图文指南请参阅 [`scripts/Trans_3Dgs_Data.md`](scripts/Trans_3Dgs_Data.md)）：
+```bash
+UE_ROOT=/path/to/UE_5.6
+"$UE_ROOT/Engine/Build/BatchFiles/Linux/Build.sh" \
+  PCGBiomeForestPoplarEditor Linux Development \
+  "$PWD/PCGBiomeForestPoplar.uproject" -WaitMutex
+```
 
-1. **配置环境**：
-   将本仓库克隆或解压至你的 UE5 项目（例如 `PCGBiomeForestPoplar`）根目录下，确保 `Plugins/` 和 `scripts/` 处于项目根级。
+正式采集使用的 UE5.6.1 引擎修复、构建记录与运行验收见 [FOREST_DATASET.md](FOREST_DATASET.md#vulkan修复与重新采集) 和 `scripts/engine_patches/`。
 
-2. **在 UE5 中导出 FBX 轨迹**：
-   打开你的 UE5 项目，在 Python 控制台中执行 `ue5_export_sequences_to_fbx.py` 脚本，将指定地图的 Level Sequence 批量导出到 `Exported_FBX/` 目录下。
+首次部署时复制配置模板；已有本机配置应直接保留：
 
-3. **使用 Blender 提取并转换位姿**：
-   在系统命令行中使用 Blender 的后台模式执行 `blender_extract_transforms.py`，它会读取上一步生成的 FBX 文件，计算相机的内外参，并生成标准的 `transforms.json` 格式数据。
-   ```bash
-   blender --background --python scripts/blender_extract_transforms.py
-   ```
+```bash
+cp -n Plugins/MatrixCityPlugin/misc/user.example.json \
+  Plugins/MatrixCityPlugin/misc/user.json
+```
 
-4. **数据后处理（可选）**：
-   使用 `scripts/` 目录下的其他对齐工具（如 `align_pose_to_center_inv_h5.py` 等）对生成的位姿进行中心化对齐、深度图可视化等进一步处理，以满足特定的训练需求。
+将 `ue_command` 改为本机编辑器或启动包装器的绝对路径，并核对 `ue_project`、地图列表和输出目录。模板的项目路径相对于配置目录，插件脚本路径可相对于插件根目录。模板包括全部 28 张正式地图。
 
-## 运行环境要求
+`user.json`、`user.local*.json` 和可选的 `email.json` 留在本地；自定义配置也可以通过 `--config /absolute/config.json` 传入。Linux 部署可按需要配置 `run_as_user`、`environment` 和 `unset_environment`，含义见 [配置与执行流程](Plugins/MatrixCityPlugin/docs/DATA_GENERATION_PIPELINE.md)。
 
-- **Unreal Engine 5** (需启用 Python Editor Script Plugin，以运行导出脚本和 MatrixCity 插件)
-- **Blender** 3.0+ (用于运行无头位姿提取脚本)
-- **Python 3.x** (系统环境，依赖包：`numpy`, `pyyaml`, `h5py` 等)
+## 运行
+
+先验证一张测试地图，不启动 UE、Blender 或 GPU 探测：
+
+```bash
+python3 Plugins/MatrixCityPlugin/misc/render_dataset.py \
+  --split test --maps /Game/Map/dataset/test/scene_010_grass \
+  --gpu-ids 0 --workers-per-gpu 1 --dry-run
+```
+
+部署完整素材并通过小规模渲染验收后，新任务使用新的运行目录和输出目录：
+
+```bash
+python3 scripts/render_forest_dataset.py \
+  --run-dir Saved/RenderRuns/my_session \
+  --output-root /absolute/dataset \
+  --gpu-ids auto --dry-run
+```
+
+确认计划后移除 `--dry-run` 开始执行；恢复已有任务时使用相同目录并加 `--resume`。`scripts/render_forest_dataset.sh` 保留当前服务器已有 session 的续跑默认值；新部署优先使用上面的 Python 入口，或显式设置 `FOREST_CONFIG`、`FOREST_RUN_DIR` 和 `FOREST_OUTPUT_ROOT`。
+
+相机 JSON 单独补导出的方法见 [相机协议与导出](docs/CAMERA_JSON_EXPORT.md)。正式采集计划、OCC/GT 定义及服务器恢复说明见 [森林数据集](FOREST_DATASET.md)。
+
+## 开发和维护
+
+在仓库根目录执行：
+
+```bash
+python3 -m pytest -q
+```
+
+这些测试使用 CPU 和模拟 UE 接口；真实场景渲染、GPU 驱动与引擎补丁仍需在部署环境验收。
+
+[仓库维护清单](docs/REPOSITORY_MAINTENANCE.md) 说明当前维护范围、部署文件和已删除的历史工具。相机元数据统一使用当前 OpenCV 协议。

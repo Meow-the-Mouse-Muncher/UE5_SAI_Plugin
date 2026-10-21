@@ -3,10 +3,11 @@
 # Byte-compiled / optimized / DLL files
 **/__pycache__/
 *.py[cod]
-!*.json
-
-_*/
-!Binaries/**
-Intermediate/**
-
-!docs/**
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+docs/_build/
+misc/user.json
+misc/user.local*.json
+misc/email.json

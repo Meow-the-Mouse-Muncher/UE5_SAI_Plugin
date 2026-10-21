@@ -8,6 +8,7 @@ import json
 import time
 from pathlib import Path
 import render_worker
+import render_cancellation
 from typing import List, Dict, Any, Callable, Optional
 from enum import Enum
 
@@ -106,6 +107,8 @@ class RenderController:
     
     def _execute_current_step(self):
         """执行当前步骤"""
+        if render_cancellation.is_requested():
+            return
         if self.current_step_index >= len(self.render_steps):
             self._on_sequence_complete()
             return

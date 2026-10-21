@@ -1,0 +1,259 @@
+--- a/Engine/Source/Runtime/VulkanRHI/Private/VulkanPipeline.cpp
++++ b/Engine/Source/Runtime/VulkanRHI/Private/VulkanPipeline.cpp
+@@ -2055,7 +2055,7 @@
+ 		}
+ 		else
+ 		{
+-			(*Contained)->DeleteVkPipeline(true);
++			(*Contained)->DeleteVkPipeline(false);
+ 			check(VkPSO->GetVulkanPipeline() == 0 );
+ 		}
+ 		GraphicsPSOLockedMap.Remove(Key);
+--- a/Engine/Source/Runtime/VulkanRHI/Private/VulkanResources.h
++++ b/Engine/Source/Runtime/VulkanRHI/Private/VulkanResources.h
+@@ -752,7 +752,7 @@
+ 	VULKANRHI_API VkDeviceMemory GetAllocationHandle() const;
+ 	VULKANRHI_API uint64 GetAllocationOffset() const;
+ 
+-	static void InternalLockWrite(FVulkanContextCommon& Context, FVulkanTexture* Surface, const VkBufferImageCopy& Region, VulkanRHI::FStagingBuffer* StagingBuffer);
++	static void InternalLockWrite(FVulkanContextCommon& Context, FVulkanTexture* Surface, const VkBufferImageCopy& Region, VulkanRHI::FStagingBuffer* StagingBuffer, bool bNeedsExtraTransitions = true);
+ 
+ 	const FVulkanCpuReadbackBuffer* GetCpuReadbackBuffer() const { return CpuReadbackBuffer; }
+ 
+--- a/Engine/Source/Runtime/VulkanRHI/Private/VulkanTexture.cpp
++++ b/Engine/Source/Runtime/VulkanRHI/Private/VulkanTexture.cpp
+@@ -116,7 +116,7 @@
+ 	UpdateVulkanTextureStats(TextureDesc, Size, false);
+ }
+ 
+-void FVulkanTexture::InternalLockWrite(FVulkanContextCommon& Context, FVulkanTexture* Surface, const VkBufferImageCopy& Region, VulkanRHI::FStagingBuffer* StagingBuffer)
++void FVulkanTexture::InternalLockWrite(FVulkanContextCommon& Context, FVulkanTexture* Surface, const VkBufferImageCopy& Region, VulkanRHI::FStagingBuffer* StagingBuffer, bool bNeedsExtraTransitions)
+ {
+ 	FVulkanCommandBuffer* CmdBuffer = Context.GetActiveCmdBuffer();
+ 	ensure(CmdBuffer->IsOutsideRenderPass());
+@@ -125,6 +125,8 @@
+ 	const VkImageSubresourceLayers& ImageSubresource = Region.imageSubresource;
+ 	const VkImageSubresourceRange SubresourceRange = FVulkanPipelineBarrier::MakeSubresourceRange(ImageSubresource.aspectMask, ImageSubresource.mipLevel, 1, ImageSubresource.baseArrayLayer, ImageSubresource.layerCount);
+ 
++	// RDG-managed updates already supply the copy barriers and must retain CopyDest state.
++	if (bNeedsExtraTransitions)
+ 	{
+ 		FVulkanPipelineBarrier Barrier;
+ 		Barrier.AddImageLayoutTransition(Surface->Image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, SubresourceRange);
+@@ -134,6 +136,7 @@
+ 	VulkanRHI::vkCmdCopyBufferToImage(StagingCommandBuffer, StagingBuffer->GetHandle(), Surface->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &Region);
+ 
+ 	// :todo-jn: replace with cmdlist layout tracking (ideally would happen on UploadContext)
++	if (bNeedsExtraTransitions)
+ 	{
+ 		FVulkanPipelineBarrier Barrier;
+ 		Barrier.AddImageLayoutTransition(Surface->Image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, Surface->GetDefaultLayout(), SubresourceRange);
+@@ -1332,10 +1335,12 @@
+ 	Region.imageExtent.depth = 1;
+ 
+ 	FVulkanTexture* Texture = ResourceCast(TextureRHI);
++	// Capture the recording scope: it can be restored before this lambda executes.
++	const bool bNeedsExtraTransitions = RHICmdList.NeedsExtraTransitions();
+ 	RHICmdList.EnqueueLambda(TEXT("FVulkanTexture::InternalLockWrite"),
+-		[Texture, Region, StagingBuffer](FRHICommandListBase& ExecutingCmdList)
+-		{
+-			FVulkanTexture::InternalLockWrite(FVulkanCommandListContext::Get(ExecutingCmdList), Texture, Region, StagingBuffer);
++		[Texture, Region, StagingBuffer, bNeedsExtraTransitions](FRHICommandListBase& ExecutingCmdList)
++		{
++			FVulkanTexture::InternalLockWrite(FVulkanCommandListContext::Get(ExecutingCmdList), Texture, Region, StagingBuffer, bNeedsExtraTransitions);
+ 		});
+ }
+ 
+--- a/Engine/Plugins/MovieScene/MovieRenderPipeline/Source/MovieRenderPipelineCore/Private/MoviePipelineLinearExecutor.cpp
++++ b/Engine/Plugins/MovieScene/MovieRenderPipeline/Source/MovieRenderPipelineCore/Private/MoviePipelineLinearExecutor.cpp
+@@ -149,7 +149,7 @@
+ 	OnExecutorErroredImpl(nullptr, true, LOCTEXT("CancelingExecutorQueue", "Executor asked to cancel all jobs."));
+ 	if (ActiveMoviePipeline)
+ 	{
+-		ActiveMoviePipeline->Shutdown(true);
++		ActiveMoviePipeline->RequestShutdown(true);
+ 	}
+ }
+ 
+--- a/Engine/Source/Runtime/Renderer/Private/SceneTextures.cpp
++++ b/Engine/Source/Runtime/Renderer/Private/SceneTextures.cpp
+@@ -964,6 +964,7 @@
+ void FSceneTextureExtracts::Release()
+ {
+ 	Depth = {};
++	PartialDepth = {};
+ 	CustomDepth = {};
+ 	UniformBuffer = {};
+ 	MobileUniformBuffer = {};
+--- a/Engine/Source/Runtime/RenderCore/Private/RenderGraphBuilder.cpp
++++ b/Engine/Source/Runtime/RenderCore/Private/RenderGraphBuilder.cpp
+@@ -10,6 +10,9 @@
+ #include "ProfilingDebugging/CsvProfiler.h"
+ #include "Async/ParallelFor.h"
+ 
++// Shared with render-pass construction so RDG tracks the same effective accesses.
++FDepthStencilBinding GetVulkanTrackedDepthStencilBinding(FDepthStencilBinding Binding);
++
+ struct FParallelPassSet : public FRHICommandListImmediate::FQueuedCommandList
+ {
+ 	FParallelPassSet() = default;
+@@ -181,7 +184,7 @@
+ 				}
+ 			});
+ 
+-			const FDepthStencilBinding& DepthStencil = RenderTargets.DepthStencil;
++			const FDepthStencilBinding DepthStencil = GetVulkanTrackedDepthStencilBinding(RenderTargets.DepthStencil);
+ 
+ 			if (FRDGTextureRef Texture = DepthStencil.GetTexture())
+ 			{
+--- a/Engine/Source/Runtime/RenderCore/Private/RenderGraphPass.cpp
++++ b/Engine/Source/Runtime/RenderCore/Private/RenderGraphPass.cpp
+@@ -3,8 +3,40 @@
+ #include "RenderGraphPass.h"
+ #include "RenderGraphPrivate.h"
+ #include "RenderGraphBuilder.h"
++#include "DynamicRHI.h"
+ 
+ FEmptyShaderParameters FRDGSentinelPass::EmptyShaderParameters;
++
++// Keep the unused aspect of a combined depth/stencil attachment in an explicitly
++// tracked read-only state. Vulkan render passes otherwise transition that aspect
++// through their attachment initial/final layouts even when its RHI access is Nop.
++// This workaround is deliberately limited to desktop Vulkan SM6, single-sample,
++// persistent attachments without a resolve target.
++FDepthStencilBinding GetVulkanTrackedDepthStencilBinding(FDepthStencilBinding Binding)
++{
++	FRDGTextureRef Texture = Binding.GetTexture();
++	if (RHIGetInterfaceType() != ERHIInterfaceType::Vulkan || GMaxRHIShaderPlatform != SP_VULKAN_SM6 ||
++		!Texture || Texture->Desc.Format != PF_DepthStencil || Texture->Desc.NumSamples != 1 ||
++		EnumHasAnyFlags(Texture->Desc.Flags, TexCreate_Memoryless) || Binding.GetResolveTexture())
++	{
++		return Binding;
++	}
++
++	FExclusiveDepthStencil Access = Binding.GetDepthStencilAccess();
++	if (!Access.IsUsingDepth() && Access.IsUsingStencil())
++	{
++		Binding.SetDepthLoadAction(ERenderTargetLoadAction::ELoad);
++		Access = Access.IsStencilWrite() ? FExclusiveDepthStencil::DepthRead_StencilWrite : FExclusiveDepthStencil::DepthRead_StencilRead;
++	}
++	else if (Access.IsUsingDepth() && !Access.IsUsingStencil())
++	{
++		Binding.SetStencilLoadAction(ERenderTargetLoadAction::ELoad);
++		Access = Access.IsDepthWrite() ? FExclusiveDepthStencil::DepthWrite_StencilRead : FExclusiveDepthStencil::DepthRead_StencilRead;
++	}
++	Binding.SetDepthStencilAccess(Access);
++	return Binding;
++}
++
+ 
+ FUniformBufferStaticBindings FRDGParameterStruct::GetStaticUniformBuffers() const
+ {
+@@ -70,7 +102,7 @@
+ 		++RenderTargetIndex;
+ 	});
+ 
+-	const FDepthStencilBinding& DepthStencil = RenderTargets.DepthStencil;
++	const FDepthStencilBinding DepthStencil = GetVulkanTrackedDepthStencilBinding(RenderTargets.DepthStencil);
+ 
+ 	if (FRDGTextureRef Texture = DepthStencil.GetTexture())
+ 	{
+--- a/Engine/Source/Runtime/VulkanRHI/Private/VulkanBarriers.cpp
++++ b/Engine/Source/Runtime/VulkanRHI/Private/VulkanBarriers.cpp
+@@ -662,8 +662,15 @@
+ 		Data->Semaphore = new VulkanRHI::FSemaphore(*Device);
+ 	}
+ 
++	// Null resources and discard destinations generate no Vulkan barrier. Do not
++	// allocate an event that neither half of ProcessTransitionSync2 would record.
++	const bool bHasBarrierResource = Data->TransitionInfos.ContainsByPredicate([](const FRHITransitionInfo& Info)
++	{
++		return Info.Resource && Info.AccessAfter != ERHIAccess::Discard;
++	});
++
+ 	// If we're staying on the same queue, use split barriers if they are permitted and supported
+-	if (GVulkanAllowSplitBarriers && (GVulkanMaxBarriersPerBatch <= 0) && Device->SupportsParallelRendering() &&
++	if (bHasBarrierResource && GVulkanAllowSplitBarriers && (GVulkanMaxBarriersPerBatch <= 0) && Device->SupportsParallelRendering() &&
+ 		(SrcPipelines == DstPipelines) && !EnumHasAnyFlags(CreateInfo.Flags, ERHITransitionCreateFlags::NoSplit))
+ 	{
+ 		// Track if host stage is used, it will prevent using split barrier
+--- a/Engine/Source/Developer/DerivedDataCache/Private/FileSystemCacheStore.cpp
++++ b/Engine/Source/Developer/DerivedDataCache/Private/FileSystemCacheStore.cpp
+@@ -1748,6 +1748,7 @@
+ 	FValue Value;
+ 	FValueId ValueId;
+ 	FCacheKey ValueKey;
++	FIoHash ValueRequestRawHash;
+ 	TUniquePtr<FArchive> ValueAr;
+ 	FCompressedBufferReader ValueReader;
+ 	FOptionalCacheRecord Record;
+@@ -1766,11 +1767,12 @@
+ 			TRACE_COUNTER_INCREMENT(FileSystemDDC_Get);
+ 			const bool bExistsOnly = EnumHasAnyFlags(Request.Policy, ECachePolicy::SkipData);
+ 			FRequestTimer RequestTimer(RequestStats);
+-			if (!(bHasValue && ValueKey == Request.Key && ValueId == Request.Id) || ValueReader.HasSource() < !bExistsOnly)
++			if (!(bHasValue && ValueKey == Request.Key && ValueId == Request.Id && ValueRequestRawHash == Request.RawHash) || ValueReader.HasSource() < !bExistsOnly)
+ 			{
+ 				ValueReader.ResetSource();
+ 				ValueAr.Reset();
+ 				ValueKey = {};
++				ValueRequestRawHash = Request.RawHash;
+ 				ValueId.Reset();
+ 				Value.Reset();
+ 				bHasValue = false;
+@@ -1804,6 +1806,37 @@
+ 					}
+ 				}
+ 			}
++			// A non-deterministic put may retain another generation in the record while
++			// storing the requested generation as external, content-addressed data.
++			if (!Request.RawHash.IsZero() && !(bHasValue && Value.GetRawHash() == Request.RawHash))
++			{
++				UE_LOGFMT(LogDerivedDataCache, Verbose,
++					"{Cache}: Resolving chunk generation for {Key}/{Id}: expected {ExpectedHash}, record {RecordHash} from '{Name}'",
++					CachePath, Request.Key, Request.Id, Request.RawHash, Value.GetRawHash(), Request.Name);
++				ValueReader.ResetSource();
++				ValueAr.Reset();
++				Value.Reset();
++				bHasValue = false;
++				const ECachePolicy QueryFlag = bRemote ? ECachePolicy::QueryRemote : ECachePolicy::QueryLocal;
++				if (!IsDeactivatedForPerformance() && EnumHasAnyFlags(Request.Policy, QueryFlag) &&
++					!DebugOptions.ShouldSimulateGetMiss(Request.Key))
++				{
++					// The reader obtains the raw size from the verified compressed header.
++					// Read that header even for SkipData, which still returns the chunk size.
++					const FValue RequestedValue(Request.RawHash, 0);
++					if (GetCacheContent(Request.Name, Request.Key, Request.Id, RequestedValue,
++						Request.Policy & ~ECachePolicy::SkipData, ValueReader, ValueAr, RequestStats))
++					{
++						Value = FValue(Request.RawHash, ValueReader.GetRawSize());
++						UE_LOGFMT(LogDerivedDataCache, VeryVerbose,
++							"{Cache}: Resolved chunk generation for {Key}/{Id}: expected {ExpectedHash}, content {ContentHash}, raw size {RawSize} from '{Name}'",
++							CachePath, Request.Key, Request.Id, Request.RawHash, ValueReader.GetRawHash(), Value.GetRawSize(), Request.Name);
++						ValueKey = Request.Key;
++						ValueId = Request.Id;
++						bHasValue = true;
++					}
++				}
++			}
+ 			if (bHasValue)
+ 			{
+ 				const uint64 RawOffset = FMath::Min(Value.GetRawSize(), Request.RawOffset);
+--- a/Engine/Source/Developer/DerivedDataCache/Private/DerivedDataCacheStoreHierarchy.cpp
++++ b/Engine/Source/Developer/DerivedDataCache/Private/DerivedDataCacheStoreHierarchy.cpp
+@@ -1523,6 +1523,15 @@
+ void FCacheStoreHierarchy::FGetChunksBatch::CompleteRequest(FCacheGetChunkResponse&& Response)
+ {
+ 	FState& State = States[int32(Response.UserData)];
++	// A cache node may resolve Key/Id to another generation. Continue to lower
++	// nodes instead of returning bytes for a different requested content hash.
++	if (Response.Status == EStatus::Ok && !State.Request.RawHash.IsZero() && State.Request.RawHash != Response.RawHash)
++	{
++		UE_LOGFMT(LogDerivedDataCache, Verbose,
++			"Rejected cache chunk generation for {Key}/{Id}: expected {ExpectedHash}, response {ResponseHash} from '{Name}'",
++			State.Request.Key, State.Request.Id, State.Request.RawHash, Response.RawHash, State.Request.Name);
++		Response.Status = EStatus::Error;
++	}
+ 	if (Response.Status == EStatus::Ok)
+ 	{
+ 		check(State.Status == EStatus::Error);

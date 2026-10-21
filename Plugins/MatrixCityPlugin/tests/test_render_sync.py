@@ -36,7 +36,8 @@ class RenderSyncTests(unittest.TestCase):
                  "onQueueFinishedCallback", "_on_map_targets_completed"}
         cls = ast.ClassDef(name="CustomMoviePipeline", bases=[], keywords=[], decorator_list=[],
                            body=[node for node in original.body if isinstance(node, ast.FunctionDef) and node.name in names])
-        namespace = {"unreal": unreal}
+        namespace = {"unreal": unreal,
+                     "render_cancellation": types.SimpleNamespace(is_requested=lambda: False)}
         exec(compile(ast.fix_missing_locations(ast.Module(body=[cls], type_ignores=[])),
                      "actual_render_sync", "exec"), namespace)
         pipeline = namespace["CustomMoviePipeline"]

@@ -3,6 +3,7 @@ from typing import Callable, Optional
 import unreal
 import utils
 import render_worker
+import render_cancellation
 from data.config import CfgNode
 
 from GLOBAL_VARS import MATERIAL_PATHS, PLUGIN_ROOT
@@ -616,6 +617,8 @@ class CustomMoviePipeline():
             render_config: 渲染配置
             executor: 执行器
         """
+        if render_cancellation.is_requested():
+            return
         # 设置批量目标物渲染状态
         cls._is_batch_target_rendering = True
         cls._current_target_index = 0
@@ -838,6 +841,10 @@ class CustomMoviePipeline():
             executor (unreal.MoviePipelineLinearExecutorBase): The executor of the queue.
             success (bool): Whether the queue finished successfully.
         """
+        # Cancellation owns teardown; do not advance the batch or export a
+        # partially rendered sequence from the executor's completion callback.
+        if render_cancellation.is_requested():
+            return
         import time
         controller = CustomMoviePipeline._render_controller
         performance = (controller.performance_settings if controller else
@@ -903,6 +910,8 @@ class CustomMoviePipeline():
             individual_job_finished_callback (Callable): The callback function to be called when an individual job finishes.
             executor (unreal.MoviePipelineLinearExecutorBase): The custom executor to use, or the default one will be used.
         """
+        if render_cancellation.is_requested():
+            return
         # check if there's jobs added to the queue
         if (len(cls.pipeline_queue.get_jobs()) == 0):
             unreal.log_error(
@@ -934,6 +943,8 @@ class CustomMoviePipeline():
             individual_job_finished_callback)
 
         # render the queue
+        if not render_cancellation.begin_queue():
+            return
         cls.new_executor.execute(cls.pipeline_queue)
         
         # 安全发送Socket消息

@@ -1,0 +1,1167 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-10-20T16:41:48.288281+00:00",
+  "purpose": "Seven scoped source fixes for Vulkan pipeline lifetime, VT copy layout, reentrant MRQ cancellation, retained scene depth cleanup, effective depth/stencil attachment tracking, empty split-barrier event lifetime, and requested DDC chunk generation consistency in UE5.6.1.",
+  "patch": {
+    "file": "ue5.6.1-vulkan-correctness.patch",
+    "sha256": "ee8435e931ceaae022ce0870954bf33ad5ac499edc406d118876b47c0089f2a4",
+    "source_files": 10,
+    "fix_count": 7,
+    "components": [
+      {
+        "file": "Saved/RenderRuns/root_cause_20261020_235808/pipeline_deletion_review/defer_registered_non_lru_pipeline.patch",
+        "sha256": "150ccd8cefe7b8fd2fd310803c7588a615a3aab982bf14d47f61749011ebb4d5"
+      },
+      {
+        "file": "Saved/RenderRuns/root_cause_20261020_235808/vt_layout_proposal/respect_vt_copydest.patch",
+        "sha256": "f6a77986bb2e78c753314df778f41af64648769b70da085256a33793e25fc65b"
+      },
+      {
+        "file": "Saved/RenderRuns/root_cause_20261020_235808/mrq_cancellation_fix/cancel_all_jobs_async.patch",
+        "sha256": "f66b827f4a382add6ffc7a340198c5df5672383ad32381892a5d8b3d962cf00d"
+      },
+      {
+        "file": "Saved/RenderRuns/root_cause_20261020_235808/scene_depth_shutdown_audit/release_partial_depth.patch",
+        "sha256": "d3964331a9b3679a6f44a3b92730b152ef0391c29a14019b26098829f534bf8a"
+      },
+      {
+        "file": "Saved/RenderRuns/root_cause_20261020_235808/stencil_binding_proposal/track_unused_depth_stencil.patch",
+        "sha256": "bc75b62a8c110d25c11ecf2509493932bb8302929e76cd24756aa3654fbfe25a"
+      },
+      {
+        "file": "Saved/RenderRuns/root_cause_20261020_235808/event_shutdown_audit/skip_empty_split_barrier_event.patch",
+        "sha256": "115a85d24380a2695931d6f9576b0127afaeeb2f897753b1976b910c074dd5e5"
+      },
+      {
+        "file": "Saved/RenderRuns/root_cause_20261020_235808/nanite_ddc_fix_proposal/honor_chunk_raw_hash.patch",
+        "sha256": "6c17078cca6d9c7a0892c2c1d843f16f0ed5276f83881e9775046c45a3080bf0"
+      }
+    ]
+  },
+  "expected_engine": {
+    "MajorVersion": 5,
+    "MinorVersion": 6,
+    "PatchVersion": 1,
+    "Changelist": 44394996,
+    "CompatibleChangelist": 43139311,
+    "IsLicenseeVersion": 0,
+    "IsPromotedBuild": 1,
+    "BranchName": "++UE5+Release-5.6",
+    "platform": "Linux x86_64",
+    "target": "UnrealEditor",
+    "configuration": "Development",
+    "modules_build_id": "43139311",
+    "installed_build": true
+  },
+  "isolation": {
+    "original_engine": "/opt/UE_5.6",
+    "patched_engine": "/opt/UE_5.6_render_fix",
+    "copy_command_argv": [
+      "cp",
+      "-a",
+      "--reflink=auto",
+      "/opt/UE_5.6",
+      "/opt/UE_5.6_render_fix"
+    ],
+    "hardlinks_used": false,
+    "original_engine_tracked_files_unchanged": true,
+    "rollback": "Point the render launcher back to the original engine; do not overwrite original engine files. Restore/verify runtime project configuration separately."
+  },
+  "fixes": [
+    {
+      "id": "defer_registered_non_lru_pipeline_deletion",
+      "module": "VulkanRHI",
+      "source": "Engine/Source/Runtime/VulkanRHI/Private/VulkanPipeline.cpp",
+      "change": "NotifyDeletedGraphicsPSO registered non-LRU path uses DeleteVkPipeline(false), entering existing EOP deferred deletion instead of destroying an in-use VkPipeline.",
+      "evidence": "Saved/RenderRuns/root_cause_20261020_235808/pipeline_lifetime_guard_argv_fixed/capture/pipeline-vuid-0001.json: captured DeleteVkPipeline(true) called by NotifyDeletedGraphicsPSO at original line 2058.",
+      "runtime_validation": "Historical six-fix runs passed at one/four/eight workers; the final seven-fix build also passed the complete twelve-worker controlled cold-cache run. See the corresponding runtime records; finite acceptance does not establish indefinite stability."
+    },
+    {
+      "id": "preserve_rdg_virtual_texture_copy_layout",
+      "module": "VulkanRHI",
+      "sources": [
+        "Engine/Source/Runtime/VulkanRHI/Private/VulkanResources.h",
+        "Engine/Source/Runtime/VulkanRHI/Private/VulkanTexture.cpp"
+      ],
+      "change": "Capture NeedsExtraTransitions while recording UpdateTexture2D; suppress implicit InternalLockWrite transitions only when the caller has already supplied RDG copy barriers. Other callers retain default transitions.",
+      "evidence": "Saved/RenderRuns/root_cause_20261020_235808/vt_layout_proposal/",
+      "runtime_validation": "Historical six-fix runs passed at one/four/eight workers; the final seven-fix build also passed the complete twelve-worker controlled cold-cache run. See the corresponding runtime records; finite acceptance does not establish indefinite stability."
+    },
+    {
+      "id": "defer_cancel_all_jobs_shutdown",
+      "module": "MovieRenderPipelineCore",
+      "source": "Engine/Plugins/MovieScene/MovieRenderPipeline/Source/MovieRenderPipelineCore/Private/MoviePipelineLinearExecutor.cpp",
+      "change": "CancelAllJobs requests asynchronous shutdown at the next safe pipeline tick. Keep bIsCanceling and the error flag; leave CancelCurrentJob unchanged.",
+      "evidence": "Saved/RenderRuns/root_cause_20261020_235808/mrq_cancellation_fix/proposal.json; extracted-method CPU regression reproduces old reentrant shot-array invalidation and passes with RequestShutdown.",
+      "runtime_validation": "Historical six-fix runs passed at one/four/eight workers; the final seven-fix build also passed the complete twelve-worker controlled cold-cache run. See the corresponding runtime records; finite acceptance does not establish indefinite stability."
+    },
+    {
+      "id": "release_extracted_partial_depth_reference",
+      "module": "Renderer",
+      "source": "Engine/Source/Runtime/Renderer/Private/SceneTextures.cpp",
+      "change": "Clear PartialDepth together with Depth in FSceneTextureExtracts::Release, including ReleaseRHI shutdown. The omitted owning reference could retain one SceneDepthZ image until device teardown.",
+      "evidence": "Saved/RenderRuns/root_cause_20261020_235808/scene_depth_shutdown_audit/findings.json",
+      "runtime_validation": "Historical six-fix runs passed at one/four/eight workers; the final seven-fix build also passed the complete twelve-worker controlled cold-cache run. See the corresponding runtime records; finite acceptance does not establish indefinite stability."
+    },
+    {
+      "id": "track_effective_depth_stencil_binding",
+      "module": "RenderCore",
+      "sources": [
+        "Engine/Source/Runtime/RenderCore/Private/RenderGraphBuilder.cpp",
+        "Engine/Source/Runtime/RenderCore/Private/RenderGraphPass.cpp"
+      ],
+      "change": "Use the same effective depth/stencil binding for RDG access collection and render-pass construction. For desktop Vulkan SM6 single-sample persistent PF_DepthStencil attachments without a resolve target, change an unused aspect to read access with ELoad when the other aspect is active. Other RHIs/formats/sample counts/memoryless/resolve cases remain unchanged.",
+      "evidence": "Saved/RenderRuns/root_cause_20261020_235808/stencil_binding_proposal/track_unused_depth_stencil.patch",
+      "build_status": "built_static_checks_passed",
+      "runtime_validation": "Historical six-fix runs passed at one/four/eight workers; the final seven-fix build also passed the complete twelve-worker controlled cold-cache run. See the corresponding runtime records; finite acceptance does not establish indefinite stability."
+    },
+    {
+      "id": "avoid_event_for_empty_split_barrier",
+      "module": "VulkanRHI",
+      "source": "Engine/Source/Runtime/VulkanRHI/Private/VulkanBarriers.cpp",
+      "change": "Before allocating a split-barrier event, require at least one non-null resource whose AccessAfter is not exactly Discard. This matches the converter skip predicate; empty/null/discard-only transitions otherwise allocate an event that neither barrier half records or returns to the pool.",
+      "evidence": [
+        "Saved/RenderRuns/root_cause_20261020_235808/event_shutdown_audit/split_event_review.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/event_validation/leaked_event_attribution.json"
+      ],
+      "runtime_evidence_scope": "Tracked leaked VkEvent 0x8926550000003a14 originated in GetBarrierEvent called by RHICreateTransition; source proves the no-barrier ownership gap. After the fix, tier_01 completed both job waves with no VVL errors at shutdown.",
+      "build_status": "built_static_checks_passed",
+      "runtime_validation": "Historical six-fix runs passed at one/four/eight workers; the final seven-fix build also passed the complete twelve-worker controlled cold-cache run. See the corresponding runtime records; finite acceptance does not establish indefinite stability."
+    },
+    {
+      "id": "honor_requested_ddc_chunk_generation",
+      "module": "DerivedDataCache",
+      "sources": [
+        "Engine/Source/Developer/DerivedDataCache/Private/FileSystemCacheStore.cpp",
+        "Engine/Source/Developer/DerivedDataCache/Private/DerivedDataCacheStoreHierarchy.cpp"
+      ],
+      "change": "Include requested RawHash in filesystem chunk reader reuse. Resolve missing or mismatched record generations by content-addressed data through the existing partial-read helper, validating the compressed header hash and obtaining its actual raw size. Preserve query policies, disabled-store behavior, simulated misses and SkipData semantics. Reject mismatched successful chunk responses in the hierarchy so lower nodes can return the requested generation.",
+      "diagnostics": "LogDerivedDataCache Verbose reports key/id and expected versus record/response hash for fallback/rejection; VeryVerbose reports successful content-hash resolution and raw size.",
+      "evidence": [
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_ddc_fix_proposal/proposal.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_ddc_fix_proposal/cpu_contract_results.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_ddc_fix_proposal/package_update_inputs.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_cache_audit/ddc_ready.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_ddc_fix_proposal/runtime_generation_mismatch_evidence.json"
+      ],
+      "causality_scope": "The controlled seven-fix cold twelve-worker run captured expectedRawHash != recordRawHash for three StaticMesh keys and entered content-addressed fallback, then completed all 24 sequences and clean shutdowns. This confirms the mechanism occurs live and the corrected path completes this finite workload. The prior failed run did not capture the expected/actual hash of each failed page; no claim about all historical driver Xid causes.",
+      "cpu_validation": {
+        "passed_cases": 22,
+        "compile_returncode": 0,
+        "run_returncode": 0,
+        "scope": "Actual candidate branches compiled with CPU dependency doubles; not full UE cache integration."
+      },
+      "build_status": "built_static_checks_passed",
+      "runtime_validation": "Passed final seven-fix twelve-worker controlled cold-cache run, including live generation-mismatch fallback, 48 MRQ steps, complete decoded outputs and all clean exits; see validation.seven_fix_cold_cache_runtime."
+    }
+  ],
+  "original_sha256": {
+    "Engine/Source/Runtime/VulkanRHI/Private/VulkanPipeline.cpp": "d89ba63f40c9ad601038c37d7dc95ec6a6ca6efa98a3577487240b638206b75e",
+    "Engine/Source/Runtime/VulkanRHI/VulkanRHI.Build.cs": "32e8e1ad863f80c42b45e8cfb3a05936c5e9310d17df65908e70c98086094c3f",
+    "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.so": "24d50dc6eee43b140b1b44396474928d2e8b648fc505438aa07e133178b34031",
+    "Engine/Binaries/Linux/UnrealEditor.modules": "ab680093779c8895ca9055dc160041750ae75551a8b32f99b5c8392c0f5065f6",
+    "Engine/Build/InstalledBuild.txt": "c6ce44517dbd2efaf82d6e71b627ede2ec6aa56ed0ad5925497a97dd774795e8",
+    "Engine/Build/Build.version": "b6a16a262d0136d1812f134ebd83e81138546dcc705f5f088a96702c970d24a0",
+    "Engine/Source/Runtime/VulkanRHI/Private/VulkanResources.h": "2e4a61c64764e2d9ff2a2ec113c6939dcdf782c7f6c89d381e0cd40274764634",
+    "Engine/Source/Runtime/VulkanRHI/Private/VulkanTexture.cpp": "76bd6b5a2e6b40aabe8d831068b93a5032294343eb6f15f1a7bfd451a349decf",
+    "Engine/Plugins/MovieScene/MovieRenderPipeline/Source/MovieRenderPipelineCore/Private/MoviePipelineLinearExecutor.cpp": "8b32994b8cd514a603cc5aa8794b69bfea8b0e8db784ac61d84090f53e055810",
+    "Engine/Plugins/MovieScene/MovieRenderPipeline/Source/MovieRenderPipelineCore/MovieRenderPipelineCore.Build.cs": "ede5f51c27cba8ac3a762b1e3d9dc0bcc8de3313e155c2b20a7f7f876f77f0ad",
+    "Engine/Plugins/MovieScene/MovieRenderPipeline/Binaries/Linux/libUnrealEditor-MovieRenderPipelineCore.so": "06f07b25da324be3face353fe9056106962191226917e02870bea85fac9fa3d2",
+    "Engine/Plugins/MovieScene/MovieRenderPipeline/Binaries/Linux/UnrealEditor.modules": "7719069cee50c5a7a30c99733cabb9f8e98270bc19f43152cf5bd7410441f9a4",
+    "Engine/Source/Runtime/Renderer/Renderer.Build.cs": "baddd62c02f8b08c5b0542a69c1f1777932def056250be440c37dfdc6c82c322",
+    "Engine/Source/Runtime/Renderer/Private/SceneTextures.cpp": "5b17f5c55e1c04ed4d49843b5edda567da6078b60130861e48c43dab924504ab",
+    "Engine/Binaries/Linux/libUnrealEditor-Renderer.so": "22566e0c12d91922dd670333c6c462c66ed16db3426bb23cc29c363e32e79bc3",
+    "Engine/Binaries/Linux/libUnrealEditor-Renderer.debug": "88d25a39a7b1963ff8a351d70971b207d3c4d92ae6c04d79410b6625a248ed26",
+    "Engine/Binaries/Linux/libUnrealEditor-Renderer.sym": "bbb7c2efc7a3e9a61e9217f8b3e4ec6468b3fbd3c82e17dce6ca5bc575570ccf",
+    "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.debug": "e7f2f1965fb4770bd7496f1dde41a8263e8d73c7914f5f6ac863a9f0d2bf4804",
+    "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.sym": "0a330ad971a7d4a6be2046745f667926340e1f2b2a03b4eb88cc1144cad93b21",
+    "Engine/Plugins/MovieScene/MovieRenderPipeline/Binaries/Linux/libUnrealEditor-MovieRenderPipelineCore.debug": "5f2ca8d6144a3a9fd4d432cefa01ff00374d85b27cdac18a99c0a57202970c6f",
+    "Engine/Plugins/MovieScene/MovieRenderPipeline/Binaries/Linux/libUnrealEditor-MovieRenderPipelineCore.sym": "61e18e1586ec1cbc19ed9a983fa1b00e4d016056b2696b88283c4207a85efef9",
+    "Engine/Source/Runtime/RenderCore/RenderCore.Build.cs": "a8f29033e521efaf0d11ac2224dd046d9a8709eddc71dc450cff69110956f496",
+    "Engine/Source/Runtime/RenderCore/Private/RenderGraphPass.cpp": "74fc731b4ca7c9cbd16c38fb78503d1d7fb74ec896938878e739447cee270add",
+    "Engine/Source/Runtime/RenderCore/Private/RenderGraphBuilder.cpp": "6de10665fe6bc02de87f97d04c8153bbb1eb2d38843b243d5c8cf7d734ad17ec",
+    "Engine/Binaries/Linux/libUnrealEditor-RenderCore.so": "dae0e950ed9f00084d86f2a9a1bfc04be8e168acbc6bfbe049ec07beffb4ab4c",
+    "Engine/Binaries/Linux/libUnrealEditor-RenderCore.debug": "86fa8b9b1644d0fd219f5edf68ba4edb090902c9addc22db5582681108e03862",
+    "Engine/Binaries/Linux/libUnrealEditor-RenderCore.sym": "0c63d2944670513f2730def6e525ed4c1a2eb7c981b3c35b38b30449296ba65e",
+    "Engine/Source/Runtime/VulkanRHI/Private/VulkanBarriers.cpp": "03a46b1dde8295aac0e0963b3cba123e4f46327fff3668db7f853bf9222663a1",
+    "Engine/Source/Developer/DerivedDataCache/DerivedDataCache.Build.cs": "f649e33d4718b7e91514a85d119a4c8548bba945a78a21e0767768b45f44b0c4",
+    "Engine/Source/Developer/DerivedDataCache/Private/FileSystemCacheStore.cpp": "5413a58496eb6cba903aba7c3c238ecba5604b1d3a8c3985197bc0576761508b",
+    "Engine/Source/Developer/DerivedDataCache/Private/DerivedDataCacheStoreHierarchy.cpp": "cd8488ab0dabaca3dabfd4fb25f5c9c5e0cdde400763b3534fa0f99b87b730f6",
+    "Engine/Binaries/Linux/libUnrealEditor-DerivedDataCache.so": "a0679f085245bb62132ab80f19e11bd5ad69211d13fec65c2fd9eea7b6850bbb",
+    "Engine/Binaries/Linux/libUnrealEditor-DerivedDataCache.debug": "596dfb31f7de50d55f99ea5c3378e810647d3339b6380007d0be28bb2942e37b",
+    "Engine/Binaries/Linux/libUnrealEditor-DerivedDataCache.sym": "b6a653ba6869d6bc9e9d440ca9609e5db5c517c5e65a1414275fed8a040a3e5a"
+  },
+  "patched_source_sha256": {
+    "Engine/Source/Runtime/VulkanRHI/Private/VulkanPipeline.cpp": "301c4e11ff7c54f2a79bc2cf6c4d05452375ab5589361cbacc11f7efab04242a",
+    "Engine/Source/Runtime/VulkanRHI/Private/VulkanResources.h": "78a8952708fb38e9ec765739e080898c23f8afa66f98c8c5641f3a2da2083bc2",
+    "Engine/Source/Runtime/VulkanRHI/Private/VulkanTexture.cpp": "a84ae69aaf3c9a0389494610f2ebe068770dd077af6b8ebac66405dd1e7c4925",
+    "Engine/Plugins/MovieScene/MovieRenderPipeline/Source/MovieRenderPipelineCore/Private/MoviePipelineLinearExecutor.cpp": "f2d4d30ee5ad0063ab980296ec45b43f83f5e210a5dcfb2b0894a0170956f3bc",
+    "Engine/Source/Runtime/Renderer/Private/SceneTextures.cpp": "958d2d36b986eb665c93b5bde8f72d1de28493fc381677f83b11531e0568bb39",
+    "Engine/Source/Runtime/RenderCore/Private/RenderGraphBuilder.cpp": "05356310a11b88d80a2f8b724deb369d2fe9a206a42cc3e7ac2c34555895e0aa",
+    "Engine/Source/Runtime/RenderCore/Private/RenderGraphPass.cpp": "cfaaf2f2b5740ce08a7bfa750ea649d270a87289a5be8f72f4a31eba72875476",
+    "Engine/Source/Runtime/VulkanRHI/Private/VulkanBarriers.cpp": "c78caacdbed363bc1b1a401e32a23451e163dfb4d3fe491d6425a75f0a0e4ef2",
+    "Engine/Source/Developer/DerivedDataCache/Private/FileSystemCacheStore.cpp": "1d19729728002344d27e878e2916cbd43d8b1960d5a7f6b01ae5615d6682696a",
+    "Engine/Source/Developer/DerivedDataCache/Private/DerivedDataCacheStoreHierarchy.cpp": "68dbb2001da92e751e41ba5b04ec345c59d8c6e382061350daf89fd7407f891c"
+  },
+  "toolchain": {
+    "sdk": "v25_clang-18.1.0-rockylinux8",
+    "target_triple": "x86_64-unknown-linux-gnu",
+    "clang_version": "18.1.0rc",
+    "clang_revision": "461274b81d8641eab64d494accddc81d7db8a09e",
+    "dotnet_sdk": "8.0.300",
+    "linker": "lld bundled with engine SDK",
+    "engine_bundled_libcxx": true,
+    "build_user": "ue",
+    "build_home": "/opt/ue-home"
+  },
+  "reproduction_steps": [
+    "Verify the original Build.version and all original_sha256 values before changing anything. Use a fresh independent clone, cp -a --reflink=auto, never cp -al or hardlinks.",
+    "Apply the combined patch only inside the clone: git -C <clone> apply --check <absolute-patch>, then git -C <clone> apply <absolute-patch>.",
+    "Build VulkanRHI, MovieRenderPipelineCore, Renderer, RenderCore, and DerivedDataCache serially. For each module, temporarily rename clone/Engine/Build/InstalledBuild.txt and set bUsePrecompiled = false only in that module Build.cs constructor. Keep -UsePrecompiled so dependencies use installed binaries.",
+    "Before actual compilation, run the recorded planning command with -WriteOutdatedActions. Review every compile/link action: only the selected module and necessary shared PCH may rebuild, and all outputs must remain inside the clone. UBT action export deletes outdated outputs, so never run this against the original engine.",
+    "Run the recorded actual build command. Paths and build user may be adapted to a fresh equivalent clone; outputs below record this machine build and are not a promise of byte-identical artifacts at another path.",
+    "After each build, restore the stock InstalledBuild.txt, the stock module Build.cs and the six stock UE5Rules/UE5ProgramRules DLL/PDB/Manifest files from the original engine. Keep patched C++ sources and rebuilt module artifacts. The stock rule assemblies prevent unrelated project/plugin builds from inheriting temporary compilation rules.",
+    "Verify original hashes remain unchanged, patched source hashes match, both UnrealEditor.modules BuildIds remain43139311, and all previously rebuilt modules are preserved during each subsequent build. Compare dynamic exports and run ldd -r with LD_LIBRARY_PATH=<clone>/Engine/Binaries/Linux for dependency resolution.",
+    "Use the cloned editor for bounded runtime validation before production. CPU compilation/link checks alone do not establish Vulkan validation cleanliness or high-concurrency stability."
+  ],
+  "temporary_build_configuration": {
+    "global_ubt_option": "-UsePrecompiled",
+    "module_override": "bUsePrecompiled = false; in selected module constructor only",
+    "installed_marker_temporarily_renamed": true,
+    "restored_files": [
+      "Engine/Build/InstalledBuild.txt",
+      "Engine/Source/Runtime/VulkanRHI/VulkanRHI.Build.cs",
+      "Engine/Plugins/MovieScene/MovieRenderPipeline/Source/MovieRenderPipelineCore/MovieRenderPipelineCore.Build.cs",
+      "Engine/Intermediate/Build/BuildRules/UE5ProgramRules.dll",
+      "Engine/Intermediate/Build/BuildRules/UE5ProgramRules.pdb",
+      "Engine/Intermediate/Build/BuildRules/UE5ProgramRulesManifest.json",
+      "Engine/Intermediate/Build/BuildRules/UE5Rules.dll",
+      "Engine/Intermediate/Build/BuildRules/UE5Rules.pdb",
+      "Engine/Intermediate/Build/BuildRules/UE5RulesManifest.json",
+      "Engine/Source/Runtime/Renderer/Renderer.Build.cs",
+      "Engine/Source/Runtime/RenderCore/RenderCore.Build.cs",
+      "Engine/Source/Developer/DerivedDataCache/DerivedDataCache.Build.cs"
+    ],
+    "restored_before_runtime_validation": true,
+    "restoration_status": "All five module build rules, six stock rule-cache files and the installed-build marker restored and hashes verified.",
+    "required_before_runtime_validation": true
+  },
+  "modules": [
+    {
+      "name": "VulkanRHI",
+      "build_status": "built_static_checks_passed",
+      "runtime_validation": "Passed final seven-fix twelve-worker controlled cold-cache run with complete outputs and clean exits; historical one/four/eight-worker passes used the six-fix build.",
+      "status_note": "Sixth event-lifetime fix compiled successfully; all 1269 original VulkanRHI exports identical, dynamic relocations resolved, other corrected modules and prior sources preserved. Final seven-fix twelve-worker controlled cold-cache runtime acceptance passed.",
+      "previous_five_fix_build": {
+        "name": "VulkanRHI",
+        "actual_build_command_argv": [
+          "runuser",
+          "-u",
+          "ue",
+          "--",
+          "env",
+          "HOME=/opt/ue-home",
+          "DOTNET_CLI_HOME=/opt/ue-home",
+          "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+          "/bin/bash",
+          "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+          "UnrealEditor",
+          "Linux",
+          "Development",
+          "-UsePrecompiled",
+          "-Module=VulkanRHI",
+          "-NoHotReload",
+          "-NoUBTMakefiles",
+          "-NoUBA",
+          "-MaxParallelActions=4"
+        ],
+        "planning_command_argv": [
+          "runuser",
+          "-u",
+          "ue",
+          "--",
+          "env",
+          "HOME=/opt/ue-home",
+          "DOTNET_CLI_HOME=/opt/ue-home",
+          "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+          "/bin/bash",
+          "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+          "UnrealEditor",
+          "Linux",
+          "Development",
+          "-UsePrecompiled",
+          "-Module=VulkanRHI",
+          "-NoHotReload",
+          "-NoUBTMakefiles",
+          "-NoUBA",
+          "-MaxParallelActions=4",
+          "-WriteOutdatedActions=/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/Saved/RenderRuns/root_cause_20261020_235808/engine_build/vulkan_build_actions.json"
+        ],
+        "action_scope": {
+          "scope_approved": true,
+          "actions": 6,
+          "pch_compile": 1,
+          "module_compile_units": 4,
+          "module_links": 1,
+          "other_modules_recompiled": false,
+          "all_outputs_in_clone": true
+        },
+        "outputs": {
+          "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.so": {
+            "sha256": "56c2af5a7ae2aff3717f5520696c10f7effc17044e80731090ec15e76ff5ad42",
+            "bytes": 4472416
+          },
+          "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.debug": {
+            "sha256": "1bd7cdb21db1bd55225a5746c51a98521a1c574eeb95158a158a0456dc268c46",
+            "bytes": 12930776
+          },
+          "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.sym": {
+            "sha256": "e89de81a09a2ca92ae4ea3b2fb7cc7dbc7613fec36e148f4ed26d93df822c7c2",
+            "bytes": 4953997
+          }
+        },
+        "exported_symbols": {
+          "original_export_count": 1269,
+          "rebuilt_export_count": 1269,
+          "removed_symbols": [],
+          "added_symbols": []
+        },
+        "build_exit_code": 0,
+        "build_wall_seconds": 58.42,
+        "build_log": "Saved/RenderRuns/root_cause_20261020_235808/engine_build/build.log",
+        "build_status": "passed"
+      },
+      "actual_build_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=VulkanRHI",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=12"
+      ],
+      "planning_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=VulkanRHI",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=12",
+        "-WriteOutdatedActions=/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/Saved/RenderRuns/root_cause_20261020_235808/event_shutdown_audit/eventfix_build_actions.json"
+      ],
+      "action_scope": {
+        "scope_approved": true,
+        "action_count": 2,
+        "actions": [
+          {
+            "type": "Compile",
+            "description": "Module.VulkanRHI.1.cpp"
+          },
+          {
+            "type": "Link",
+            "description": "libUnrealEditor-VulkanRHI.so"
+          }
+        ],
+        "description": "Only VulkanRHI and its PCH; preserve corrected RenderCore/Renderer/MRQ modules"
+      },
+      "outputs": {
+        "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.so": {
+          "sha256": "643dc461ba49ff75810352af7cabbbdc62e04f89efa178e340a2fa869dcc59a8",
+          "bytes": 4472512
+        },
+        "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.debug": {
+          "sha256": "4896dd03054d0402c478174579bfcd5526534f8eab475b1b6db0adddee792bca",
+          "bytes": 12930424
+        },
+        "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.sym": {
+          "sha256": "e5b71b0f598263da9314305302163b5b5e4147b778036d7b9d1d4430ab5579e8",
+          "bytes": 4954157
+        }
+      },
+      "expected_output_files": [
+        "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.so",
+        "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.debug",
+        "Engine/Binaries/Linux/libUnrealEditor-VulkanRHI.sym"
+      ],
+      "build_exit_code": 0,
+      "build_started_unix": 1792516765.0001304,
+      "build_log": "Saved/RenderRuns/root_cause_20261020_235808/event_shutdown_audit/eventfix_build.log",
+      "build_wall_seconds": 21.407,
+      "build_finished_unix": 1792516786.4067948,
+      "runtime_rules_restored": true,
+      "dynamic_relocations_resolved": true,
+      "exported_symbols": {
+        "original_export_count": 1269,
+        "rebuilt_export_count": 1269,
+        "removed_symbols": [],
+        "added_symbols": []
+      },
+      "audit_ready_file": "Saved/RenderRuns/root_cause_20261020_235808/event_shutdown_audit/eventfix_ready.json"
+    },
+    {
+      "name": "MovieRenderPipelineCore",
+      "actual_build_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=MovieRenderPipelineCore",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=12"
+      ],
+      "planning_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=MovieRenderPipelineCore",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=4",
+        "-WriteOutdatedActions=/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/Saved/RenderRuns/root_cause_20261020_235808/engine_build/movie_pipeline_core_actions.json"
+      ],
+      "action_scope": {
+        "scope_approved": true,
+        "action_count": 12,
+        "compile_units": 11,
+        "links": 1,
+        "other_modules_recompiled": false,
+        "all_outputs_in_clone": true
+      },
+      "outputs": {
+        "Engine/Plugins/MovieScene/MovieRenderPipeline/Binaries/Linux/libUnrealEditor-MovieRenderPipelineCore.so": {
+          "sha256": "04d473b17f6f409ecad4bc66718e7af14da019edd3b720a0b1924e36a50ae441",
+          "bytes": 6915624
+        },
+        "Engine/Plugins/MovieScene/MovieRenderPipeline/Binaries/Linux/libUnrealEditor-MovieRenderPipelineCore.debug": {
+          "sha256": "665ea1ea61a6f0395b2a5f516eb708581212d07e00964b5452899e0750e548f6",
+          "bytes": 21377016
+        },
+        "Engine/Plugins/MovieScene/MovieRenderPipeline/Binaries/Linux/libUnrealEditor-MovieRenderPipelineCore.sym": {
+          "sha256": "f2a6f9789b942f3f518324f034fe544dd965e62ab8986889b08a37bd3281fe51",
+          "bytes": 7113696
+        }
+      },
+      "exported_symbols": {
+        "original_export_count": 3641,
+        "rebuilt_export_count": 3644,
+        "removed_symbols": [],
+        "added_symbols": [
+          "__bss_start",
+          "_edata",
+          "_end"
+        ]
+      },
+      "build_exit_code": 0,
+      "build_wall_seconds": 85.97,
+      "build_log": "Saved/RenderRuns/root_cause_20261020_235808/engine_build/movie_pipeline_core_build.log",
+      "build_status": "passed",
+      "runtime_validation": "Passed final seven-fix twelve-worker controlled cold-cache run with complete outputs and clean exits; historical one/four/eight-worker passes used the six-fix build."
+    },
+    {
+      "name": "Renderer",
+      "build_status": "passed",
+      "runtime_validation": "Passed final seven-fix twelve-worker controlled cold-cache run with complete outputs and clean exits; historical one/four/eight-worker passes used the six-fix build.",
+      "actual_build_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=Renderer",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=12"
+      ],
+      "planning_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=Renderer",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=12",
+        "-WriteOutdatedActions=/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/Saved/RenderRuns/root_cause_20261020_235808/scene_depth_shutdown_audit/renderer_build_actions.json"
+      ],
+      "action_scope": {
+        "scope_approved": true,
+        "compile_actions": 33,
+        "link_actions": 1,
+        "max_parallel_actions": 12,
+        "other_modules_recompiled": false,
+        "all_outputs_in_clone": true,
+        "changed_source_compiled_by": "/opt/UE_5.6_render_fix/Engine/Intermediate/Build/Linux/x64/UnrealEditor/Development/Renderer/Module.Renderer.25.cpp",
+        "checked": "All compile actions are Renderer unity units and all link outputs are Renderer.so/debug/sym in the clone."
+      },
+      "outputs": {
+        "Engine/Binaries/Linux/libUnrealEditor-Renderer.so": {
+          "sha256": "57518e8f7e573bb277ce135b6e337df94e196fbf449a80b90ff9fb1d243de00c",
+          "bytes": 35680568
+        },
+        "Engine/Binaries/Linux/libUnrealEditor-Renderer.debug": {
+          "sha256": "e741d98d1ff5d7a76125358321d97ed5bc03baa30b84683e3828785c000b1625",
+          "bytes": 111936216
+        },
+        "Engine/Binaries/Linux/libUnrealEditor-Renderer.sym": {
+          "sha256": "3066bffebdad574c40c988e95d659d586360adacf8ce08c2d7a97a4ecf971b61",
+          "bytes": 50284485
+        }
+      },
+      "exported_symbols": {
+        "original_exported_symbols": 2815,
+        "rebuilt_exported_symbols": 2815,
+        "missing_symbols": [],
+        "added_symbols": []
+      },
+      "dynamic_relocations_resolved": true,
+      "runtime_rules_restored": true,
+      "build_exit_code": 0,
+      "build_wall_seconds": 124.7,
+      "build_log": "Saved/RenderRuns/root_cause_20261020_235808/scene_depth_shutdown_audit/renderer_build.log"
+    },
+    {
+      "name": "RenderCore",
+      "build_status": "built_static_checks_passed",
+      "runtime_validation": "Passed final seven-fix twelve-worker controlled cold-cache run with complete outputs and clean exits; historical one/four/eight-worker passes used the six-fix build.",
+      "actual_build_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=RenderCore",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=12"
+      ],
+      "planning_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=RenderCore",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=12",
+        "-WriteOutdatedActions=/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/Saved/RenderRuns/root_cause_20261020_235808/stencil_binding_proposal/rendercore_build_actions.json"
+      ],
+      "action_scope": {
+        "scope_approved": true,
+        "action_count": 7,
+        "description": "1 shared CoreUObject PCH, 5 RenderCore unity compiles, 1 RenderCore link. All outputs in isolated clone."
+      },
+      "outputs": {
+        "Engine/Binaries/Linux/libUnrealEditor-RenderCore.so": {
+          "sha256": "257a2989803aafdb996ecc25784763cf8bd83db6e9d28611c6fd92881f749ba7",
+          "bytes": 5018528
+        },
+        "Engine/Binaries/Linux/libUnrealEditor-RenderCore.debug": {
+          "sha256": "759f19b5572904b001afc11142ed7c683fa6a91129e5957f56920d3b3e2a5da8",
+          "bytes": 17090080
+        },
+        "Engine/Binaries/Linux/libUnrealEditor-RenderCore.sym": {
+          "sha256": "fb556c7e79797c961b0abb713b1b7f8937bc54e3a3ea884d7ab172bd76634c7d",
+          "bytes": 6249185
+        }
+      },
+      "expected_output_files": [
+        "Engine/Binaries/Linux/libUnrealEditor-RenderCore.so",
+        "Engine/Binaries/Linux/libUnrealEditor-RenderCore.debug",
+        "Engine/Binaries/Linux/libUnrealEditor-RenderCore.sym"
+      ],
+      "build_exit_code": 0,
+      "dynamic_relocations_resolved": true,
+      "exported_symbols": {
+        "original": 2553,
+        "missing": [],
+        "added": []
+      },
+      "runtime_rules_restored": true,
+      "build_started_unix": 1792516002.8007421,
+      "build_log": "Saved/RenderRuns/root_cause_20261020_235808/stencil_binding_proposal/rendercore_build.log",
+      "status_note": "Built successfully; all original exports preserved and dependent symbols resolved. Final seven-fix twelve-worker controlled cold-cache runtime acceptance passed.",
+      "build_wall_seconds": 45.03
+    },
+    {
+      "name": "DerivedDataCache",
+      "build_status": "built_static_checks_passed",
+      "runtime_validation": "Passed final seven-fix twelve-worker controlled cold-cache run with complete outputs and clean exits; historical one/four/eight-worker passes used the six-fix build.",
+      "actual_build_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=DerivedDataCache",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=12"
+      ],
+      "planning_command_argv": [
+        "runuser",
+        "-u",
+        "ue",
+        "--",
+        "env",
+        "HOME=/opt/ue-home",
+        "DOTNET_CLI_HOME=/opt/ue-home",
+        "DOTNET_CLI_TELEMETRY_OPTOUT=1",
+        "/bin/bash",
+        "/opt/UE_5.6_render_fix/Engine/Build/BatchFiles/Linux/Build.sh",
+        "UnrealEditor",
+        "Linux",
+        "Development",
+        "-UsePrecompiled",
+        "-Module=DerivedDataCache",
+        "-NoHotReload",
+        "-NoUBTMakefiles",
+        "-NoUBA",
+        "-MaxParallelActions=12",
+        "-WriteOutdatedActions=/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/Saved/RenderRuns/root_cause_20261020_235808/nanite_cache_audit/ddc_build_actions.json"
+      ],
+      "action_scope": {
+        "scope_approved": true,
+        "action_count": 5,
+        "description": "1 shared Core PCH, 3 DerivedDataCache unity compiles, 1 DerivedDataCache link. All outputs in isolated clone.",
+        "actions_sha256": "548e7b49da2c79e9d3093f586e179286ada06189143313d854583c3862952e4f"
+      },
+      "outputs": {
+        "Engine/Binaries/Linux/libUnrealEditor-DerivedDataCache.so": {
+          "sha256": "ca09c43e3813e0e7e35d8006c0285adeae4d17b2740e4377df1435673697ffb2",
+          "bytes": 5698336
+        },
+        "Engine/Binaries/Linux/libUnrealEditor-DerivedDataCache.debug": {
+          "sha256": "25e6323f3544b9d98adb31db356bc11f88d983d3581bee827dad1e1ec2dce962",
+          "bytes": 8443400
+        },
+        "Engine/Binaries/Linux/libUnrealEditor-DerivedDataCache.sym": {
+          "sha256": "e8afc60759838cbb2973fe50682e46099ee37833d0d39278348a2ca97dc5f319",
+          "bytes": 3365072
+        }
+      },
+      "expected_output_files": [
+        "Engine/Binaries/Linux/libUnrealEditor-DerivedDataCache.so",
+        "Engine/Binaries/Linux/libUnrealEditor-DerivedDataCache.debug",
+        "Engine/Binaries/Linux/libUnrealEditor-DerivedDataCache.sym"
+      ],
+      "build_exit_code": 0,
+      "build_wall_seconds": 37.235,
+      "build_log": "Saved/RenderRuns/root_cause_20261020_235808/nanite_cache_audit/ddc_build.log",
+      "exported_symbols": {
+        "original": 6540,
+        "clone": 6540,
+        "missing": [],
+        "added": [],
+        "changed_symbol_types": {}
+      },
+      "dynamic_relocations_resolved": true,
+      "runtime_rules_restored": true,
+      "status_note": "Built successfully; all 6540 original exports retained with unchanged symbol types and no added exports, dynamic relocations resolved, prior four corrected modules preserved. Controlled twelve-worker cold-cache run captured generation mismatches, used content-addressed fallback and completed all outputs and exits successfully. Finite runtime acceptance is not an indefinite stability guarantee.",
+      "audit_ready_file": "Saved/RenderRuns/root_cause_20261020_235808/nanite_cache_audit/ddc_ready.json"
+    }
+  ],
+  "validation": {
+    "patch_applies_to_original_source": true,
+    "reverse_patch_applies_to_clone_source": true,
+    "dynamic_relocations_resolved": true,
+    "ldd_plugin_environment": {
+      "LD_LIBRARY_PATH": "/opt/UE_5.6_render_fix/Engine/Binaries/Linux"
+    },
+    "original_engine_hashes_verified": 34,
+    "original_exported_api_symbols_retained": true,
+    "gpu_runtime": "Final seven-fix twelve-worker cold-concurrent run passed: 12 jobs, 24 sequences, 48 MRQ steps, 1200 PNG/1200 EXR/24 FBX; every RGB/depth output decoded, all depths finite and nonzero, all twelve native UE and scheduler exits 0, ordinary VVL errors 0, post-run GPU probe passed and no new Xid. Live diagnostics captured requested-versus-record DDC generation mismatches and content-addressed fallback. Production concurrency is selected as 12 workers. Historical one/four/eight-worker passes used six fixes; the earlier cold twelve-worker CPU Nanite failure and warm single-worker success remain recorded separately.",
+    "audit_ready_file": "Saved/RenderRuns/root_cause_20261020_235808/engine_build/ready.json",
+    "patch_check_command_argv": [
+      "git",
+      "-C",
+      "/opt/UE_5.6",
+      "apply",
+      "--check",
+      "/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/scripts/engine_patches/ue5.6.1-vulkan-correctness.patch"
+    ],
+    "patch_check_exit_code": 0,
+    "reverse_patch_status": "Passed read-only seven-fix clone reverse check (exit 0). In-memory application of all combined patch hunks to the original ten complete source files also matches the current clone byte for byte.",
+    "dynamic_relocation_status": "All five modules passed; latest DerivedDataCache ddc_ready.json confirms the new module and preservation of all four prior corrected modules.",
+    "exported_api_status": "All original exports retained by all five modules; DerivedDataCache retains all 6540 exports with unchanged symbol types and no additions.",
+    "completed_module_audits": [
+      "Saved/RenderRuns/root_cause_20261020_235808/engine_build/ready.json",
+      "Saved/RenderRuns/root_cause_20261020_235808/scene_depth_shutdown_audit/renderer_ready.json",
+      "Saved/RenderRuns/root_cause_20261020_235808/stencil_binding_proposal/rendercore_ready.json",
+      "Saved/RenderRuns/root_cause_20261020_235808/event_shutdown_audit/eventfix_ready.json",
+      "Saved/RenderRuns/root_cause_20261020_235808/nanite_cache_audit/ddc_ready.json"
+    ],
+    "prior_five_fix_runtime": {
+      "directory": "Saved/RenderRuns/root_cause_20261020_235808/patched_validation_v2",
+      "render_validation": "Saved/RenderRuns/root_cause_20261020_235808/patched_validation_v2/render_validation.json",
+      "validation_errors": "Saved/RenderRuns/root_cause_20261020_235808/patched_validation_v2/validation_errors.json",
+      "ue_exit_code": 0,
+      "sequences": 2,
+      "png": 100,
+      "exr": 100,
+      "fbx": 2,
+      "remaining_error": "VUID-vkDestroyDevice-device-05137 for VkEvent, not SceneDepthZ image"
+    },
+    "single_worker_six_fix_runtime": {
+      "status": "passed",
+      "workers": 1,
+      "job_waves": 2,
+      "jobs": 2,
+      "sequences": 4,
+      "png": 200,
+      "exr": 200,
+      "fbx": 4,
+      "decoded_output_validation": true,
+      "native_ue_returncodes": [
+        0,
+        0
+      ],
+      "scheduler_returncode": 0,
+      "validation_layer": "ordinary Khronos VVL, no debugger",
+      "validation_errors": 0,
+      "gpu_probe_passed": true,
+      "new_xid_lines": [],
+      "reports": [
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_01/render_validation.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_01/validation_errors.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_01/post_stop_health.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_01/finished.json"
+      ],
+      "scope": "Bounded two-wave integration run; does not establish higher-concurrency or indefinite stability."
+    },
+    "capacity": {
+      "status": "passed",
+      "production_workers": 12,
+      "target": "Select production concurrency from measured VRAM and full job lifecycle acceptance.",
+      "passed_workers": [
+        1,
+        4,
+        8,
+        12
+      ],
+      "pending_workers": [],
+      "passed_worker_scope": "One/four/eight-worker runs used the historical six-fix build; twelve-worker controlled cold-cache run used the final seven-fix build.",
+      "failed_tiers": [
+        "tier_12 before seventh DDC fix"
+      ],
+      "engine_fix_count_by_workers": {
+        "1": 6,
+        "4": 6,
+        "8": 6,
+        "12": 7
+      },
+      "selection_reason": "Select twelve workers after complete cold-concurrent output and shutdown acceptance. Measured active VRAM median 73.364%, peak 86.719%; active GPU utilization median 97%.",
+      "selected_tier": "tier_12_ddc_fixed",
+      "selected_tier_measurements": {
+        "tier": "tier_12_ddc_fixed",
+        "workers": 12,
+        "jobs": 12,
+        "rgb_files": 1200,
+        "depth_files": 1200,
+        "fbx_files": 24,
+        "sequences": 24,
+        "all_outputs_decoded": true,
+        "validation_errors": 0,
+        "new_xid_lines": [],
+        "post_graphics_probe_pass": true,
+        "wall_seconds": 806.38,
+        "images_per_second_including_startup_with_validation": 2.9762640920085595,
+        "peak_memory_mib": 124677.0,
+        "peak_gpu_utilization_percent": 99.0,
+        "active_sample_filter": "all workers alive; GPU util >=50%; memory >=7000 MiB per worker",
+        "active_sample_count": 62,
+        "active_memory_mib_min_median_max": [
+          99660.0,
+          105476.0,
+          124677.0
+        ],
+        "report": "Saved/RenderRuns/root_cause_20261020_235808/capacity_validation_summary.json",
+        "resource_samples": "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12_ddc_fixed/resource_samples.jsonl",
+        "valid_gpu_samples": 78,
+        "memory_total_mib": 143771.0,
+        "peak_memory_percent": 86.719,
+        "active_median_memory_percent": 73.364,
+        "active_median_gpu_utilization_percent": 97.0,
+        "scope": "Finite validation with ordinary Vulkan validation enabled; active memory statistics use the stated filter and do not imply every startup/teardown sample remains above 70%. Timing is not a production throughput forecast."
+      }
+    },
+    "historical_xid_causality": "Concrete Vulkan lifetime/layout defects were reproduced and fixed. The later twelve-worker CPU Nanite/DDC generation-consistency failure is a distinct issue. Unique causation of all prior driver Xid failures has not been established; no guarantee against future faults.",
+    "reverse_patch_check_command_argv": [
+      "git",
+      "-C",
+      "/opt/UE_5.6_render_fix",
+      "apply",
+      "--reverse",
+      "--check",
+      "/mnt/nas_b/sjy/code/PCGBiomeForestPoplar/scripts/engine_patches/ue5.6.1-vulkan-correctness.patch"
+    ],
+    "reverse_patch_check_exit_code": 0,
+    "static_reverification": {
+      "verified_utc": "2026-10-20T18:02:43.333553+00:00",
+      "scope": "Read-only seven-fix combined-package and current-clone verification; no engine writes, builds, UE launches or GPU commands by this documentation operation.",
+      "patch_sha256_matches_manifest": true,
+      "component_patch_hashes_verified": 7,
+      "package_equals_component_concatenation": true,
+      "source_files": 10,
+      "modules": 5,
+      "original_hashes_verified": 34,
+      "patched_source_hashes_verified": 10,
+      "module_output_hashes_verified": 15,
+      "hash_mismatches": [],
+      "in_memory_patch_replay_matches_all_complete_clone_source_files": true,
+      "forward_patch_check_exit_code": 0,
+      "reverse_patch_check_exit_code": 0,
+      "restored_build_configuration_files_verified": 12,
+      "tracked_source_and_output_files_share_no_original_clone_inode": true,
+      "engine_and_plugin_modules_build_id": "43139311"
+    },
+    "four_worker_six_fix_runtime": {
+      "status": "passed",
+      "workers": 4,
+      "job_waves": 2,
+      "jobs": 8,
+      "sequences": 16,
+      "png": 800,
+      "exr": 800,
+      "fbx": 16,
+      "decoded_output_validation": true,
+      "all_depth_finite_and_nonzero": true,
+      "native_ue_returncodes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scheduler_returncode": 0,
+      "validation_layer": "ordinary Khronos VVL, no debugger",
+      "validation_errors": 0,
+      "gpu_probe_passed": true,
+      "new_xid_lines": [],
+      "reports": [
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_04/render_validation.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_04/run/result.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_04/validation_errors.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_04/post_stop_health.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_04/finished.json"
+      ],
+      "scope": "Bounded four-worker two-wave integration run, including worker replacement and full exits; does not establish eight/twelve-worker capacity or indefinite stability."
+    },
+    "eight_worker_six_fix_runtime": {
+      "status": "passed",
+      "engine_fix_count": 6,
+      "workers": 8,
+      "job_waves": 1,
+      "jobs": 8,
+      "sequences": 9,
+      "png": 450,
+      "exr": 450,
+      "fbx": 9,
+      "decoded_output_validation": true,
+      "all_depth_finite_and_nonzero": true,
+      "native_ue_returncodes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scheduler_returncode": 0,
+      "validation_errors": 0,
+      "gpu_probe_passed": true,
+      "new_xid_lines": [],
+      "reports": [
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_08/render_validation.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_08/run/result.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_08/validation_errors.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_08/post_stop_health.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_08/finished.json"
+      ],
+      "scope": "One finite wave of 8 jobs: first job retains 2 sequences and other jobs 1 each. Full exits passed. This does not cover twelve-worker cold-build generation consistency."
+    },
+    "warm_cache_single_worker_nanite_retest": {
+      "status": "passed",
+      "engine_fix_count": 6,
+      "workers": 1,
+      "job_waves": 1,
+      "jobs": 1,
+      "sequences": 2,
+      "png": 100,
+      "exr": 100,
+      "fbx": 2,
+      "decoded_output_validation": true,
+      "all_depth_finite_and_nonzero": true,
+      "native_ue_returncodes": [
+        0
+      ],
+      "scheduler_returncode": 0,
+      "validation_errors": 0,
+      "gpu_probe_passed": true,
+      "new_xid_lines": [],
+      "reports": [
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_single_009/render_validation.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_single_009/run/result.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_single_009/validation_errors.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_single_009/post_stop_health.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/nanite_single_009/finished.json"
+      ],
+      "scope": "Same scene_009_grass two-sequence job after the failed twelve-worker run populated the shared cache; no seventh fix yet. Warm-cache success alone does not prove cold-concurrent causation or repair."
+    },
+    "twelve_worker_six_fix_cold_cache_failure": {
+      "status": "failed",
+      "engine_fix_count": 6,
+      "workers": 12,
+      "planned_jobs": 12,
+      "planned_sequences": 24,
+      "scheduler_returncode": 130,
+      "image_files": 0,
+      "nanite_assertion_worker_returncodes": {
+        "scene_012_edge_Target_004_s000": 139,
+        "scene_009_edge_Target_004_s000": 139,
+        "scene_009_grass_Target_004_s000": 139,
+        "scene_012_grass_Target_004_s000": 139
+      },
+      "error_class": "CPU Nanite corrupt fixup header followed by ApplyFixups assertion, with preceding nondeterministic StaticMesh cache records.",
+      "vuid_lines": 0,
+      "recorded_assertion_log_lines": 12,
+      "gpu_probe_passed": true,
+      "new_xid_lines": [],
+      "remaining_workers": "Stopped by scheduler cancellation; see native result.json for all outcomes.",
+      "reports": [
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12/run/result.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12/validation_errors.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12/post_stop_health.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12/finished.json"
+      ],
+      "scope": "Distinct from the previously reproduced Vulkan lifetime/layout faults; does not demonstrate a driver device-loss failure."
+    },
+    "seven_fix_cold_cache_runtime": {
+      "status": "passed",
+      "engine_fix_count": 7,
+      "directory": "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12_ddc_fixed",
+      "workers": 12,
+      "jobs": 12,
+      "sequences": 24,
+      "mrq_steps": 48,
+      "expected_png": 1200,
+      "expected_exr": 1200,
+      "expected_fbx": 24,
+      "cold_cache_preparation": "Saved/RenderRuns/root_cause_20261020_235808/nanite_cache_audit/cold_cache_preparation.json",
+      "scope": "Completed controlled seven-fix twelve-worker cold-concurrent run: 12 jobs, 24 sequences and 48 MRQ steps with all expected outputs decoded and all twelve UE processes plus scheduler exiting0. Independent cache copy removed three record references to force concurrent builds, while preserving content-addressed payloads and the original cache. This is finite acceptance, not an indefinite stability guarantee.",
+      "live_generation_mismatch_evidence": {
+        "file": "Saved/RenderRuns/root_cause_20261020_235808/nanite_ddc_fix_proposal/runtime_generation_mismatch_evidence.json",
+        "sha256": "1e11c044edd08a41b76bd252b8d8cd6792c5ea7daf5493dc40c51e725e361995",
+        "unique_generation_mismatches": 5,
+        "distinct_static_mesh_keys": 3,
+        "full_runtime_acceptance": false,
+        "snapshot_scope": "Evidence captured while the run was in progress; its full_runtime_acceptance=false describes that snapshot. Completed acceptance is established by the final reports in this runtime record."
+      },
+      "png": 1200,
+      "exr": 1200,
+      "fbx": 24,
+      "decoded_output_validation": true,
+      "all_depth_finite_and_nonzero": true,
+      "native_ue_returncodes": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "scheduler_returncode": 0,
+      "validation_errors": 0,
+      "gpu_probe_passed": true,
+      "new_xid_lines": [],
+      "reports": [
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12_ddc_fixed/render_validation.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12_ddc_fixed/run/result.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12_ddc_fixed/validation_errors.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12_ddc_fixed/finished.json",
+        "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12_ddc_fixed/post_stop_health.json"
+      ],
+      "report_sha256": {
+        "render_validation.json": "9b9915e68463c9d1134bd1fcd6f14dfe586d5f0fccb591dff89e82900f65b126",
+        "run/result.json": "ed755d897eef920377cd0da40691f117ffaa13f5dda0bba71c472520bfc7e9e8",
+        "validation_errors.json": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+        "finished.json": "dd80439979d1e8c7b31cba2596a42f42c8c7092a660318aa059e3d9f9c8b7422",
+        "post_stop_health.json": "7c4b691037e62f0f96359876357c510efec8c19c12f7c8fa2e62bcdc2dd39e24"
+      },
+      "wall_seconds": 806.38,
+      "capacity_measurements": {
+        "tier": "tier_12_ddc_fixed",
+        "workers": 12,
+        "jobs": 12,
+        "rgb_files": 1200,
+        "depth_files": 1200,
+        "fbx_files": 24,
+        "sequences": 24,
+        "all_outputs_decoded": true,
+        "validation_errors": 0,
+        "new_xid_lines": [],
+        "post_graphics_probe_pass": true,
+        "wall_seconds": 806.38,
+        "images_per_second_including_startup_with_validation": 2.9762640920085595,
+        "peak_memory_mib": 124677.0,
+        "peak_gpu_utilization_percent": 99.0,
+        "active_sample_filter": "all workers alive; GPU util >=50%; memory >=7000 MiB per worker",
+        "active_sample_count": 62,
+        "active_memory_mib_min_median_max": [
+          99660.0,
+          105476.0,
+          124677.0
+        ],
+        "report": "Saved/RenderRuns/root_cause_20261020_235808/capacity_validation_summary.json",
+        "resource_samples": "Saved/RenderRuns/root_cause_20261020_235808/capacity_preparation/tier_12_ddc_fixed/resource_samples.jsonl",
+        "valid_gpu_samples": 78,
+        "memory_total_mib": 143771.0,
+        "peak_memory_percent": 86.719,
+        "active_median_memory_percent": 73.364,
+        "active_median_gpu_utilization_percent": 97.0,
+        "scope": "Finite validation with ordinary Vulkan validation enabled; active memory statistics use the stated filter and do not imply every startup/teardown sample remains above 70%. Timing is not a production throughput forecast."
+      }
+    }
+  },
+  "engine_files_frozen_after_ready": true,
+  "updated_utc": "2026-10-20T18:18:02.151032+00:00",
+  "patched_source_hash_method": "Applied the combined seven-component unified diff to original source text in memory; read-only verification confirms all ten resulting complete files and recorded hashes match the current isolated clone.",
+  "overall_status": "All seven fixes built and static checks passed for five isolated modules. Final twelve-worker controlled cold-cache run passed 48 MRQ steps, complete decoded outputs, clean exits, VUID 0 and post-run GPU health; 12 workers selected for production. Historical six-fix one/four/eight-worker passes and the earlier failed twelve-worker run remain documented. This record does not assert that formal production has started or prior formal outputs have been removed.",
+  "production": {
+    "status_at_launch": "running",
+    "workers": 12,
+    "mode": "fresh_full_dataset",
+    "controller_pid": 298133,
+    "native_train_pid": 298457,
+    "session_report": "Saved/RenderRuns/root_cause_20261020_235808/production_fresh_preparation/execution/session.json",
+    "deletion_report": "Saved/RenderRuns/root_cause_20261020_235808/formal_dataset_deletion.json",
+    "output_root": "/mnt/cpfs_b5/perception_data/sjy/forest_dataset",
+    "environment_correction_report": "Saved/RenderRuns/root_cause_20261020_235808/production_environment_correction/change.json",
+    "original_cache_retained": true,
+    "validation_layer": false,
+    "debugger": false,
+    "launch_unix": 1792520393.356601,
+    "runtime_progress_observation_pending": false,
+    "startup_acceptance_report": "Saved/RenderRuns/root_cause_20261020_235808/production_fresh_preparation/startup_acceptance.json",
+    "active_memory_percent_range": [
+      70.41058349736734,
+      70.43492776707403
+    ],
+    "latest_counts_at_observation": {
+      ".png": 211,
+      ".exr": 213,
+      ".fbx": 0
+    }
+  }
+}

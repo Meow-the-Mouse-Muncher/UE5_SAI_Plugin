@@ -8,3 +8,10 @@ scripts/forest_dataset/*.py text eol=lf
 scripts/forest_dataset/*.txt text eol=lf
 /PCGBiomeForestPoplar.uproject text eol=lf
 /Config/DefaultEngine.ini text eol=lf
+/Source/** text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+/pytest.ini text eol=lf
+/requirements-dev.txt text eol=lf
+# Preserve engine patch bytes, including whitespace in diff context lines.
+scripts/engine_patches/*.patch -text -whitespace

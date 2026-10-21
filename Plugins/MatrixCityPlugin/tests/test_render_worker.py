@@ -95,7 +95,8 @@ class WorkerSelectionTests(unittest.TestCase):
         cls = next(node for node in source.body if isinstance(node, ast.ClassDef) and node.name == "CustomMoviePipeline")
         method = next(node for node in cls.body if isinstance(node, ast.FunctionDef) and node.name == "start_batch_target_rendering")
         isolated_cls = ast.ClassDef(name="QueueUnderTest", bases=[], keywords=[], body=[method], decorator_list=[])
-        namespace = {"render_worker": worker, "unreal": types.SimpleNamespace(log=lambda *args: None)}
+        namespace = {"render_worker": worker, "unreal": types.SimpleNamespace(log=lambda *args: None),
+                     "render_cancellation": types.SimpleNamespace(is_requested=lambda: False)}
         tree = ast.fix_missing_locations(ast.Module(body=[isolated_cls], type_ignores=[]))
         exec(compile(tree, "actual_queue_builder", "exec"), namespace)
         queue = namespace["QueueUnderTest"]
