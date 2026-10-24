@@ -1,6 +1,6 @@
 # 相机位姿与内参 JSON 导出
 
-本流程读取已经生成的 FBX、RGB 和深度文件，向对应序列的 `pose/transforms.json` 写入相机元数据。它不会启动 UE，不会渲染图像，也不会生成或训练新数据。
+本流程只读取已经生成的 FBX，向对应序列的 `pose/transforms.json` 写入相机元数据。它不会启动 UE，不会渲染图像，也不会生成或训练新数据。
 
 目标服务器的项目与运行时：
 
@@ -51,7 +51,7 @@ cd /mnt/nas_b/sjy/code/PCGBiomeForestPoplar
     pose/transforms.json          # 与 GT 的 JSON 内容相同
 ```
 
-五种轨迹为 `fix_line`、`plane_grid`、`rot_arc`、`rot_spiral`、`rand_shell`。每个序列必须已有 25 张原生 512×512 RGB，且 GT、OCC 各有同编号的 25 张深度。缺帧、多帧、编号不一致、图像尺寸不符会拒绝导出，不会自动重排、截断或缩放图像。旧的单张 GT 深度不能满足此协议。
+五种轨迹为 `fix_line`、`plane_grid`、`rot_arc`、`rot_spiral`、`rand_shell`。导出不检查 RGB/深度图像：图像完整性由渲染调度器负责，不完整的序列会被整体删除并重新渲染，之后才导出相机 JSON。单独调用本脚本时，调用方需保证图像已完整。
 
 如需从其他位置读取 FBX，可显式添加 `--fbx-root /absolute/Exported_FBX`。该目录仍使用 `<trajectory>/<prefix>.fbx` 布局；相机 JSON 仍写入所选输出根目录的 GT/OCC 序列。
 

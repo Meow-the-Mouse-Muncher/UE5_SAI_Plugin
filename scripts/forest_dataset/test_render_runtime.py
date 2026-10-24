@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import os
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -20,7 +21,8 @@ class RuntimeTests(unittest.TestCase):
                 mock.patch.object(renderer, 'choose_gpus') as choose:
             with self.assertRaisesRegex(RuntimeError, 'runtime reached'):
                 renderer.main(arguments)
-            configure.assert_called_once_with({'run_as_user': 'ue'}, arguments)
+            configure.assert_called_once_with({'run_as_user': 'ue'}, arguments,
+                                              config_dir=config_path.parent)
             resolve.assert_called_once_with('deployment.json')
             choose.assert_not_called()
 
@@ -69,6 +71,49 @@ class RuntimeTests(unittest.TestCase):
                        {'unset_environment': 'DISPLAY'}, {'unset_environment': [1]}):
             with self.subTest(config=config), self.assertRaises(ValueError):
                 renderer.configure_runtime(config, [])
+
+    def test_external_runtime_routes_generated_files_and_temporary_data(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / 'project' / 'forest.uproject'
+            project.parent.mkdir()
+            project.write_text('{}')
+            trajectories = project.parent / 'Content/Sequences/_workers'
+            trajectories.mkdir(parents=True)
+            (trajectories / 'keep.uasset').write_bytes(b'trajectory')
+            runtime = root / 'external'
+            with mock.patch.dict(os.environ, {}, clear=True), \
+                    mock.patch.object(tempfile, 'tempdir', None), \
+                    mock.patch.object(sys, 'dont_write_bytecode', False):
+                renderer.configure_runtime({'ue_project': str(project), 'runtime_root': str(runtime)}, [])
+                for name in ('Saved', 'Intermediate', 'DerivedDataCache'):
+                    self.assertTrue((project.parent / name).is_symlink())
+                    self.assertEqual((project.parent / name).resolve(), runtime / name)
+                self.assertEqual(tempfile.gettempdir(), str(runtime / 'tmp'))
+                self.assertEqual(os.environ['TMPDIR'], str(runtime / 'tmp'))
+                self.assertEqual(os.environ['UE_LocalDataCachePath'], str(runtime / 'DerivedDataCache/Local'))
+                self.assertEqual(os.environ['XDG_CACHE_HOME'], str(runtime / 'cache'))
+                self.assertTrue(sys.dont_write_bytecode)
+            self.assertFalse(trajectories.is_symlink())
+            self.assertEqual((trajectories / 'keep.uasset').read_bytes(), b'trajectory')
+
+    def test_external_runtime_dry_run_does_not_move_or_create_directories(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            project = root / 'project' / 'forest.uproject'
+            saved = project.parent / 'Saved'
+            saved.mkdir(parents=True)
+            project.write_text('{}')
+            checkpoint = saved / 'plan.json'
+            checkpoint.write_text('{"checkpoint": true}')
+            runtime = root / 'external'
+            with mock.patch.dict(os.environ, {}, clear=True), \
+                    mock.patch.object(sys, 'dont_write_bytecode', False):
+                renderer.configure_runtime({'ue_project': str(project), 'runtime_root': str(runtime)},
+                                           ['--dry-run'])
+            self.assertFalse(runtime.exists())
+            self.assertFalse(saved.is_symlink())
+            self.assertEqual(checkpoint.read_text(), '{"checkpoint": true}')
 
 
 if __name__ == '__main__':

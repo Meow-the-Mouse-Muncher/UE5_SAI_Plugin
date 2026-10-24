@@ -92,65 +92,6 @@ def test_discovery_rejects_invalid_limits(tmp_path, limit):
         protocol.discover_jobs(tmp_path, limit=limit)
 
 
-@pytest.mark.parametrize("kind,suffix", [("rgb", "GT"), ("depth", "GT"), ("depth", "occ")])
-def test_rejects_missing_per_view_rgb_or_depth(tmp_path, kind, suffix):
-    job = make_pair(tmp_path)
-    extension = "png" if kind == "rgb" else "exr"
-    (Path(job[suffix + "_dir"]) / kind / f"0024.{extension}").unlink()
-    with pytest.raises(ValueError, match="exactly 25"):
-        protocol.discover_jobs(tmp_path)
-
-
-def test_rejects_extra_view_without_silently_truncating(tmp_path):
-    job = make_pair(tmp_path)
-    (Path(job["occ_dir"]) / "rgb/0025.png").write_bytes(png_header())
-    with pytest.raises(ValueError, match="exactly 25"):
-        protocol.validate_render_pair(job)
-
-
-def test_rejects_wrong_resolution_or_invalid_png_header(tmp_path):
-    job = make_pair(tmp_path)
-    path = Path(job["occ_dir"]) / "rgb/0017.png"
-    path.write_bytes(png_header(1024, 512))
-    with pytest.raises(ValueError, match="native 512x512"):
-        protocol.validate_render_pair(job)
-    path.write_bytes(b"invalid header")
-    with pytest.raises(ValueError, match="PNG header"):
-        protocol.validate_render_pair(job)
-
-
-@pytest.mark.parametrize("suffix", ["GT", "occ"])
-def test_rejects_depth_resolution_mismatch_even_when_rgb_is_512(tmp_path, suffix):
-    job = make_pair(tmp_path)
-    path = Path(job[suffix + "_dir"]) / "depth/0017.exr"
-    path.write_bytes(exr_header(1024, 512))
-    with pytest.raises(ValueError, match="Depth must be native 512x512"):
-        protocol.discover_jobs(tmp_path)
-    assert not (Path(job["GT_dir"]) / "pose").exists()
-
-
-@pytest.mark.parametrize("content,match", [
-    (b"invalid EXR header", "OpenEXR magic/version"),
-    (exr_header(include_data_window=False), "missing dataWindow"),
-    (exr_header(flags=0x1000), "Multipart OpenEXR"),
-    (exr_header(flags=0x800), "Deep OpenEXR"),
-    (exr_header(width=0), "dataWindow dimensions"),
-    (exr_header()[:-1], "OpenEXR header"),
-])
-def test_rejects_invalid_or_unsupported_exr_headers(tmp_path, content, match):
-    job = make_pair(tmp_path)
-    (Path(job["GT_dir"]) / "depth/0000.exr").write_bytes(content)
-    with pytest.raises(ValueError, match=match):
-        protocol.validate_render_pair(job)
-
-
-def test_exr_size_only_reads_header_and_ignores_pixel_chunks(tmp_path):
-    path = tmp_path / "depth.exr"
-    # Arbitrary trailing bytes cannot affect a dimensions-only header read.
-    path.write_bytes(exr_header() + b"not decoded pixel data" * 1000)
-    assert protocol._exr_size(path) == (512, 512)
-
-
 @pytest.mark.parametrize("prefix", ["../escape", "nested/prefix", "nested\\prefix", ".."])
 def test_rejects_unsafe_sequence_filters(tmp_path, prefix):
     make_pair(tmp_path)
@@ -162,7 +103,7 @@ def test_rejects_job_destination_override(tmp_path):
     job = make_pair(tmp_path)
     job["GT_dir"] = str(tmp_path.parent / "outside")
     with pytest.raises(ValueError, match="GT_dir disagrees"):
-        protocol.validate_render_pair(job)
+        protocol._job_paths(job)
 
 
 def test_rejects_symlink_escape_on_output(tmp_path):

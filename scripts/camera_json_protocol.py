@@ -5,7 +5,6 @@ import hashlib
 import json
 import os
 from pathlib import Path
-import struct
 import tempfile
 from collections.abc import Mapping, Sequence
 
@@ -13,7 +12,6 @@ import numpy as np
 
 SCHEMA_VERSION = "camera-json-v1-25views"
 TRAJECTORIES = ("fix_line", "plane_grid", "rot_arc", "rot_spiral", "rand_shell")
-FRAME_STEMS = tuple(f"{index:04d}" for index in range(25))
 
 
 def _name(value: str, label: str) -> str:
@@ -56,103 +54,6 @@ def _job_paths(job: Mapping) -> tuple[Path, Path, Path, Path]:
     return root, expected[0], expected[1], fbx
 
 
-def _png_size(path: Path) -> tuple[int, int]:
-    with path.open("rb") as stream:
-        header = stream.read(24)
-    if len(header) != 24 or header[:8] != b"\x89PNG\r\n\x1a\n" or header[12:16] != b"IHDR":
-        raise ValueError(f"Invalid PNG header: {path}")
-    if struct.unpack(">I", header[8:12])[0] != 13:
-        raise ValueError(f"Invalid PNG IHDR length: {path}")
-    return struct.unpack(">II", header[16:24])
-
-
-def _exr_size(path: Path) -> tuple[int, int]:
-    """Read a bounded, single-part OpenEXR header; never decode image pixels."""
-    header_limit = 1024 * 1024
-    file_size = path.stat().st_size
-    with path.open("rb") as stream:
-        def read_exact(length):
-            if length < 0 or stream.tell() + length > min(file_size, header_limit):
-                raise ValueError(f"Invalid or oversized OpenEXR header: {path}")
-            value = stream.read(length)
-            if len(value) != length:
-                raise ValueError(f"Truncated OpenEXR header: {path}")
-            return value
-
-        magic, version = struct.unpack("<II", read_exact(8))
-        if magic != 20000630 or version & 0xFF != 2:
-            raise ValueError(f"Invalid OpenEXR magic/version: {path}")
-        if version & 0x1000:
-            raise ValueError(f"Multipart OpenEXR depth is unsupported: {path}")
-        if version & 0x800:
-            raise ValueError(f"Deep OpenEXR depth is unsupported: {path}")
-        if version & ~(0xFF | 0x200 | 0x400):
-            raise ValueError(f"Unknown OpenEXR version flags: {path}")
-        max_name_length = 255 if version & 0x400 else 31
-
-        def c_string():
-            result = bytearray()
-            while True:
-                character = read_exact(1)
-                if character == b"\0":
-                    return bytes(result)
-                result.extend(character)
-                if len(result) > max_name_length:
-                    raise ValueError(f"Invalid OpenEXR attribute name/type: {path}")
-
-        dimensions = None
-        names = set()
-        while True:
-            name = c_string()
-            if not name:
-                break
-            if name in names:
-                raise ValueError(f"Duplicate OpenEXR header attribute: {path}")
-            names.add(name)
-            attribute_type = c_string()
-            if not attribute_type:
-                raise ValueError(f"Empty OpenEXR attribute type: {path}")
-            length = struct.unpack("<I", read_exact(4))[0]
-            if stream.tell() + length > min(file_size, header_limit):
-                raise ValueError(f"Invalid or oversized OpenEXR header attribute: {path}")
-            if name == b"dataWindow":
-                if attribute_type != b"box2i" or length != 16:
-                    raise ValueError(f"Invalid OpenEXR dataWindow: {path}")
-                minimum_x, minimum_y, maximum_x, maximum_y = struct.unpack("<iiii", read_exact(16))
-                width, height = maximum_x - minimum_x + 1, maximum_y - minimum_y + 1
-                if width <= 0 or height <= 0:
-                    raise ValueError(f"Invalid OpenEXR dataWindow dimensions: {path}")
-                dimensions = (width, height)
-            else:
-                stream.seek(length, os.SEEK_CUR)
-        if dimensions is None:
-            raise ValueError(f"OpenEXR header is missing dataWindow: {path}")
-        return dimensions
-
-
-def validate_render_pair(job: Mapping) -> None:
-    """Require exactly 25 native 512-square RGB and per-view GT/OCC depth files."""
-    root, gt, occ, _ = _job_paths(job)
-    expected = set(FRAME_STEMS)
-    for render_dir in (gt, occ):
-        for kind, extension in (("rgb", ".png"), ("depth", ".exr")):
-            directory = _under(root, *render_dir.relative_to(root).parts, kind)
-            if not directory.is_dir():
-                raise ValueError(f"Missing render directory: {directory}")
-            files = [path for path in directory.iterdir() if path.suffix.lower() == extension]
-            stems = {path.stem for path in files}
-            if len(files) != 25 or stems != expected:
-                raise ValueError(f"Expected exactly 25 {kind} frames 0000..0024 in {directory}")
-            for path in files:
-                _under(root, *path.relative_to(root).parts)
-                if not path.is_file() or path.stat().st_size == 0:
-                    raise ValueError(f"Missing or empty render file: {path}")
-                if kind == "rgb" and _png_size(path) != (512, 512):
-                    raise ValueError(f"RGB must be native 512x512: {path}")
-                if kind == "depth" and _exr_size(path) != (512, 512):
-                    raise ValueError(f"Depth must be native 512x512: {path}")
-
-
 def discover_jobs(output_root, fbx_root=None, trajectories=None, sequences=None, limit=None) -> list[dict]:
     """Discover the new <output>/Exported_FBX/<trajectory>/<prefix>.fbx layout."""
     root = Path(output_root).expanduser().resolve()
@@ -191,7 +92,7 @@ def discover_jobs(output_root, fbx_root=None, trajectories=None, sequences=None,
     if not jobs:
         raise ValueError("No FBX jobs match the requested trajectories/sequences")
     for job in jobs:
-        validate_render_pair(job)
+        _job_paths(job)
     return jobs
 
 
@@ -209,7 +110,7 @@ def load_jobs_manifest(path, output_root):
         if identity in seen:
             raise ValueError('Duplicate sequence in camera jobs manifest')
         seen.add(identity)
-        validate_render_pair(job)
+        _job_paths(job)
     return jobs
 
 
@@ -308,7 +209,6 @@ def _validate_payload(payload: Mapping) -> None:
 
 def build_payload(job: Mapping, poses: Sequence, intrinsics: Mapping, source_metadata: Mapping) -> dict:
     """Build JSON from already converted, rigid OpenCV c2w poses in render order."""
-    validate_render_pair(job)
     _, _, _, fbx = _job_paths(job)
     if len(poses) != 25:
         raise ValueError("Exactly 25 poses are required; do not deduplicate stationary frames")
@@ -347,7 +247,6 @@ def _atomic_bytes(path: Path, content: bytes) -> None:
 
 def write_pair(job: Mapping, payload: Mapping, overwrite=False) -> dict:
     """Preflight both destinations; write byte-identical JSON by atomic replacement."""
-    validate_render_pair(job)
     _validate_payload(payload)
     root, gt, occ, fbx = _job_paths(job)
     if payload["trajectory"] != job["trajectory"] or payload.get("sequence_prefix") != job["prefix"]:

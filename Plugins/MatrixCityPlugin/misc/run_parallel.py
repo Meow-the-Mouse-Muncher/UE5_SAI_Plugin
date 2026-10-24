@@ -2,6 +2,11 @@
 
 Existing --num_gpus, --gpu_ids and --processes_per_gpu flags remain accepted.
 """
+import sys
+
+if __name__ == '__main__':
+    sys.dont_write_bytecode = True
+
 from render_dataset import main
 
 

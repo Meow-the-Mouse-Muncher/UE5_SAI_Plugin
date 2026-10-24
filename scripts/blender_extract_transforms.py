@@ -2,13 +2,16 @@
 """Headless FBX camera export for the 25-view, native-512 data protocol.
 
 Normally launched by export_camera_json.py. This script only reads existing
-FBX/RGB/depth files and writes camera metadata; it never renders images.
+FBX files and writes camera metadata; it never renders or inspects images.
 """
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import sys
+
+if __name__ == '__main__':
+    sys.dont_write_bytecode = True
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))

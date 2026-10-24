@@ -16,6 +16,8 @@ import run_cmd_async
 COMPATIBILITY_FLAGS = {
     "-Multiprocess",
     "-NoAssetRegistryCacheWrite",
+    "-notracethreading",
+    "-traceautostart=0",
     "-ini:Engine:[ConsoleVariables]:AssetRegistry.DisableDirectoryWatcher=1",
     "-ini:EditorPerProjectUserSettings:[/Script/UnrealEd.EditorLoadingSavingSettings]:bMonitorContentDirectories=False",
     "-ini:Engine:[ConsoleVariables]:r.Vulkan.Submission.AllowTimelineSemaphores=0",

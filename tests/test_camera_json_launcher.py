@@ -126,23 +126,6 @@ def test_dry_run_validates_real_render_tree_without_blender_or_writes(tmp_path, 
     assert not (output / "metadata").exists()
 
 
-def test_dry_run_still_rejects_missing_per_view_annotations(tmp_path, monkeypatch):
-    output = make_render_root(tmp_path / "render")
-    (next((output / "plane_grid").glob("*_GT")) / "depth/0001.exr").unlink()
-    no_system_blender(monkeypatch, tmp_path)
-    with pytest.raises(ValueError, match="exactly 25"):
-        launcher.main(["--output-root", str(output), "--dry-run"])
-
-
-def test_dry_run_rejects_non512_depth_without_a_run_plan(tmp_path, monkeypatch):
-    output = make_render_root(tmp_path / "render")
-    (next((output / "plane_grid").glob("*_occ")) / "depth/0001.exr").write_bytes(exr_header(256, 512))
-    no_system_blender(monkeypatch, tmp_path)
-    with pytest.raises(ValueError, match="Depth must be native 512x512"):
-        launcher.main(["--output-root", str(output), "--dry-run"])
-    assert not (output / "metadata").exists()
-
-
 def test_launcher_uses_argv_not_shell_and_cleans_foreign_python_environment(tmp_path, monkeypatch):
     output = tmp_path / "render data"
     output.mkdir()

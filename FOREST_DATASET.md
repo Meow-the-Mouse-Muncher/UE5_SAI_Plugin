@@ -61,28 +61,54 @@ root运行时，原入口根据 `user.json` 自动切换为非root的 `ue` 用�
 
 ```bash
 python3 scripts/render_forest_dataset.py \
-  --run-dir Saved/RenderRuns/root_cause_20261020_235808/production_fresh_preparation/execution \
+  --run-dir /mnt/cpfs_b5/perception_data/sjy/forest_runtime/PCGBiomeForestPoplar/Saved/RenderRuns/root_cause_20261020_235808/production_fresh_preparation/execution \
   --resume
 ```
 
 同一命令加 `--dry-run` 只验证原计划、素材和GPU分配，不启动UE或Blender。新的全量任务使用新的 `--run-dir`，省略 `--resume`；已有输出须通过其原session恢复。
 
-便捷Bash入口默认续跑当前session、使用CPFS输出并按每卡70 GiB预算分配进程：
+便捷Bash入口默认续跑当前session、使用CPFS输出并按每卡100 GiB预算分配进程：
 
 ```bash
 bash scripts/render_forest_dataset.sh --dry-run  # 只校验计划
 bash scripts/render_forest_dataset.sh            # 开始/继续渲染
 ```
 
-脚本自动定位工程目录，可从任意工作目录通过绝对路径运行。`FOREST_RUN_DIR`、`FOREST_OUTPUT_ROOT`、`FOREST_CONFIG` 可覆盖运行状态、数据和机器配置路径；迁移H100时须保留原session及其train/test子目录，并提供本机有效的引擎配置。已有数据但缺少原checkpoint时会拒绝续跑。
+脚本自动定位工程目录，可从任意工作目录通过绝对路径运行。`FOREST_RUNTIME_ROOT` 默认是 `/mnt/cpfs_b5/perception_data/sjy/forest_runtime/PCGBiomeForestPoplar`，脚本将其传给 Python 启动器；`FOREST_RUN_DIR` 默认指向该根目录下的 `Saved/RenderRuns/root_cause_20261020_235808/production_fresh_preparation/execution`。`FOREST_RUN_DIR`、`FOREST_OUTPUT_ROOT`、`FOREST_CONFIG` 可分别覆盖运行状态、数据和机器配置路径。迁移H100时须保留原session及其train/test子目录，并提供本机有效的引擎配置。已有数据但缺少原checkpoint时会拒绝续跑。
 
-数据位于 `/mnt/cpfs_b5/perception_data/sjy/forest_dataset/{train,test}/`。当前日志和状态位于 `Saved/RenderRuns/root_cause_20261020_235808/production_fresh_preparation/execution/`：`train_launcher.log`、`test_launcher.log` 为各split总日志，`{train,test}/<job-id>/ue.log` 为UE日志，同目录还包含 `launcher.log` 和 `camera_export.log`。`session.json`、各split的 `progress.json` 记录进度；test尚未运行时不会有相应日志。
+数据位于 `/mnt/cpfs_b5/perception_data/sjy/forest_dataset/{train,test}/`。日志和状态位于运行盘根目录下的 `Saved/RenderRuns/root_cause_20261020_235808/production_fresh_preparation/execution/`：`train_launcher.log`、`test_launcher.log` 为各split总日志，`{train,test}/<job-id>/ue.log` 为UE日志，同目录还包含 `launcher.log` 和 `camera_export.log`。`session.json`、各split的 `progress.json` 记录进度；test尚未运行时不会有相应日志。
 
-默认 `--workers-per-gpu auto --vram-budget-gb 70` 按每个UE约9216 MiB估算；每卡总预算取70 GiB和物理容量90%的较小值，扣除已有显存占用，再按可用主存限制总并发。空闲大显存卡通常分配7个worker；同样的70 GiB预算适用于当前H20与后续H100，不因卡容量增加而自动拉高总预算。不同容量的卡可有不同worker数，共享任务队列让先空闲的worker继续领取任务。该预算是启动前估算，实际显存会随场景浮动，无法由这个参数强制锁定；可通过 `--worker-vram-mb`、`--vram-budget-gb`、`--vram-target` 调整。显式worker数超过估算预算时会拒绝启动。当前只有一张物理卡，多卡分配和GPU数量变化通过CPU调度测试验证。
+### 2026-10-23：运行写入目录迁至CPFS
 
-断点恢复复用原 `plan.json`、`render.yaml`、`trajectory.yaml`，允许更改GPU数量及并发，不允许改变seed、采样、地图或采集清单。完整图像和非空FBX齐全的序列保留；不完整的序列重新渲染，完整任务跳过。UE在每个worker批次结束后导出FBX，因此中断批次内只有图像、尚无FBX的序列也会重渲。任务级 `render_done.json` 标记渲染阶段，`done.json` 在相机JSON也完成验证后才写入。恢复统计包含此前成功的任务，失败和完成数分别记录。session、split输出目录均有进程锁，防止并发写入同一数据。
+工程仍位于NAS；以下三个工程目录通过符号链接写入运行盘。运行盘采用扁平布局，不再添加 `project/` 层级。
 
-每个任务完成图像与FBX后，自动调用 `scripts/export_camera_json.py`，通过精确序列清单导出，最多同时启动两个CPU Blender进程。OCC和GT各写入 `pose/transforms.json`，保持原25视角/512分辨率协议、OpenCV c2w和米单位平移。已有数据缺JSON时只补导出，不启动UE；JSON损坏、两份不一致或FBX哈希变化时重新导出。可用 `--blender /path/to/blender` 指定运行时。单split入口的 `--skip-camera-json` 仅用于不同分辨率、单帧或非OCC/GT的基准测试。
+| 工程入口 | 实体目录（位于 `FOREST_RUNTIME_ROOT` 下） | 内容 |
+|---|---|---|
+| `Saved/` | `Saved/` | 原session、检查点、日志和诊断文件 |
+| `Intermediate/` | `Intermediate/` | Python stub、着色器编译等可再生中间文件 |
+| `DerivedDataCache/` | `DerivedDataCache/` | 主DDC位于 `Local/`（`UE_LocalDataCachePath`），VT缓存位于 `VT/` |
+
+运行环境设置 `TMPDIR`、`TMP`、`TEMP` 为运行盘的 `tmp/`，设置 `XDG_CACHE_HOME` 为 `cache/`，并设置 `PYTHONDONTWRITEBYTECODE=1`。`UE_LocalDataCachePath` 最终指向 `${FOREST_RUNTIME_ROOT}/DerivedDataCache/Local`，VT缓存写入 `${FOREST_RUNTIME_ROOT}/DerivedDataCache/VT`。`Content/Sequences/_workers` 继续保留在工程中；迁移不删除生成轨迹、原session或正式渲染产物。`FOREST_OUTPUT_ROOT` 仍默认 `/mnt/cpfs_b5/perception_data/sjy/forest_dataset`，与运行盘分开。
+
+当前部署的 `misc/user.json` 将 `ue_command` 指向仓库的 `scripts/run_forest_editor.sh`。该包装器默认执行 `/opt/UE_5.6_render_fix/Engine/Binaries/Linux/UnrealEditor`，可用 `FOREST_EDITOR_BIN` 覆盖编辑器路径，并保留调用者设置的 `XDG_CACHE_HOME` 和DDC环境。旧 `/opt/ue56-install/run-editor-fixed` 保留且不修改；下文相关引用是历史部署记录。
+
+迁移前先确认旧调度器和UE进程已退出。已有非空目录需要显式迁移；以下命令先检查计划，再迁移并建立链接：
+
+```bash
+export FOREST_RUNTIME_ROOT=/mnt/cpfs_b5/perception_data/sjy/forest_runtime/PCGBiomeForestPoplar
+python3 Plugins/MatrixCityPlugin/misc/render_storage.py \
+  --project PCGBiomeForestPoplar.uproject --runtime-root "$FOREST_RUNTIME_ROOT" --dry-run
+python3 Plugins/MatrixCityPlugin/misc/render_storage.py \
+  --project PCGBiomeForestPoplar.uproject --runtime-root "$FOREST_RUNTIME_ROOT" --migrate
+```
+
+保留并迁移完整 `Saved/`，尤其是原执行目录的 `session.json`、`plan.json`、`progress.json` 和各job完成标记。不要另建空session代替原检查点，也不要删除 `Content/Sequences/_workers` 来腾空间。正常启动会验证这三个链接；设置了 `runtime_root` 的机器配置也可直接启用该布局。迁移完成后，仍通过上面的同一session和 `--resume` 续跑。本次迁移不自动重启渲染。
+
+默认 `--workers-per-gpu auto --vram-budget-gb 100` 按每个UE约9216 MiB估算；每卡总预算取100 GiB和物理容量90%的较小值，扣除已有显存占用，再按可用主存限制总并发。空闲且容量充足的卡通常分配11个worker；当前L20Z报告81559 MiB，受物理容量90%的限制，空闲时仍分配7个worker。不同容量的卡可有不同worker数，共享任务队列让先空闲的worker继续领取任务。该预算是启动前估算，实际显存会随场景浮动，无法由这个参数强制锁定；可通过 `--worker-vram-mb`、`--vram-budget-gb`、`--vram-target` 调整。显式worker数超过估算预算时会拒绝启动。多卡分配和GPU数量变化通过CPU调度测试验证。
+
+断点恢复复用原 `plan.json`、`render.yaml`、`trajectory.yaml`，允许更改GPU数量及并发，不允许改变seed、采样、地图或采集清单。完整图像和非空FBX齐全的序列保留；不完整的序列先删除其GT/OCC目录与FBX，再重新渲染，不做修补；完整任务跳过。UE在每个worker批次结束后导出FBX，因此中断批次内只有图像、尚无FBX的序列也会重渲。任务级 `render_done.json` 标记渲染阶段，`done.json` 在相机JSON也完成验证后才写入。恢复统计包含此前成功的任务，失败和完成数分别记录。session、split输出目录均有进程锁，防止并发写入同一数据。
+
+每个任务完成图像与FBX后，自动调用 `scripts/export_camera_json.py`，通过精确序列清单导出。Blender 并发数由 `--camera-export-workers` 控制，默认 `auto` 为 CPU 核数/2，不受 GPU 数量限制；只缺JSON的任务由独立CPU线程补导出，不占用GPU槽位。导出只读FBX，不检查图像。OCC和GT各写入 `pose/transforms.json`，保持原25视角/512分辨率协议、OpenCV c2w和米单位平移。已有数据缺JSON时只补导出，不启动UE；JSON损坏、两份不一致或FBX哈希变化时重新导出。可用 `--blender /path/to/blender` 指定运行时。单split入口的 `--skip-camera-json` 仅用于不同分辨率、单帧或非OCC/GT的基准测试。
 
 每个任务保存 `camera_jobs.json`、`camera_export.log` 和 `camera_export_report.json`。导出失败会使任务失败，但保留已完成的图像与FBX供下次恢复。停止统一入口时使用SIGINT/Ctrl+C，停止请求会传给当前原生调度器，并等待其协作清理。
 
@@ -90,7 +116,7 @@ bash scripts/render_forest_dataset.sh            # 开始/继续渲染
 
 ## Vulkan修复与重新采集
 
-本轮故障调查证据保存在 `Saved/RenderRuns/root_cause_20261020_235808/`。原 `/opt/UE_5.6` 保留；修复版为独立目录 `/opt/UE_5.6_render_fix`，正式启动包装器为 `/opt/ue56-install/run-editor-fixed`。UE仍为5.6.1、模块BuildId仍为43139311；分辨率、空间采样、轨迹和地图素材不因本次引擎修复而降级。
+本轮故障调查证据保存在 `Saved/RenderRuns/root_cause_20261020_235808/`。原 `/opt/UE_5.6` 保留；修复版为独立目录 `/opt/UE_5.6_render_fix`，当时的启动包装器为 `/opt/ue56-install/run-editor-fixed`。UE仍为5.6.1、模块BuildId仍为43139311；分辨率、空间采样、轨迹和地图素材不因本次引擎修复而降级。
 
 七项修复合并在 [ue5.6.1-vulkan-correctness.patch](scripts/engine_patches/ue5.6.1-vulkan-correctness.patch)，源码和产物哈希、构建步骤、验收边界见 [对应构建记录](scripts/engine_patches/ue5.6.1-vulkan-correctness.build.json)。补丁涉及10份源码、5个模块：
 
@@ -124,7 +150,7 @@ python3 Saved/RenderRuns/root_cause_20261020_235808/production_fresh_preparation
 
 新计划使用 `Config/Dataset/train_sequences.csv` 的17280条和 `test_sequences.csv` 的1920条，依次训练后测试，每个地图/目标拆3个shard，共1152和72个job。参数为512×512、空间采样8、时间采样1、seed42、OCC+GT、PNG+EXR和FBX；全量预计960000张PNG、960000张EXR和19200份FBX。正式运行不带Vulkan验证层或调试器。
 
-启动器不包含删除操作。执行前必须由外部明确完成正式 `train/`、`test/` 的清理并保留记录，`_diagnostics/` 不在清理范围；启动器会拒绝非空或经符号链接重定向的正式目录，并检查已有正式worker。锁和一次性执行目录防止重复启动，任一split非零退出立即停止，不自动重试；取消只向native scheduler发信号并至少留90秒清理，不向整组进程强制发信号。
+启动器不包含删除操作。执行前必须由外部明确完成正式 `train/`、`test/` 的清理并保留记录，`_diagnostics/` 不在清理范围；启动器会拒绝非空或经符号链接重定向的正式目录，并检查已有正式worker。锁和一次性执行目录防止重复启动，任一split非零退出立即停止，不自动重试；取消只向native scheduler发信号并至少留120秒清理，不向整组进程强制发信号。
 
 正式全量采集已按12并发启动，旧 `train/`、`test/` 已清空并重新创建，删除审计见调查目录的 `formal_dataset_deletion.json`。新任务的持久状态为 `production_fresh_preparation/execution/session.json`，训练调度日志为 `production_fresh_preparation/execution/train_launcher.log`；训练完成后自动进入测试集。实际输出根目录为 `/mnt/cpfs_b5/perception_data/sjy/forest_dataset/`。默认 `misc/user.json` 已切换修复引擎；Linux缓存变量改为 `UE_LocalDataCachePath=/opt/ue56-cache/ddc-render-fixed`，原缓存仍保留。
 

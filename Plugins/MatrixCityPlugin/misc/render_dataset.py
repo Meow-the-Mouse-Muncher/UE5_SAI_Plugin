@@ -1,11 +1,13 @@
 """Dynamically schedule disjoint scene/trajectory shards on selected physical GPUs."""
 import argparse
+import concurrent.futures
 from contextlib import ExitStack
 import hashlib
 import json
 import logging
 import os
 import queue
+import shutil
 import signal
 import socket
 import subprocess
@@ -15,15 +17,25 @@ import time
 import uuid
 from pathlib import Path
 
+if __name__ == '__main__':
+    sys.dont_write_bytecode = True
+
 import yaml
 
 from pipeline_config import (PLUGIN_ROOT, dump_json, load_render_config, partition_tasks,
                              resolve_map, resolve_path, trajectory_tasks)
 from render_resume import (camera_jobs, camera_pair_valid, compatible_resume, exclusive_lock,
-                           remaining_render_job, worker_allocation)
+                           remaining_render_job, resume_sequence_plans, worker_allocation)
+from run_cmd_async import EXIT_WORKER_UNREAPED, SUPERVISOR_STATUSES
 
 SCRIPT_DIR = PLUGIN_ROOT.parents[1] / 'scripts'
 sys.path.insert(0, str(SCRIPT_DIR))
+
+# Supervisor stop worst case: 45s MRQ cancellation, 15s after SIGTERM and 30s
+# for a SIGKILL that waits on an uninterruptible driver call, plus slack.
+WORKER_STOP_SECONDS = 100
+# export_camera_json.py runs each Blender exporter with --threads 2.
+BLENDER_THREADS = 2
 
 
 SYNC_PROFILES = {
@@ -35,7 +47,7 @@ SYNC_PROFILES = {
 }
 
 
-def configure_runtime(config, argv, *, entry_point=None):
+def configure_runtime(config, argv, *, entry_point=None, config_dir=None):
     """Select the configured Linux user before applying its runtime environment."""
     user = config.get("run_as_user")
     if user is not None:
@@ -64,6 +76,27 @@ def configure_runtime(config, argv, *, entry_point=None):
     for key in unset:
         os.environ.pop(key, None)
     os.environ.update(environment)
+    if config.get('runtime_root') or os.environ.get('FOREST_RUNTIME_ROOT'):
+        from render_storage import prepare_project_storage, resolve_runtime_root
+        project = resolve_path(config['ue_project'], config_dir)
+        runtime_root = resolve_runtime_root(project, config)
+        dry_run = '--dry-run' in argv
+        paths = prepare_project_storage(project, runtime_root, dry_run=dry_run)
+        os.environ.update({
+            'FOREST_RUNTIME_ROOT': str(runtime_root),
+            'TMPDIR': str(paths['tmp']),
+            'TMP': str(paths['tmp']),
+            'TEMP': str(paths['tmp']),
+            'XDG_CACHE_HOME': str(paths['cache']),
+            'UE_LocalDataCachePath': str(paths['DerivedDataCache'] / 'Local'),
+            'PYTHONDONTWRITEBYTECODE': '1',
+        })
+        sys.dont_write_bytecode = True
+        if not dry_run:
+            import tempfile
+            # tempfile caches its selected directory independently of os.environ.
+            tempfile.tempdir = str(paths['tmp'])
+            (paths['DerivedDataCache'] / 'Local').mkdir(parents=True, exist_ok=True)
 
 
 def choose_gpus(requested):
@@ -162,7 +195,7 @@ def _main(argv, resources):
     parser.add_argument("--workers-per-gpu", "--processes_per_gpu", default="auto", help="auto budgets VRAM and RAM; or an explicit positive integer")
     parser.add_argument("--worker-vram-mb", type=int, default=9216, help="Estimated peak MiB per UE worker for automatic allocation")
     parser.add_argument("--vram-target", type=float, default=0.9, help="Maximum fraction of physical VRAM to budget")
-    parser.add_argument("--vram-budget-gb", type=float, default=70, help="Per-card total VRAM budget in GiB; allocation estimate, not a driver-enforced limit")
+    parser.add_argument("--vram-budget-gb", type=float, default=100, help="Per-card total VRAM budget in GiB; allocation estimate, not a driver-enforced limit")
     parser.add_argument("--num_gpus", "--num-gpus", type=int, default=None, help="Limit the number of selected GPUs")
     parser.add_argument("--maps", "-m", nargs="+")
     parser.add_argument("--split", choices=("train", "test", "all"), default="train")
@@ -181,8 +214,21 @@ def _main(argv, resources):
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--skip-camera-json", action="store_true", help="Disable automatic 25-view camera metadata (e.g. nonstandard benchmarks)")
     parser.add_argument("--blender", help="Blender executable for automatic camera export")
-    parser.add_argument("--camera-export-workers", type=int, default=2, help="Maximum concurrent CPU camera exporters")
+    parser.add_argument("--camera-export-workers", default="auto",
+                        help="Maximum concurrent Blender camera exporters; auto = CPU cores / {}".format(BLENDER_THREADS))
     parser.add_argument("--keep-going", action="store_true")
+    parser.add_argument("--max-retries", type=int, default=2,
+                        help="Requeue a failed job this many times; 0 disables retries")
+    parser.add_argument("--max-failures", type=int, default=None,
+                        help="Abort after this many jobs exhaust retries (default: 1%% of jobs, at least 3)")
+    parser.add_argument("--launch-stagger", type=float, default=0.25,
+                        help="Seconds between consecutive worker launches; spreads Vulkan startup load")
+    parser.add_argument("--min-free-gb", type=float, default=20,
+                        help="Stop launching new jobs when the run or output filesystem has less free space")
+    parser.add_argument("--probe-timeout", type=float, default=30,
+                        help="Seconds for the one-per-run Vulkan adapter probe")
+    parser.add_argument("--probe-attempts", type=int, default=3,
+                        help="Vulkan adapter probe attempts before the run fails")
     parser.add_argument("--base_port", type=int, default=None, help="Legacy per-worker port base")
     args = parser.parse_args(argv)
     if args.workers_per_gpu != 'auto':
@@ -191,8 +237,14 @@ def _main(argv, resources):
                 raise ValueError()
         except ValueError:
             parser.error('--workers-per-gpu must be auto or a positive integer')
-    if (args.shards_per_scene is not None and args.shards_per_scene < 1) or args.camera_export_workers < 1:
+    if args.shards_per_scene is not None and args.shards_per_scene < 1:
         parser.error("Worker and shard counts must be positive")
+    if args.camera_export_workers != 'auto':
+        try:
+            if int(args.camera_export_workers) < 1:
+                raise ValueError()
+        except ValueError:
+            parser.error('--camera-export-workers must be auto or a positive integer')
     if (args.worker_vram_mb < 1 or not 0 < args.vram_target <= 1 or not 0 < args.vram_budget_gb < float('inf')
             or (args.num_gpus is not None and args.num_gpus < 1)):
         parser.error('Invalid GPU allocation budget or GPU count')
@@ -200,10 +252,16 @@ def _main(argv, resources):
         parser.error("--task-limit must be positive")
     if args.timeout < 0 or args.seed < 0:
         parser.error("--timeout and --seed must be nonnegative")
+    if args.max_retries < 0 or (args.max_failures is not None and args.max_failures < 1):
+        parser.error("--max-retries and --max-failures must be nonnegative")
+    if args.min_free_gb < 0:
+        parser.error("--min-free-gb must be nonnegative")
+    if args.probe_timeout <= 0 or args.probe_attempts < 1 or args.launch_stagger < 0:
+        parser.error("Probe timeout/attempts and launch stagger must be positive")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     config_path = resolve_path(args.config)
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    configure_runtime(config, argv)
+    configure_runtime(config, argv, config_dir=config_path.parent)
     old_plan = None
     if args.resume:
         if not args.run_dir:
@@ -227,9 +285,6 @@ def _main(argv, resources):
         defaults['split'] = next(iter(splits)) if len(splits) == 1 else 'all'
         defaults['maps'] = sorted({j['map_package_path'] for j in old_plan['jobs']})
         defaults['targets'] = sorted({t for j in old_plan['jobs'] for t in j.get('target_names') or []}) or None
-        plan_files = (old_plan.get('dataset') or {}).get('plan_files', {})
-        if len(plan_files) == 1:
-            defaults['sequence_plan'] = next(iter(plan_files))
         for key, value in defaults.items():
             aliases = {'maps': {'-m'}, 'trajectory_config': set()}.get(key, set())
             if '--' + key.replace('_', '-') not in supplied and not aliases.intersection(supplied):
@@ -273,8 +328,14 @@ def _main(argv, resources):
         import dataset_plan
         manifest, dataset_identity = dataset_plan.installed_manifest(project)
         splits = ('train', 'test') if args.split == 'all' else (args.split,)
-        plan_paths = ([resolve_path(args.sequence_plan)] if args.sequence_plan else
-                      [project.parent / ('Config/Dataset/' + s + '_sequences.csv') for s in splits])
+        if args.sequence_plan:
+            plan_paths = [resolve_path(args.sequence_plan)]
+        elif old_plan is not None:
+            plan_paths = resume_sequence_plans(old_plan, project)
+        else:
+            plan_paths = []
+        if not plan_paths:
+            plan_paths = [project.parent / ('Config/Dataset/' + s + '_sequences.csv') for s in splits]
         jobs, summary, selected_rows = dataset_plan.jobs_from_csv(plan_paths, manifest, maps, args.targets,
             shard_count, args.task_limit, trajectory_tasks(trajectory))
         dataset_identity.update(summary)
@@ -298,9 +359,8 @@ def _main(argv, resources):
         if not compatible_resume(old_plan, plan, args.seed, args.sync_profile):
             raise ValueError('Resume plan/configuration differs from the original image recipe')
         fingerprint = plan['fingerprint'] = old_plan['fingerprint']
-        # Keep the exact legacy recipe behind its fingerprint. Mount aliases
-        # may normalize differently today; rewriting its paths would make the
-        # next restart unable to verify the same immutable fingerprint.
+        # Keep the exact legacy recipe behind its fingerprint. Deployment paths
+        # may differ today; rewriting them would invalidate the next restart.
         for key in ('jobs', 'render_config', 'trajectory_config', 'dataset'):
             plan[key] = old_plan.get(key)
     camera_enabled = not args.skip_camera_json
@@ -333,37 +393,59 @@ def _main(argv, resources):
     (run_dir / "trajectory.yaml").write_text(yaml.safe_dump(trajectory, sort_keys=False), encoding="utf-8")
     (run_dir / "render.yaml").write_text(yaml.safe_dump(render, sort_keys=False), encoding="utf-8")
     pending = queue.Queue()
+    # Jobs whose images are complete and only lack camera JSON. They need no
+    # GPU, so dedicated CPU threads drain them in parallel with rendering.
+    camera_pending = queue.Queue()
     results = []
     resumed = []
-    for job in jobs:
+    def resumable(job):
+        """Classify a job as ('done', marker), ('camera', None) or ('render', None)."""
+        if not args.resume:
+            return 'render', None
         marker = run_dir / job["id"] / "done.json"
-        if args.resume and marker.is_file():
+        valid_frames = True
+        if final_dataset:
             try:
-                old = json.loads(marker.read_text())
-                if not isinstance(old, dict):
-                    old = {}
+                valid_frames = not remaining_render_job(output_root, job, render)['trajectory_tasks']
             except (OSError, ValueError):
+                valid_frames = False
+        if not valid_frames:
+            return 'render', None
+        valid_camera = not camera_enabled or all(camera_pair_valid(c) for c in camera_jobs(output_root, job))
+        if not valid_camera:
+            return ('camera', None) if final_dataset else ('render', None)
+        if not marker.is_file():
+            return 'render', None
+        try:
+            old = json.loads(marker.read_text())
+            if not isinstance(old, dict):
                 old = {}
-            current = output_inventory(output_root, job)
-            valid_frames = True
-            if final_dataset:
-                try:
-                    dataset_plan.check_output(output_root, job, render)
-                    valid_frames = not remaining_render_job(output_root, job, render)['trajectory_tasks']
-                except (OSError, ValueError):
-                    valid_frames = False
-            valid_camera = not camera_enabled or all(camera_pair_valid(c) for c in camera_jobs(output_root, job))
-            if valid_frames and valid_camera and old.get("fingerprint") == fingerprint and current == old.get("output"):
+        except (OSError, ValueError):
+            old = {}
+        if old.get("fingerprint") == fingerprint and output_inventory(output_root, job) == old.get("output"):
+            return 'done', old
+        return 'render', None
+
+    # Validation is per-job file-system latency (about 5s per job on CPFS);
+    # done serially it kept every GPU idle for minutes at each restart.
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as validators:
+        for job, (state, old) in zip(jobs, validators.map(resumable, jobs)):
+            if state == 'render':
+                pending.put(job)
+            elif state == 'camera':
+                camera_pending.put(job)
+            else:
                 logging.info("RESUME_SKIP %s", job["id"])
                 results.append(old)
                 resumed.append(job['id'])
-                continue
-        pending.put(job)
     dump_json(run_dir / 'progress.json', {'completed': len(resumed), 'planned': len(jobs),
                                          'resumed': len(resumed), 'failed': 0, 'results': results})
-    logging.info('SCHEDULE GPUs=%s workers=%s resumed=%s pending=%s camera_json=%s',
-                 [g['index'] for g in gpus], counts, len(resumed), pending.qsize(), camera_enabled)
-    camera_slots = threading.Semaphore(args.camera_export_workers)
+    camera_workers = (max(1, (os.cpu_count() or 2) // BLENDER_THREADS)
+                      if args.camera_export_workers == 'auto' else int(args.camera_export_workers))
+    logging.info('SCHEDULE GPUs=%s workers=%s resumed=%s pending=%s camera_only=%s camera_json=%s camera_workers=%s',
+                 [g['index'] for g in gpus], counts, len(resumed), pending.qsize(), camera_pending.qsize(),
+                 camera_enabled, camera_workers if camera_enabled else 0)
+    camera_slots = threading.Semaphore(camera_workers)
     lock = threading.Lock()
     allocated_ports = set()
     failed = threading.Event()
@@ -389,25 +471,155 @@ def _main(argv, resources):
             except ProcessLookupError:
                 pass
 
+    # One Vulkan probe per run, shared by every worker. A launch storm of
+    # per-worker probes can exceed the probe timeout and used to abort the
+    # entire dataset; camera-only jobs never need this at all.
+    device_map_lock = threading.Lock()
+    device_map = {"ready": threading.Event(), "value": None, "error": None}
+    device_map_path = run_dir / "device_bindings.json"
+
+    def ensure_device_map():
+        """Probe every scheduled GPU once; return the manifest or None.
+
+        A probe failure must not abort the dataset: workers still fall back to
+        a local probe (with retries) and only the affected job pays for it.
+        """
+        with device_map_lock:
+            if device_map["ready"].is_set():
+                return device_map["value"]
+            try:
+                from gpu_devices import build_device_map
+                manifest = build_device_map(gpus, timeout=args.probe_timeout,
+                                            attempts=args.probe_attempts)
+                # Always rewrite: a restarted or resumed scheduler must not
+                # inherit adapter indices from an earlier node or driver.
+                dump_json(device_map_path, manifest)
+                logging.info("DEVICE_MAP %s", json.dumps({"host": manifest["host"],
+                             "gpus": manifest["gpus"], "timings": manifest["probe"]["timings"]},
+                             sort_keys=True))
+                device_map["value"] = manifest
+            except Exception as error:
+                logging.exception("DEVICE_MAP_FAILED %s; workers will probe individually",
+                                  error.__class__.__name__)
+            finally:
+                device_map["ready"].set()
+            return device_map["value"]
+
+    attempts = {}
+    permanent_failures = []
+    failure_budget = (args.max_failures if args.max_failures is not None
+                      else max(3, -(-len(jobs) // 100)))
+
     def fail_run():
         failed.set()
         if not args.keep_going:
             cancel_active_workers()
 
-    def worker(slot, gpu):
-        while not stop_requested.is_set() and not cancelled.is_set() and not (failed.is_set() and not args.keep_going):
+    def retry(job, attempt, reason, target=None):
+        """Requeue a failed job until its attempt budget is exhausted.
+
+        Exhausting one job's retries is not a run-level event: it is counted
+        against the failure budget, and only crossing that budget stops the
+        run. Stopping on the first exhaustion would make ``--max-failures``
+        meaningless and turn one bad map into a cancelled dataset.
+        """
+        if attempt + 1 > args.max_retries:
+            permanent_failures.append(job["id"])
+            logging.error("RETRY_EXHAUSTED %s attempts=%s reason=%s", job["id"], attempt + 1, reason)
+            if len(permanent_failures) >= failure_budget:
+                logging.error("FAILURE_BUDGET %s jobs failed; stopping the run",
+                              len(permanent_failures))
+                fail_run()
+            return False
+        logging.warning("RETRY %s attempt=%s/%s reason=%s", job["id"], attempt + 1,
+                        args.max_retries + 1, reason)
+        (pending if target is None else target).put(job)
+        return True
+
+    launch_lock = threading.Lock()
+    next_launch = [time.monotonic()]
+
+    def pace_launch():
+        """Space consecutive UE launches by ``--launch-stagger``.
+
+        Pacing happens at launch time, after the shared device probe: a slow
+        or failed probe must not release every waiting worker at once.
+        """
+        with launch_lock:
+            now = time.monotonic()
+            at = max(now, next_launch[0])
+            next_launch[0] = at + args.launch_stagger
+        # Wake on cancellation too: a failed run must not keep queued
+        # launchers sleeping through the scheduler's stop deadline.
+        while time.monotonic() < at and not scheduling_stopped():
+            stop_requested.wait(min(0.2, at - time.monotonic()))
+
+    def scheduling_stopped():
+        return (stop_requested.is_set() or cancelled.is_set()
+                or (failed.is_set() and not args.keep_going))
+
+    disk_low = threading.Event()
+
+    def enough_disk():
+        """Drain instead of failing mid-job when run logs or outputs run out of space.
+
+        A full filesystem fails marker/progress writes and cancels every
+        active render; stopping new launches lets running workers finish.
+        """
+        for path in (run_dir, output_root):
             try:
-                job = pending.get_nowait()
+                free = shutil.disk_usage(path).free
+            except OSError as error:
+                logging.warning("DISK_CHECK_FAILED %s: %s", path, error)
+                continue
+            if free < args.min_free_gb * 1024 ** 3:
+                if not disk_low.is_set():
+                    disk_low.set()
+                    logging.error("DISK_LOW %s has %.1f GiB free (< %s GiB); no new jobs will start",
+                                  path, free / 1024 ** 3, args.min_free_gb)
+                return False
+        return True
+
+    retired_slots = []
+    rendered_tasks = {}
+
+    def worker(slot, gpu):
+        """Render on ``gpu``; with ``gpu=None`` only export camera JSON for finished renders."""
+        source = pending if gpu is not None else camera_pending
+        gpu_label = gpu["index"] if gpu is not None else 'cpu'
+        while not scheduling_stopped():
+            if disk_low.is_set() or not enough_disk():
+                return
+            try:
+                job = source.get_nowait()
             except queue.Empty:
                 return
+            attempt = attempts.get(job["id"], 0)
             job_dir = run_dir / job["id"]
             proc = None
             proc_kind = 'render'
+            requeued = False
+            retire_slot = False
+            launched_tasks = 0
+            reason = None
             start = time.monotonic()
             try:
                 job_dir.mkdir(exist_ok=True)
+                # A retry only re-renders sequences the failed attempt left incomplete.
                 render_job = (remaining_render_job(output_root, job, render)
-                              if args.resume and final_dataset else job)
+                              if (args.resume or attempt or gpu is None) and final_dataset else job)
+                if gpu is None and render_job['trajectory_tasks']:
+                    # Images went missing after classification; a GPU slot owns it now.
+                    logging.warning("CAMERA_ONLY_NEEDS_RENDER %s; moved to the render queue", job["id"])
+                    pending.put(job)
+                    continue
+                if render_job['trajectory_tasks'] and render_job is not job:
+                    # Incomplete sequences are not inspected or repaired:
+                    # delete their images, pose JSON and FBX, then render anew.
+                    for sequence in camera_jobs(output_root, render_job):
+                        for directory in (sequence['GT_dir'], sequence['occ_dir']):
+                            shutil.rmtree(directory, ignore_errors=True)
+                        Path(sequence['fbx_path']).unlink(missing_ok=True)
                 (job_dir / 'done.json').unlink(missing_ok=True)
                 options = {"map_package_path": job["map_package_path"],
                        "trajectory_tasks": render_job["trajectory_tasks"],
@@ -422,21 +634,31 @@ def _main(argv, resources):
                 if 'occlusion_actor_names' in job:
                     options['occlusion_actor_names'] = job['occlusion_actor_names']
                 dump_json(job_dir / "worker.json", options)
-                port = args.base_port + slot if args.base_port is not None else allocate_port(allocated_ports, lock)
-                command = [sys.executable, str(PLUGIN_ROOT / "misc/run_cmd_async.py"),
-                       "--config_file", str(run_dir / "launch.json"), "--gpu_id", str(gpu["index"]),
-                       "--port", str(port), "--ue-map", job["map_package_path"],
-                       "--render-config", str(run_dir / "render.yaml"),
-                       "--worker-config", str(job_dir / "worker.json"), "--headless",
-                       "--log-file", str(job_dir / "ue.log"), "--timeout", str(args.timeout)]
                 returncode = 0
-                logging.info("START %s gpu=%s slot=%s tasks=%s reused_tasks=%s", job["id"], gpu["index"], slot,
-                             len(render_job['trajectory_tasks']), len(job['trajectory_tasks']) - len(render_job['trajectory_tasks']))
+                teardown_incomplete = False
+                logging.info("START %s gpu=%s slot=%s tasks=%s reused_tasks=%s attempt=%s",
+                             job["id"], gpu_label, slot, len(render_job['trajectory_tasks']),
+                             len(job['trajectory_tasks']) - len(render_job['trajectory_tasks']), attempt + 1)
                 if render_job['trajectory_tasks']:
+                    port = args.base_port + slot if args.base_port is not None else allocate_port(allocated_ports, lock)
+                    command = [sys.executable, str(PLUGIN_ROOT / "misc/run_cmd_async.py"),
+                           "--config_file", str(run_dir / "launch.json"), "--gpu_id", str(gpu["index"]),
+                           "--gpu-uuid", str(gpu["uuid"]),
+                           "--port", str(port), "--ue-map", job["map_package_path"],
+                           "--render-config", str(run_dir / "render.yaml"),
+                           "--worker-config", str(job_dir / "worker.json"), "--headless",
+                           "--log-file", str(job_dir / "ue.log"), "--timeout", str(args.timeout),
+                           "--probe-timeout", str(args.probe_timeout),
+                           "--probe-attempts", str(args.probe_attempts),
+                           "--probe-lock", str(run_dir / "vulkan_probe.lock")]
+                    if ensure_device_map() is not None:
+                        command += ["--device-map", str(device_map_path)]
+                    pace_launch()
                     with (job_dir / "launcher.log").open("ab") as log:
                         if stop_requested.is_set() or cancelled.is_set():
                             raise InterruptedError("Scheduler stop requested before worker launch")
                         proc = subprocess.Popen(command, cwd=str(PLUGIN_ROOT), stdout=log, stderr=log)
+                        launched_tasks = len(render_job['trajectory_tasks'])
                         with lock:
                             active[slot] = (proc, 'render')
                             if cancelled.is_set():
@@ -447,8 +669,24 @@ def _main(argv, resources):
                         returncode = proc.wait()
                         with lock:
                             active.pop(slot, None)
+                        if returncode == EXIT_WORKER_UNREAPED:
+                            # The killed UE still holds GPU memory and driver
+                            # state; launching another one here would stack on it.
+                            retire_slot = True
+                            with lock:
+                                retired_slots.append({"slot": slot, "gpu": gpu_label, "job": job["id"]})
+                            logging.error("SLOT_RETIRED slot=%s gpu=%s job=%s: UE not reaped after SIGKILL",
+                                          slot, gpu_label, job["id"])
+                        if returncode in SUPERVISOR_STATUSES and final_dataset:
+                            # The rc=0 checks below validate the outputs; a
+                            # retry would find nothing left to render. An
+                            # incomplete job fails them and is retried.
+                            logging.warning("RENDER_TEARDOWN_INCOMPLETE %s rc=%s: validating outputs",
+                                            job["id"], returncode)
+                            teardown_incomplete = True
+                            returncode = 0
                         if returncode:
-                            fail_run()
+                            reason = "render rc={}".format(returncode)
                 if returncode == 0 and final_dataset:
                     dataset_plan.check_output(output_root, job, render)
                     if remaining_render_job(output_root, job, render)['trajectory_tasks']:
@@ -494,22 +732,21 @@ def _main(argv, resources):
                     if returncode == 0:
                         raise InterruptedError("Scheduler stop requested before worker launch")
                 inventory = output_inventory(output_root, job)
-                result = {"id": job["id"], "gpu": gpu["index"], "returncode": returncode,
+                result = {"id": job["id"], "gpu": gpu_label, "returncode": returncode,
                       "wall_seconds": round(time.monotonic() - start, 3), "output": inventory,
-                      "fingerprint": fingerprint, 'camera_json': camera_enabled,
-                      'rendered_tasks': len(render_job['trajectory_tasks']),
-                      'rendered_image_files': (inventory['image_files'] * len(render_job['trajectory_tasks'])
-                                               // len(job['trajectory_tasks']))}
+                      "fingerprint": fingerprint, 'camera_json': camera_enabled}
+                if teardown_incomplete:
+                    result['teardown_incomplete'] = True
                 if returncode == 0 and not inventory["image_files"]:
                     result["returncode"] = returncode = 1
-                    result["error"] = "Worker returned success without images"
+                    result["error"] = reason = "Worker returned success without images"
             except Exception as error:
-                fail_run()
                 logging.exception("Worker task failed: %s", job["id"])
-                result = {"id": job["id"], "gpu": gpu["index"], "returncode": 1,
+                result = {"id": job["id"], "gpu": gpu_label, "returncode": 1,
                           "wall_seconds": round(time.monotonic() - start, 3), "error": str(error),
                           "output": {"image_files": 0, "bytes": 0, "frame_views": 0, "directories": []}}
                 returncode = 1
+                reason = "{}: {}".format(error.__class__.__name__, error)
             finally:
                 with lock:
                     active.pop(slot, None)
@@ -519,18 +756,51 @@ def _main(argv, resources):
                     elif not cancelled.is_set():
                         proc.send_signal(signal.SIGINT)
                     try:
-                        # Supervisor gives MRQ 45s to stop, then up to 15s for
-                        # its forced fallback. Let that owned cleanup finish.
-                        proc.wait(timeout=70)
+                        # Let the supervisor's bounded owned cleanup finish.
+                        proc.wait(timeout=WORKER_STOP_SECONDS)
                     except subprocess.TimeoutExpired:
                         if proc_kind == 'camera':
                             os.killpg(proc.pid, signal.SIGKILL)
                         else:
                             proc.kill()
                         proc.wait()
-                pending.task_done()
-            if returncode:
-                fail_run()
+                source.task_done()
+            # Throughput counts every attempt's newly valid sequences: a retry
+            # that only backfills camera JSON must not erase earlier renders.
+            if launched_tasks:
+                completed_tasks = launched_tasks if returncode == 0 else 0
+                if returncode and final_dataset:
+                    try:
+                        completed_tasks = launched_tasks - len(
+                            remaining_render_job(output_root, job, render)['trajectory_tasks'])
+                    except Exception:
+                        logging.exception("Could not count completed sequences: %s", job["id"])
+                with lock:
+                    rendered_tasks[job["id"]] = rendered_tasks.get(job["id"], 0) + max(0, completed_tasks)
+            result['rendered_tasks'] = rendered_tasks.get(job["id"], 0)
+            result['rendered_image_files'] = (result['output']['image_files'] * result['rendered_tasks']
+                                              // len(job['trajectory_tasks']))
+            # A failure during a scheduler stop is a cancellation, not evidence
+            # against the job: record it, but never requeue or count it.
+            stopping = stop_requested.is_set() or cancelled.is_set()
+            if returncode and not stopping:
+                attempts[job["id"]] = attempt + 1
+                result["retry_attempt"] = attempt + 1
+                requeued = result["requeued"] = retry(
+                    job, attempt, reason, camera_pending if gpu is None else None)
+            if requeued:
+                # Attempt evidence only: the job is already back in the queue,
+                # so the run's result list waits for its final attempt.
+                try:
+                    dump_json(job_dir / "failed.json", result)
+                except OSError:
+                    fail_run()
+                    logging.exception("Could not write worker marker")
+                logging.info("END %s gpu=%s rc=%s %.1fs images=%s retry=%s", job["id"], gpu_label,
+                             returncode, result["wall_seconds"], result["output"]["image_files"], attempt + 1)
+                if retire_slot:
+                    return
+                continue
             try:
                 dump_json(job_dir / ("done.json" if returncode == 0 else "failed.json"), result)
             except OSError:
@@ -549,7 +819,9 @@ def _main(argv, resources):
                     logging.exception("Could not write progress")
             if progress_failed:
                 fail_run()
-            logging.info("END %s gpu=%s rc=%s %.1fs images=%s", job["id"], gpu["index"], returncode, result["wall_seconds"], result["output"]["image_files"])
+            logging.info("END %s gpu=%s rc=%s %.1fs images=%s", job["id"], gpu_label, returncode, result["wall_seconds"], result["output"]["image_files"])
+            if retire_slot:
+                return
 
     def request_stop(signum, _frame):
         nonlocal stop_signal
@@ -573,27 +845,54 @@ def _main(argv, resources):
             thread = threading.Thread(target=worker, args=(slot, slot_gpus[slot]), daemon=True)
             thread.start()
             threads.append(thread)
+        # Camera-only backfill is CPU work: it scales with cores, not GPU slots.
+        for index in range(min(camera_workers, camera_pending.qsize()) if camera_enabled else 0):
+            if stop_requested.is_set():
+                break
+            thread = threading.Thread(target=worker, args=(slots + index, None), daemon=True)
+            thread.start()
+            threads.append(thread)
         while any(t.is_alive() for t in threads):
             if stop_requested.is_set() and stop_deadline is None:
                 logging.warning("SCHEDULER_STOP_REQUEST signal=%s", signal.Signals(stop_signal).name)
                 failed.set()
                 cancel_active_workers()
-                stop_deadline = time.monotonic() + 70
+                stop_deadline = time.monotonic() + WORKER_STOP_SECONDS
             if stop_deadline is not None and time.monotonic() >= stop_deadline:
                 cleanup_timed_out = True
-                logging.error("Worker cleanup exceeded the 70-second stop deadline")
+                logging.error("Worker cleanup exceeded the %s-second stop deadline", WORKER_STOP_SECONDS)
                 break
             for thread in threads:
                 thread.join(timeout=0.2)
         wall = time.monotonic() - begin
         with lock:
             final_results = list(results)
-        result = {"success": not failed.is_set() and not stop_requested.is_set() and pending.empty(),
+        failed_jobs = [r["id"] for r in final_results if r["returncode"] != 0]
+        # Jobs still queued when every worker exited, e.g. a retry requeued by
+        # the last live slot just before that slot was retired.
+        unscheduled = []
+        for leftover in (pending, camera_pending):
+            while True:
+                try:
+                    unscheduled.append(leftover.get_nowait()["id"])
+                except queue.Empty:
+                    break
+        if unscheduled and not stop_requested.is_set():
+            logging.error("UNSCHEDULED %s jobs left in the queue: %s", len(unscheduled), unscheduled)
+        # ``failed`` means the run was aborted (budget or a fatal scheduler
+        # error). A job that exhausted its own retries without tripping the
+        # budget does not abort the dataset, but it does leave it incomplete,
+        # so the exit status must still report failure.
+        result = {"success": (not failed.is_set() and not stop_requested.is_set()
+                              and not unscheduled and not failed_jobs),
                   "wall_seconds": round(wall, 3),
                   "attempted_this_run": len(final_results) - len(resumed),
                   "completed_this_run": sum(r['returncode'] == 0 for r in final_results[len(resumed):]),
                   "resumed": len(resumed), 'completed': sum(r['returncode'] == 0 for r in final_results),
                   "planned": len(jobs), "results": final_results,
+                  "failed_jobs": failed_jobs, "failed_count": len(failed_jobs),
+                  "unscheduled_jobs": unscheduled, "retired_slots": list(retired_slots),
+                  "disk_low": disk_low.is_set(),
                   "image_files": sum(r["output"]["image_files"] for r in final_results),
                   "stop_signal": signal.Signals(stop_signal).name if stop_signal is not None else None,
                   "cleanup_timed_out": cleanup_timed_out}

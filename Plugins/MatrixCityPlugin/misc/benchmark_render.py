@@ -22,6 +22,9 @@ import sys
 import time
 import xml.etree.ElementTree as ET
 
+if __name__ == '__main__':
+    sys.dont_write_bytecode = True
+
 from gpu_devices import find_gpu, gpu_inventory
 
 

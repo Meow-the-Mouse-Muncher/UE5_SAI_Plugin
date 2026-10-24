@@ -58,8 +58,26 @@ def remaining_render_job(root, job, render):
     return result
 
 
+def resume_sequence_plans(plan, project):
+    """Locate approved CSVs in the current project after a deployment move."""
+    paths = []
+    for recorded in (plan.get('dataset') or {}).get('plan_files', {}):
+        path = Path(recorded).expanduser()
+        if (path.parent.parts[-2:] == ('Config', 'Dataset')
+                and path.name in ('train_sequences.csv', 'test_sequences.csv')):
+            local = Path(project).parent / 'Config/Dataset' / path.name
+            if local.is_file():
+                path = local
+        if not path.is_file():
+            raise FileNotFoundError(
+                'Cannot locate recorded sequence plan {}; restore the file or pass '
+                '--sequence-plan with an unchanged copy'.format(recorded))
+        paths.append(path.resolve())
+    return paths
+
+
 def compatible_resume(old, candidate, seed, sync_profile):
-    """Accept mount aliases and GPU changes; reject changes to image recipes."""
+    """Accept relocated CSVs and GPU changes; reject changes to image recipes."""
     identity = {'jobs': old['jobs'], 'render': old['render_config'],
                 'trajectory': old['trajectory_config'], 'seed': seed,
                 'sync_profile': sync_profile, 'dataset': old.get('dataset')}
@@ -72,8 +90,9 @@ def compatible_resume(old, candidate, seed, sync_profile):
                               ('jobs', 'render_config', 'trajectory_config', 'dataset')})
         data['render_config']['Output_Path'] = str(Path(data['render_config']['Output_Path']).resolve())
         if data['dataset']:
-            data['dataset']['plan_files'] = {str(Path(key).resolve()): value for key, value
-                                            in data['dataset'].get('plan_files', {}).items()}
+            # CSV locations are deployment details. Keep every content hash
+            # (including multiplicity) so a move cannot change the approved plan.
+            data['dataset']['plan_files'] = sorted(data['dataset'].get('plan_files', {}).values())
         return data
     return normalized(old) == normalized(candidate)
 

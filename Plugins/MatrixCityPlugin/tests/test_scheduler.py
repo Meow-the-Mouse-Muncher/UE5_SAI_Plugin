@@ -131,6 +131,32 @@ class SchedulerTests(unittest.TestCase):
             self.assertEqual(run_cmd_async.main(["--config_file", str(config), "--dry-run"]), 0)
             self.assertFalse(output.exists())
 
+    def test_fallback_probes_are_serialized_by_shared_lock(self):
+        """A failed shared probe must not turn into one local probe per worker at once."""
+        import gpu_devices
+        state = {"active": 0, "peak": 0}
+        guard = threading.Lock()
+
+        def probe(gpu_id, env, timeout, attempts):
+            with guard:
+                state["active"] += 1
+                state["peak"] = max(state["peak"], state["active"])
+            time.sleep(0.05)
+            with guard:
+                state["active"] -= 1
+            return gpu_id, env, {"uuid": gpu_id}
+
+        with tempfile.TemporaryDirectory() as folder, \
+                patch.object(gpu_devices, "resolve_vulkan_adapter", probe):
+            lock = str(Path(folder) / "vulkan_probe.lock")
+            threads = [threading.Thread(target=run_cmd_async.resolve_gpu_binding,
+                                        args=("GPU-{}".format(i), None, {}, 1, 1, lock)) for i in range(6)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(timeout=5)
+        self.assertEqual(state["peak"], 1)
+
     def test_interrupt_during_process_registration_cancels_new_child(self):
         """Ctrl-C must cover children whose Popen returned after active was read."""
         with tempfile.TemporaryDirectory() as folder:
@@ -161,6 +187,9 @@ class SchedulerTests(unittest.TestCase):
                 return fake
 
             def join(thread, timeout=None):
+                if thread.name.startswith("ThreadPoolExecutor"):
+                    # Resume-validation pool shutdown, not the worker loop.
+                    return original_join(thread, timeout)
                 threads.append(thread)
                 if first_join[0]:
                     first_join[0] = False

@@ -9,6 +9,9 @@ import subprocess
 import sys
 import time
 
+if __name__ == '__main__':
+    sys.dont_write_bytecode = True
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'Plugins/MatrixCityPlugin/misc'))
 from pipeline_config import dump_json, load_render_config, resolve_path
@@ -27,18 +30,20 @@ def main(argv=None):
     p.add_argument('--workers-per-gpu', default='auto')
     p.add_argument('--worker-vram-mb', type=int, default=9216)
     p.add_argument('--vram-target', type=float, default=0.9)
-    p.add_argument('--vram-budget-gb', type=float, default=70, help='Total estimated VRAM budget per GPU in GiB')
-    p.add_argument('--camera-export-workers', type=int, default=2)
+    p.add_argument('--vram-budget-gb', type=float, default=100, help='Total estimated VRAM budget per GPU in GiB')
+    p.add_argument('--camera-export-workers', default='auto', help='Concurrent Blender exporters; auto = CPU cores / 2')
     p.add_argument('--blender')
     p.add_argument('--timeout', type=float, default=0, help='Worker timeout in seconds; 0 disables it')
     p.add_argument('--dry-run', action='store_true')
     args = p.parse_args(argv)
     if (not 0 < args.vram_budget_gb < float('inf') or not 0 < args.vram_target <= 1
-            or args.worker_vram_mb < 1 or args.camera_export_workers < 1 or args.timeout < 0):
+            or args.worker_vram_mb < 1 or args.timeout < 0
+            or (args.camera_export_workers != 'auto'
+                and (not args.camera_export_workers.isdigit() or int(args.camera_export_workers) < 1))):
         p.error('Invalid memory budget, exporter count or timeout')
     config_path = resolve_path(args.config)
     config = json.loads(config_path.read_text())
-    configure_runtime(config, argv, entry_point=__file__)
+    configure_runtime(config, argv, entry_point=__file__, config_dir=config_path.parent)
     run = Path(args.run_dir).expanduser().resolve()
     previous_path = run / 'session.json'
     previous = json.loads(previous_path.read_text()) if previous_path.exists() else {}
@@ -145,7 +150,7 @@ def main(argv=None):
             # by the scheduler, which gives UE its cooperative cancellation window.
             if process is not None and process.poll() is None:
                 process.send_signal(signal.SIGINT)
-                process.wait(timeout=90)
+                process.wait(timeout=120)
             for sig, handler in handlers.items():
                 signal.signal(sig, handler)
 

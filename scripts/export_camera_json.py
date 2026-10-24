@@ -8,6 +8,9 @@ import shutil
 import subprocess
 import sys
 
+if __name__ == '__main__':
+    sys.dont_write_bytecode = True
+
 SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR))
 from camera_json_protocol import discover_jobs, load_jobs_manifest

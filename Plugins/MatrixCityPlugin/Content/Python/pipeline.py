@@ -1,3 +1,8 @@
+import sys
+
+# Unreal's embedded Python may ignore PYTHONDONTWRITEBYTECODE.
+sys.dont_write_bytecode = True
+
 import unreal
 import utils_sequencer  # 轨迹脚本
 import batch_utils  # 批量处理工具
